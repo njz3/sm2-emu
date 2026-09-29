@@ -1691,7 +1691,7 @@ int main(int argc, char** argv)
                         (unsigned long long)snd.unmapped_reads,
                         (unsigned long long)snd.unmapped_writes);
 
-            const hw::Scsp::Stats& scsp = the_scsp_board->scsp().stats();
+            const hw::ScspCore::Stats& scsp = the_scsp_board->scsp().stats();
             std::printf("scsp audio        : %llu sample(s) at %u Hz, peak %d/32767, "
                         "%llu dropped\n",
                         (unsigned long long)scsp.samples, the_sound->sample_rate(),

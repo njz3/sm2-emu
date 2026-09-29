@@ -123,6 +123,9 @@ public:
     [[nodiscard]] usize client_count() const { return m_clients.size(); }
     [[nodiscard]] const std::string& last_error() const { return m_last_error; }
 
+    /// The last open() failed because something else already listens on the port.
+    [[nodiscard]] bool address_in_use() const { return m_address_in_use; }
+
 private:
 #if defined(_WIN32)
     using Fd                       = std::uintptr_t;

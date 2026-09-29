@@ -2341,6 +2341,21 @@ void Gui::draw_network_tab(Config& config)
             config.outputs_network_port = static_cast<u32>(std::clamp(port, 1, 65535));
         }
     }
+    {
+        int port = static_cast<int>(config.outputs_network_udp_port);
+        ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::InputInt(tr_id("Announce port (UDP)"), &port)) {
+            config.outputs_network_udp_port = static_cast<u32>(std::clamp(port, 0, 65535));
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            tooltip(tr("When a game starts, announces it and the outputs port\n"
+                       "once to tools on this machine that wait for it, as\n"
+                       "Supermodel does (8001, which BackForceFeeder listens\n"
+                       "on). 0 turns it off."));
+        }
+    }
     ImGui::EndDisabled();
 
     ImGui::Checkbox(tr_id("Windows outputs (MAMEOutput messages)"), &config.outputs_windows);

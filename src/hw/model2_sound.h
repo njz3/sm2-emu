@@ -29,12 +29,13 @@
 #include "core/types.h"
 #include "cpu/bus.h"
 #include "cpu/m68000/m68000.h"
-#include "hw/scsp.h"
+#include "hw/scsp_core.h"
 #include "hw/scsp_dsp.h"
 #include "hw/dsbz80.h"
 #include "hw/dsb2.h"
 #include "hw/sound_board.h"
 
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
@@ -88,7 +89,7 @@ public:
     void midi_in(u8 value);
 
     /// Called when the SCSP sends a byte back to the host.
-    void set_midi_out_handler(Scsp::MidiOutHandler handler);
+    void set_midi_out_handler(ScspCore::MidiOutHandler handler);
 
     // -- audio ---------------------------------------------------------------
 
@@ -96,12 +97,12 @@ public:
     [[nodiscard]] std::span<const s16> pending_samples() const override { return m_pending; }
     void clear_pending_samples() override { m_pending.clear(); }
 
-    [[nodiscard]] u32 sample_rate() const override { return m_scsp.sample_rate(); }
+    [[nodiscard]] u32 sample_rate() const override { return m_scsp->sample_rate(); }
 
     /// SCSP slots currently keyed on. The Model 1 board counts MultiPCM channels
     /// instead; neither number means anything precise, they just say whether the
     /// board is making noise.
-    [[nodiscard]] u32 active_voices() const override { return m_scsp.active_slots(); }
+    [[nodiscard]] u32 active_voices() const override { return m_scsp->active_slots(); }
 
     // -- cpu::Bus ----------------------------------------------------------
     //
@@ -139,7 +140,7 @@ public:
 
     [[nodiscard]] const Counters& counters() const { return m_counters; }
     [[nodiscard]] const cpu::m68000::M68000& cpu() const { return m_cpu; }
-    [[nodiscard]] const Scsp& scsp() const { return m_scsp; }
+    [[nodiscard]] const ScspCore& scsp() const { return *m_scsp; }
     [[nodiscard]] std::span<const u8> ram() const { return m_ram; }
 
     /// Save/restore the whole sound board: the 68000, the SCSP, both MPEG
@@ -169,8 +170,9 @@ private:
     cpu::m68000::M68000 m_cpu;
 
     /// Constructed with *this as its memory. Safe in the initialiser list: the
-    /// SCSP's constructor only stores the pointer.
-    Scsp m_scsp;
+    /// SCSP's constructor only stores the pointer. Behind ScspCore so another
+    /// emulation of the chip can take its place (SCSP.md).
+    std::unique_ptr<ScspCore> m_scsp;
 
     /// The MPEG music boards, present only on DSB titles. A set carries at
     /// most one; both are inert otherwise. m_dsb is the Z80 board (stcc),
