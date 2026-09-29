@@ -319,6 +319,10 @@ struct Config {
     /// MAME's port, which the tools look for.
     u32 net_outputs_port = 8000;
 
+    /// Where Supermodel's UDP announcement of a starting game goes, which
+    /// BackForceFeeder waits for. 8001 is Supermodel's; 0 sends none.
+    u32 net_outputs_udp_port = 8001;
+
     // -- paths -------------------------------------------------------------
 
     /// ROM archives; a game named with no path loads <rom_dir>/<name>.{zip,7z}.

@@ -48,13 +48,13 @@ avis, pas une consultation.
 
 ### Point d'intégration unique
 
-Seule [Model2Sound](src/hw/model2_sound.h) instancie le SCSP (`Scsp m_scsp`, ligne 173).
-[main.cpp:1605](src/main.cpp:1605) lit en plus `scsp().stats()` pour le rapport sans
-affichage. Ce qu'utilise la carte son :
+Seule [Model2Sound](src/hw/model2_sound.h) instancie le SCSP (`m_scsp`). `main.cpp` lit
+en plus `scsp().stats()` pour le rapport sans affichage. Ce qu'utilise la carte son,
+et donc ce que déclare [ScspCore](src/hw/scsp_core.h) :
 
 | Appel | Rôle |
 |---|---|
-| `Scsp(ScspMemory&, clock)`, `reset()` | construction, remise à zéro |
+| constructeur `(ScspMemory&, clock)`, `reset()` | construction, remise à zéro |
 | `read(offset)`, `write(offset, data, mem_mask)` | registres, adresse en mots (accès octet par masque) |
 | `generate(out, 1)` | un sample stéréo à 44 100 Hz, appelé tous les 256 cycles du 68000 |
 | `midi_in(byte)`, `set_midi_out_handler` | liaison série avec la carte CPU |
@@ -63,17 +63,21 @@ affichage. Ce qu'utilise la carte son :
 | `sample_rate()`, `active_slots()` | fréquence, et nombre de voix pour la contention de bus ([model2_sound.cpp:296](src/hw/model2_sound.cpp:296)) |
 | `stats()`, `serialize(Archive&)` | test sans affichage, save states |
 
-### Découpage proposé
+### Découpage
 
 ```
-src/hw/scsp_core.h        interface ScspCore (les appels ci-dessus, virtuels)
-src/hw/scsp.h/.cpp        ScspMame : le cœur actuel, inchangé hormis « : public ScspCore »
+src/hw/scsp_core.h        interface ScspCore (les appels ci-dessus, virtuels)       ✅ étape 1
+src/hw/scsp.h/.cpp        ScspMame : le cœur actuel, corps de fonctions inchangés  ✅ étape 1
 src/hw/scsp_dsp.h/.cpp    DSP du cœur mame, inchangé
 src/hw/scsp_mdfn.h/.cpp   ScspMednafen : le nouveau cœur (slots, EG, LFO, DSP, timers, MIDI)
 ```
 
-- `Model2Sound` détient un `std::unique_ptr<ScspCore>` créé selon la configuration.
+- `Model2Sound` détient un `std::unique_ptr<ScspCore>` ([model2_sound.h](src/hw/model2_sound.h)),
+  pour l'instant toujours un `ScspMame`. L'étape 2 le fera choisir par la configuration.
   Le coût d'un appel virtuel par sample est négligeable (44 100 appels/s).
+- `ScspCore::Stats` et les types de callbacks (`IrqHandler`, `MainIrqHandler`,
+  `MidiOutHandler`) vivent dans l'interface ; `write()` n'a plus de masque par défaut
+  (`Model2Sound` le passe toujours).
 - Le cœur actuel garde ses noms et sa structure, pour rester comparable à MAME.
 - **La bascule s'applique au chargement du jeu (ou au reset)**, pas à chaud : l'état
   interne d'un cœur ne se transpose pas dans l'autre.
@@ -123,23 +127,39 @@ src/hw/scsp_mdfn.h/.cpp   ScspMednafen : le nouveau cœur (slots, EG, LFO, DSP, 
 
 Le mode sans affichage existe déjà : `--boot-test N` fait tourner N images, et
 `--dump-audio fichier.wav` enregistre tout le son. Le générateur de bruit du cœur
-mame a une graine fixe, donc deux exécutions identiques donnent le même WAV.
+mame a une graine fixe, donc deux exécutions identiques donnent le même WAV, à
+condition de partir d'une NVRAM vierge à chaque fois.
+
+[tools/scsp_ab.ps1](tools/scsp_ab.ps1) fait tout cela pour une liste de jeux (NVRAM
+vierge, `--config` séparé pour ne pas réécrire le `sm2-emu.ini` de l'utilisateur,
+empreintes SHA-256 des WAV dans `build/scsp_ab/<tag>.hashes`) et compare deux tags :
 
 ```
-sm2-emu --boot-test 3600 --scsp-core mame     --dump-audio hotd_mame.wav     hotd.zip
-sm2-emu --boot-test 3600 --scsp-core mednafen --dump-audio hotd_mednafen.wav hotd.zip
+pwsh tools/scsp_ab.ps1 -Tag before -Roms <dossier des ROMs>
+pwsh tools/scsp_ab.ps1 -Tag after  -Roms <dossier des ROMs> -Against before
+pwsh tools/scsp_ab.ps1 -Tag mdfn   -Roms <dossier des ROMs> -Extra '--scsp-core','mednafen'
 ```
 
-- [ ] Script de comparaison (niveau RMS, pic, spectre, écoute alternée).
-- [ ] Étape 1 validée par un WAV **identique au bit près** avant et après le passage
-      par l'interface `ScspCore`.
+`tools/` est ignoré par le `.gitignore` du projet : `git add -f tools/scsp_ab.ps1`
+pour versionner le script.
+
+La liste par défaut compte 16 jeux dont le programme son tourne dans les 1 500
+premières images (26 s) : vf2, hotd, stcc, vstriker, dynamcop, skytargt, fvipers,
+zerogun, von, gunblade, vcop2, sgt24h, topskatr, dynabb97, bel, motoraid. Indy 500,
+Last Bronx, Sega Water Ski et Planet Harriers restent muets sur cette durée.
+
+- [x] Comparaison au bit près (empreintes), pour les étapes censées être inaudibles.
+- [ ] Comparaison mesurée (niveau RMS, pic, spectre) et écoute alternée, pour le
+      nouveau cœur.
+- [x] Étape 1 validée : WAV **identiques au bit près** avant et après le passage par
+      l'interface `ScspCore`.
 
 ## Plan par étapes
 
 | # | Étape | Statut | Notes |
 |---|---|---|---|
 | 0 | Décision licence | à faire | voir plus haut |
-| 1 | Interface `ScspCore` ; le cœur actuel devient `ScspMame` | à faire | aucun changement audible attendu (WAV identique) |
+| 1 | Interface `ScspCore` ; le cœur actuel devient `ScspMame` | ✅ fait | 20 WAV identiques au bit près, save states OK |
 | 2 | Sélection (ini, CLI, CMake) + identifiant de cœur dans les save states | à faire | |
 | 3 | Squelette du nouveau cœur : registres, DMA, timers, interruptions, MIDI | à faire | objectif : le driver son démarre, même muet |
 | 4 | Lecture des slots : phase, interpolation, boucles, 8/16 bits, bruit LFSR, SBCTL | à faire | |
@@ -228,3 +248,10 @@ Légende : ✅ correct, ⚠️ différence audible, ❌ cassé, — non testé.
 
 - **2026-09-29** : création du fichier. Comparaison initiale des deux cœurs, choix d'une
   interface `ScspCore` avec bascule au chargement du jeu, point licence relevé.
+- **2026-09-29** : étape 1. Nouvelle interface [scsp_core.h](src/hw/scsp_core.h) ; `Scsp`
+  renommé `ScspMame` et dérivé de `ScspCore` (seules les déclarations et le préfixe
+  `ScspMame::` changent, les corps de fonctions restent ceux de MAME) ; `Model2Sound`
+  passe par un `std::unique_ptr<ScspCore>`. Validation : 20 jeux capturés sur 1 500
+  images avant et après, WAV identiques au bit près (16 sonores, 4 muets), et
+  `--savestate-test 900` PASS sur vf2 et hotd. Format des save states inchangé.
+  Ajout de [tools/scsp_ab.ps1](tools/scsp_ab.ps1).

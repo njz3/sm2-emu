@@ -3,7 +3,7 @@
 // Ported from MAME's src/devices/sound/scsp.cpp (BSD-3-Clause, copyright-holders
 // ElSemi, R. Belmont). See scsp.h for the list of changes; in summary:
 //
-//   scsp_device::                     Scsp::
+//   scsp_device::                     ScspMame::
 //   m_irq_cb(l, ASSERT_LINE)          irq_cb(l, true)
 //   sound_stream                      a caller-supplied s16 buffer
 //   emu_timer                         deadlines on m_sample_count
@@ -156,7 +156,7 @@ constexpr u32 kMidiBitsPerByte = 10;
 // Construction and reset
 // ---------------------------------------------------------------------------
 
-Scsp::Scsp(ScspMemory& memory, u32 clock)
+ScspMame::ScspMame(ScspMemory& memory, u32 clock)
     : m_memory(&memory),
       m_clock(clock != 0 ? clock : kDefaultClock),
       m_BUFPTR(0),
@@ -213,7 +213,7 @@ Scsp::Scsp(ScspMemory& memory, u32 clock)
 	init();
 }
 
-void Scsp::reset()
+void ScspMame::reset()
 {
 	std::memset(&m_Slots, 0, sizeof(m_Slots));
 	std::memset(&m_udata.data, 0, sizeof(m_udata.data));
@@ -242,7 +242,7 @@ void Scsp::reset()
 	main_irq_cb(false);
 }
 
-void Scsp::serialize(Archive& ar)
+void ScspMame::serialize(Archive& ar)
 {
 	ar.bytes(m_udata.datab, sizeof(m_udata.datab));
 
@@ -311,19 +311,19 @@ void Scsp::serialize(Archive& ar)
 // MAME's devcb objects are callable whether or not anything is bound; std::function
 // is not, so the null check lives here rather than at every call site.
 
-void Scsp::irq_cb(int level, bool assert)
+void ScspMame::irq_cb(int level, bool assert)
 {
 	if (m_irq_cb)
 		m_irq_cb(level, assert);
 }
 
-void Scsp::main_irq_cb(bool assert)
+void ScspMame::main_irq_cb(bool assert)
 {
 	if (m_main_irq_cb)
 		m_main_irq_cb(assert);
 }
 
-void Scsp::warn_dma_gate()
+void ScspMame::warn_dma_gate()
 {
 	if (!m_warned_dma_gate)
 	{
@@ -332,7 +332,7 @@ void Scsp::warn_dma_gate()
 	}
 }
 
-u32 Scsp::next_random()
+u32 ScspMame::next_random()
 {
 	// xorshift32. Upstream uses MAME's own generator; the only requirements are
 	// that it is cheap and that it is not correlated with anything, and being
@@ -343,7 +343,7 @@ u32 Scsp::next_random()
 	return m_random_state;
 }
 
-u8 Scsp::DecodeSCI(u8 irq)
+u8 ScspMame::DecodeSCI(u8 irq)
 {
 	u8 SCI = 0;
 	u8 v;
@@ -356,7 +356,7 @@ u8 Scsp::DecodeSCI(u8 irq)
 	return SCI;
 }
 
-void Scsp::CheckPendingIRQ()
+void ScspMame::CheckPendingIRQ()
 {
 	u32 pend = m_udata.data[0x20/2];
 	u32 en = m_udata.data[0x1e/2];
@@ -400,7 +400,7 @@ void Scsp::CheckPendingIRQ()
 	irq_cb(0, false);
 }
 
-void Scsp::MainCheckPendingIRQ(u16 irq_type)
+void ScspMame::MainCheckPendingIRQ(u16 irq_type)
 {
 	m_mcipd |= irq_type;
 
@@ -412,7 +412,7 @@ void Scsp::MainCheckPendingIRQ(u16 irq_type)
 		main_irq_cb(false);
 }
 
-void Scsp::ResetInterrupts()
+void ScspMame::ResetInterrupts()
 {
 	u32 reset = m_udata.data[0x22/2];
 
@@ -451,7 +451,7 @@ void Scsp::ResetInterrupts()
 // the clock, and the timers reduce to deadlines on the sample counter. That also
 // removes the only reason this device would need a scheduler.
 
-void Scsp::kick_timer(int which, u16 value)
+void ScspMame::kick_timer(int which, u16 value)
 {
 	m_TimPris[which] = 1 << ((value >> 8) & 0x7);
 	m_TimCnt[which]  = (value & 0xff) << 8;
@@ -465,7 +465,7 @@ void Scsp::kick_timer(int which, u16 value)
 	}
 }
 
-void Scsp::service_timers()
+void ScspMame::service_timers()
 {
 	for (int which = 0; which < 3; ++which)
 	{
@@ -477,7 +477,7 @@ void Scsp::service_timers()
 	}
 }
 
-void Scsp::timer_expired(int which)
+void ScspMame::timer_expired(int which)
 {
 	// Upstream's timerA_cb, timerB_cb and timerC_cb, which differ only in which
 	// SCIPD bit and which register's low byte they touch -- and in that only
@@ -505,7 +505,7 @@ void Scsp::timer_expired(int which)
 // construction, so the byte is carried whole and only the byte period is kept.
 // That period matters: it is what limits how fast the host can feed commands.
 
-void Scsp::begin_midi_transmit(u8 value)
+void ScspMame::begin_midi_transmit(u8 value)
 {
 	m_midi_transmit_byte = value;
 	m_midi_out_countdown = (sample_rate() * kMidiBitsPerByte + kMidiBaud / 2) / kMidiBaud;
@@ -513,7 +513,7 @@ void Scsp::begin_midi_transmit(u8 value)
 		m_midi_out_countdown = 1;
 }
 
-void Scsp::service_midi_out()
+void ScspMame::service_midi_out()
 {
 	if (m_midi_out_countdown == 0)
 		return;
@@ -534,7 +534,7 @@ void Scsp::service_midi_out()
 		begin_midi_transmit(m_MidiOutStack[m_MidiOutR]);
 }
 
-void Scsp::midi_in(u8 value)
+void ScspMame::midi_in(u8 value)
 {
 	// Upstream's rcv_complete, minus the bit assembly.
 	m_MidiStack[m_MidiW++] = value;
@@ -544,19 +544,19 @@ void Scsp::midi_in(u8 value)
 	CheckPendingIRQ();
 }
 
-int Scsp::Get_AR(int base, int R)
+int ScspMame::Get_AR(int base, int R)
 {
 	int Rate = base + (R << 1);
 	return m_ARTABLE[std::clamp(Rate, 0, 63)];
 }
 
-int Scsp::Get_DR(int base, int R)
+int ScspMame::Get_DR(int base, int R)
 {
 	int Rate = base + (R << 1);
 	return m_DRTABLE[std::clamp(Rate, 0, 63)];
 }
 
-void Scsp::Compute_EG(SCSP_SLOT *slot)
+void ScspMame::Compute_EG(SCSP_SLOT *slot)
 {
 	int octave = (OCT(slot) ^ 8) - 8;
 	int rate;
@@ -574,7 +574,7 @@ void Scsp::Compute_EG(SCSP_SLOT *slot)
 	slot->EG.EGHOLD = EGHOLD(slot);
 }
 
-int Scsp::EG_Update(SCSP_SLOT *slot)
+int ScspMame::EG_Update(SCSP_SLOT *slot)
 {
 	switch (slot->EG.state)
 	{
@@ -624,7 +624,7 @@ int Scsp::EG_Update(SCSP_SLOT *slot)
 	return (slot->EG.volume >> EG_SHIFT) << (SHIFT - 10);
 }
 
-u32 Scsp::Step(SCSP_SLOT *slot)
+u32 ScspMame::Step(SCSP_SLOT *slot)
 {
 	int octave = (OCT(slot) ^ 8) - 8 + SHIFT - 10;
 	u32 Fn = FNS(slot) + (1 << 10);
@@ -641,7 +641,7 @@ u32 Scsp::Step(SCSP_SLOT *slot)
 }
 
 
-void Scsp::Compute_LFO(SCSP_SLOT *slot)
+void ScspMame::Compute_LFO(SCSP_SLOT *slot)
 {
 	if (PLFOS(slot) != 0)
 		LFO_ComputeStep(&(slot->PLFO), LFOF(slot), PLFOWS(slot), PLFOS(slot), 0);
@@ -649,7 +649,7 @@ void Scsp::Compute_LFO(SCSP_SLOT *slot)
 		LFO_ComputeStep(&(slot->ALFO), LFOF(slot), ALFOWS(slot), ALFOS(slot), 1);
 }
 
-void Scsp::StartSlot(SCSP_SLOT *slot)
+void ScspMame::StartSlot(SCSP_SLOT *slot)
 {
 	++m_stats.slot_starts;
 	if (!slot->active)
@@ -667,7 +667,7 @@ void Scsp::StartSlot(SCSP_SLOT *slot)
 	Compute_LFO(slot);
 }
 
-void Scsp::StopSlot(SCSP_SLOT *slot,int keyoff)
+void ScspMame::StopSlot(SCSP_SLOT *slot,int keyoff)
 {
 	if (keyoff /*&& slot->EG.state!=SCSP_RELEASE*/)
 	{
@@ -682,7 +682,7 @@ void Scsp::StopSlot(SCSP_SLOT *slot,int keyoff)
 	slot->udata.data[0] &= ~0x800;
 }
 
-void Scsp::init()
+void ScspMame::init()
 {
 	int i;
 
@@ -793,7 +793,7 @@ void Scsp::init()
 	m_TimCnt[2] = 0xffff;
 }
 
-void Scsp::UpdateSlotReg(int s,int r)
+void ScspMame::UpdateSlotReg(int s,int r)
 {
 	SCSP_SLOT *slot = m_Slots + s;
 	switch (r & 0x3f)
@@ -835,7 +835,7 @@ void Scsp::UpdateSlotReg(int s,int r)
 	}
 }
 
-void Scsp::UpdateReg(int reg)
+void ScspMame::UpdateReg(int reg)
 {
 	switch (reg & 0x3f)
 	{
@@ -1006,11 +1006,11 @@ void Scsp::UpdateReg(int reg)
 	}
 }
 
-void Scsp::UpdateSlotRegR(int slot,int reg)
+void ScspMame::UpdateSlotRegR(int slot,int reg)
 {
 }
 
-void Scsp::UpdateRegR(int reg)
+void ScspMame::UpdateRegR(int reg)
 {
 	switch (reg & 0x3f)
 	{
@@ -1069,7 +1069,7 @@ void Scsp::UpdateRegR(int reg)
 	}
 }
 
-void Scsp::w16(u32 addr, u16 val)
+void ScspMame::w16(u32 addr, u16 val)
 {
 	addr &= 0xffff;
 	if (addr < 0x400)
@@ -1116,7 +1116,7 @@ void Scsp::w16(u32 addr, u16 val)
 	}
 }
 
-u16 Scsp::r16(u32 addr)
+u16 ScspMame::r16(u32 addr)
 {
 	u16 v = 0;
 	addr &= 0xffff;
@@ -1220,7 +1220,7 @@ u16 Scsp::r16(u32 addr)
 }
 
 
-inline s32 Scsp::UpdateSlot(SCSP_SLOT *slot)
+inline s32 ScspMame::UpdateSlot(SCSP_SLOT *slot)
 {
 	if (SSCTL(slot) == 3) // manual says cannot be used
 	{
@@ -1396,7 +1396,7 @@ inline s32 Scsp::UpdateSlot(SCSP_SLOT *slot)
 	return sample;
 }
 
-void Scsp::DoMasterSamples(s16 *output, u32 frames)
+void ScspMame::DoMasterSamples(s16 *output, u32 frames)
 {
 	for (int s = 0; s < int(frames); ++s)
 	{
@@ -1508,7 +1508,7 @@ void Scsp::DoMasterSamples(s16 *output, u32 frames)
 
 // TODO: this needs to be timer-ized
 // Very likely this is burst too.
-void Scsp::exec_dma()
+void ScspMame::exec_dma()
 {
 	static u16 tmp_dma[3];
 	int i;
@@ -1607,7 +1607,7 @@ void Scsp::exec_dma()
 // CPU for the same interval, which puts the register access at most a scanline
 // ahead of the audio instead of exactly at it. See Model2Sound::run.
 
-void Scsp::set_slot_gains(const u16 gains[32])
+void ScspMame::set_slot_gains(const u16 gains[32])
 {
 	bool any = false;
 	for (int i = 0; i < 32; ++i)
@@ -1619,12 +1619,12 @@ void Scsp::set_slot_gains(const u16 gains[32])
 	m_slot_gain_active = any;
 }
 
-u16 Scsp::read(u32 offset)
+u16 ScspMame::read(u32 offset)
 {
 	return r16(offset * 2);
 }
 
-void Scsp::write(u32 offset, u16 data, u16 mem_mask)
+void ScspMame::write(u32 offset, u16 data, u16 mem_mask)
 {
 	u16 tmp = r16(offset * 2);
 	// MAME's COMBINE_DATA.
@@ -1632,7 +1632,7 @@ void Scsp::write(u32 offset, u16 data, u16 mem_mask)
 	w16(offset * 2, tmp);
 }
 
-void Scsp::generate(s16 *output, u32 frames)
+void ScspMame::generate(s16 *output, u32 frames)
 {
 	if (frames == 0)
 		return;
@@ -1676,7 +1676,7 @@ static const float ASCALE[8] = {0.0f,0.4f,0.8f,1.5f,3.0f,6.0f,12.0f,24.0f};
 static const float PSCALE[8] = {0.0f,7.0f,13.5f,27.0f,55.0f,112.0f,230.0f,494.0f};
 
 
-void Scsp::LFO_Init()
+void ScspMame::LFO_Init()
 {
 	for (int i = 0; i < 256; ++i)
 	{
@@ -1744,7 +1744,7 @@ void Scsp::LFO_Init()
 	}
 }
 
-s32 Scsp::PLFO_Step(SCSP_LFO_t *LFO)
+s32 ScspMame::PLFO_Step(SCSP_LFO_t *LFO)
 {
 	int p;
 	LFO->phase += LFO->phase_step;
@@ -1756,7 +1756,7 @@ s32 Scsp::PLFO_Step(SCSP_LFO_t *LFO)
 	return p << (SHIFT - LFO_SHIFT);
 }
 
-s32 Scsp::ALFO_Step(SCSP_LFO_t *LFO)
+s32 ScspMame::ALFO_Step(SCSP_LFO_t *LFO)
 {
 	int p;
 	LFO->phase += LFO->phase_step;
@@ -1768,7 +1768,7 @@ s32 Scsp::ALFO_Step(SCSP_LFO_t *LFO)
 	return p << (SHIFT - LFO_SHIFT);
 }
 
-void Scsp::LFO_ComputeStep(SCSP_LFO_t *LFO,u32 LFOF,u32 LFOWS,u32 LFOS,int ALFO)
+void ScspMame::LFO_ComputeStep(SCSP_LFO_t *LFO,u32 LFOF,u32 LFOWS,u32 LFOS,int ALFO)
 {
 	float step = (float) LFOFreq[LFOF] * 256.0f / 44100.0f;
 	LFO->phase_step = (u32) ((float) (1 << LFO_SHIFT) * step);

@@ -29,6 +29,16 @@ namespace {
 /// it. A second of outputs is a few kilobytes at most, so it is not just slow.
 constexpr usize kMaxUnsent = 64 * 1024;
 
+/// How often the UDP announcement goes out while nobody is connected.
+/// BackForceFeeder listens for it a second at a time between its TCP attempts,
+/// so a single datagram can fall in the gap.
+constexpr std::chrono::seconds kAnnounceInterval{2};
+
+[[nodiscard]] bool is_loopback(const std::string& ip)
+{
+    return ip.starts_with("127.");
+}
+
 /// A lamp-port bit that a cabinet gives a name, on top of the lampN every bit
 /// is published as.
 struct NamedBit {
@@ -76,23 +86,39 @@ NetOutputs::~NetOutputs()
     stop();
 }
 
-void NetOutputs::sync(const std::string& game, const std::string& bind_ip, u16 port)
+void NetOutputs::sync(const std::string& game, const std::string& bind_ip, u16 port,
+                      u16 announce_port)
 {
     if (game == m_game && bind_ip == m_bind_ip && port == m_port) {
+        if (announce_port != m_announce_port) {
+            // service() announces straight away on the new port.
+            m_announce_port   = announce_port;
+            m_announce_failed = false;
+            m_next_announce   = {};
+        }
         return;
     }
 
     stop();
-    m_game    = game;
-    m_bind_ip = bind_ip;
-    m_port    = port;
+    m_game          = game;
+    m_bind_ip       = bind_ip;
+    m_port          = port;
+    m_announce_port = announce_port;
     if (game.empty()) {
         return;
     }
 
     if (!m_listener.open(bind_ip, port)) {
-        m_error = m_listener.last_error();
-        SM2_WARN("cabinet outputs disabled: %s", m_error.c_str());
+        if (m_listener.address_in_use()) {
+            m_error = "port " + std::to_string(port) + " is already in use";
+            SM2_WARN("cabinet outputs disabled: port %u is already in use on %s. Something "
+                     "else listens there (another emulator's outputs, or a second "
+                     "sm2-emu); close it, or set net_outputs_port to a free port.",
+                     static_cast<unsigned>(port), bind_ip.empty() ? "*" : bind_ip.c_str());
+        } else {
+            m_error = m_listener.last_error();
+            SM2_WARN("cabinet outputs disabled: %s", m_error.c_str());
+        }
         return;
     }
     SM2_INFO("cabinet outputs: serving '%s' on %s:%u", game.c_str(),
@@ -111,10 +137,14 @@ void NetOutputs::stop()
     }
     m_clients.clear();
     m_listener.close();
+    m_announcer.close();
     m_values.clear();
     m_game.clear();
     m_bind_ip.clear();
-    m_port = 0;
+    m_port            = 0;
+    m_announce_port   = 0;
+    m_announce_failed = false;
+    m_next_announce   = {};
     m_error.clear();
 }
 
@@ -166,6 +196,42 @@ void NetOutputs::service()
     if (m_clients.size() != before) {
         SM2_INFO("cabinet outputs: client disconnected (%zu connected)", m_clients.size());
     }
+
+    if (m_clients.empty() && m_announce_port != 0 && !m_announce_failed
+        && std::chrono::steady_clock::now() >= m_next_announce) {
+        announce();
+    }
+}
+
+void NetOutputs::announce()
+{
+    // A server on the loopback cannot be reached from another machine, so it
+    // is not advertised to the LAN either.
+    const bool        loopback    = is_loopback(m_bind_ip);
+    const std::string destination = loopback ? "127.0.0.1" : "255.255.255.255";
+
+    if (!m_announcer.valid()) {
+        const bool opened = m_announcer.open(loopback ? "127.0.0.1" : m_bind_ip, 0)
+                         && (loopback || m_announcer.set_broadcast(true));
+        if (!opened) {
+            m_announce_failed = true;
+            SM2_WARN("cabinet outputs: no UDP announcement: %s",
+                     m_announcer.last_error().c_str());
+            m_announcer.close();
+            return;
+        }
+        SM2_INFO("cabinet outputs: announcing '%s' to %s:%u (UDP) until a tool connects",
+                 m_game.c_str(), destination.c_str(), static_cast<unsigned>(m_announce_port));
+    }
+
+    // Supermodel's datagram, two lines: the game, then where its server listens.
+    const std::string text = "mame_start = " + m_game + "\rtcp = " + std::to_string(m_port) + "\r";
+    const auto* bytes      = reinterpret_cast<const u8*>(text.data());
+    if (!m_announcer.send_to({bytes, text.size()}, destination, m_announce_port)) {
+        SM2_TRACE("cabinet outputs: UDP announcement not sent: %s",
+                  m_announcer.last_error().c_str());
+    }
+    m_next_announce = std::chrono::steady_clock::now() + kAnnounceInterval;
 }
 
 void NetOutputs::queue(Client& client, std::string_view name, std::string_view value)

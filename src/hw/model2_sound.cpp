@@ -19,6 +19,7 @@
 
 #include "core/archive.h"
 #include "core/log.h"
+#include "hw/scsp.h"
 
 #include <algorithm>
 #include <array>
@@ -84,7 +85,8 @@ constexpr usize kResetVectorBytes = 16;
 
 }  // namespace
 
-Model2Sound::Model2Sound() : m_cpu(*this), m_scsp(*this, kScspClock)
+Model2Sound::Model2Sound()
+    : m_cpu(*this), m_scsp(std::make_unique<ScspMame>(*this, kScspClock))
 {
     m_ram.assign(kRamSize, 0);
     m_pending.reserve(kMaxPendingFrames * 2);
@@ -92,7 +94,7 @@ Model2Sound::Model2Sound() : m_cpu(*this), m_scsp(*this, kScspClock)
     // The SCSP's interrupts go to the sound 68000, and only there: on Model 2 the
     // main_irq callback, which on a Saturn would reach the SH-2, is left unwired,
     // as MAME leaves it. The host's sound interrupt comes from the UART instead.
-    m_scsp.set_irq_handler([this](int level, bool assert) {
+    m_scsp->set_irq_handler([this](int level, bool assert) {
         if (level <= 0) {
             m_cpu.clear_irq_lines();
             return;
@@ -119,16 +121,16 @@ void Model2Sound::attach_dsb2(std::span<const u8> dsb_program, std::span<const u
     m_dsb2.attach(dsb_program, dsb_mpeg);
 }
 
-void Model2Sound::set_midi_out_handler(Scsp::MidiOutHandler handler)
+void Model2Sound::set_midi_out_handler(ScspCore::MidiOutHandler handler)
 {
-    m_scsp.set_midi_out_handler(std::move(handler));
+    m_scsp->set_midi_out_handler(std::move(handler));
 }
 
 void Model2Sound::midi_in(u8 value)
 {
     // The host serial link drives both the SCSP's MIDI port and, on the sets
     // that carry one, the DSB. MAME fans the same txd out to both.
-    m_scsp.midi_in(value);
+    m_scsp->midi_in(value);
     m_dsb.write_txd(value);
     m_dsb2.write_txd(value);
 }
@@ -146,7 +148,7 @@ void Model2Sound::reset()
     m_counters     = Counters{};
     m_pending.clear();
 
-    m_scsp.reset();
+    m_scsp->reset();
     m_dsb.reset();
     m_dsb2.reset();
 
@@ -165,7 +167,7 @@ void Model2Sound::serialize(Archive& ar)
 {
     ar.bytes(m_ram.data(), m_ram.size());
     m_cpu.serialize(ar);
-    m_scsp.serialize(ar);
+    m_scsp->serialize(ar);
     m_dsb.serialize(ar);
     m_dsb2.serialize(ar);
     // Retired per-slot balance state, kept so existing save states still load.
@@ -219,11 +221,11 @@ void Model2Sound::run(u32 host_cycles)
     // produced. Inert -- and free -- for the sets without one.
     if (m_dsb.present()) {
         m_dsb.run(host_cycles);
-        m_dsb.mix(m_pending.data() + offset, frames, m_scsp.sample_rate());
+        m_dsb.mix(m_pending.data() + offset, frames, m_scsp->sample_rate());
     }
     if (m_dsb2.present()) {
         m_dsb2.run(host_cycles);
-        m_dsb2.mix(m_pending.data() + offset, frames, m_scsp.sample_rate());
+        m_dsb2.mix(m_pending.data() + offset, frames, m_scsp->sample_rate());
     }
 
     // Nothing draining the buffer means a headless run. The SCSP still has to be
@@ -242,7 +244,7 @@ void Model2Sound::generate_sample()
 {
     const usize offset = m_pending.size();
     m_pending.resize(offset + 2);
-    m_scsp.generate(m_pending.data() + offset, 1);
+    m_scsp->generate(m_pending.data() + offset, 1);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +299,7 @@ void Model2Sound::bus_wait(u32 address)
 {
     if (address < kRamBase + kRamSize
         || (address >= kScspBase && address < kScspBase + kScspSize)) {
-        const u32 contention = (kContentionCycles * m_scsp.active_slots() + 16) / 32;
+        const u32 contention = (kContentionCycles * m_scsp->active_slots() + 16) / 32;
         m_cpu.stall(static_cast<s32>(kBusWaitCycles + contention));
     }
 }
@@ -346,7 +348,7 @@ u16 Model2Sound::read16(u32 address)
 
     if (address >= kScspBase && address < kScspBase + kScspSize) {
         ++m_counters.scsp_reads;
-        return m_scsp.read((address - kScspBase) >> 1);
+        return m_scsp->read((address - kScspBase) >> 1);
     }
 
     // The banking register is write-only. MAME maps no reader at all, so a read
@@ -410,7 +412,7 @@ void Model2Sound::configure_balance(const std::string& game_name)
     if (it != kFlatGain.end()) {
         std::array<u16, 32> gains;
         gains.fill(it->second);
-        m_scsp.set_slot_gains(gains.data());
+        m_scsp->set_slot_gains(gains.data());
     }
 }
 
@@ -433,7 +435,7 @@ void Model2Sound::write16(u32 address, u16 value)
 
     if (address >= kScspBase && address < kScspBase + kScspSize) {
         ++m_counters.scsp_writes;
-        m_scsp.write((address - kScspBase) >> 1, value, 0xffff);
+        m_scsp->write((address - kScspBase) >> 1, value, 0xffff);
         return;
     }
 
@@ -473,7 +475,7 @@ void Model2Sound::write8(u32 address, u8 value)
         const u16 mask = (masked & 1) != 0 ? u16{0x00ff} : u16{0xff00};
         const u16 wide = (masked & 1) != 0 ? static_cast<u16>(value)
                                            : static_cast<u16>(value << 8);
-        m_scsp.write((masked - kScspBase) >> 1, wide, mask);
+        m_scsp->write((masked - kScspBase) >> 1, wide, mask);
         return;
     }
 

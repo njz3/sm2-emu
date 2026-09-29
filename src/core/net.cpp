@@ -263,6 +263,25 @@ void UdpSocket::close()
     }
 }
 
+bool UdpSocket::set_broadcast(bool enable)
+{
+    if (m_fd == kInvalid) return false;
+
+    const int value = enable ? 1 : 0;
+    if (setsockopt(
+#if defined(_WIN32)
+            static_cast<SOCKET>(m_fd),
+#else
+            m_fd,
+#endif
+            SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&value), sizeof value)
+        != 0) {
+        m_last_error = last_socket_error();
+        return false;
+    }
+    return true;
+}
+
 bool UdpSocket::send_to(std::span<const u8> data, const std::string& dest_ip, u16 port)
 {
     if (m_fd == kInvalid) return false;
@@ -442,6 +461,7 @@ TcpListener::~TcpListener()
 bool TcpListener::open(const std::string& bind_ip, u16 port)
 {
     close();
+    m_address_in_use = false;
 
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
@@ -474,8 +494,15 @@ bool TcpListener::open(const std::string& bind_ip, u16 port)
 
     if (::bind(native(fd), reinterpret_cast<sockaddr*>(&addr), sizeof addr) != 0
         || ::listen(native(fd), 4) != 0) {
+#if defined(_WIN32)
+        m_address_in_use = WSAGetLastError() == WSAEADDRINUSE;
+#else
+        m_address_in_use = errno == EADDRINUSE;
+#endif
         m_last_error = "listen " + (bind_ip.empty() ? std::string("*") : bind_ip) + ":"
-                     + std::to_string(port) + ": " + last_socket_error();
+                     + std::to_string(port) + ": "
+                     + (m_address_in_use ? std::string("address already in use")
+                                         : last_socket_error());
         close_socket(fd);
         return false;
     }

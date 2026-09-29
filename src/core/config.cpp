@@ -548,6 +548,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->net_outputs_port)) {
                 bad_value();
             }
+        } else if (key == "net_outputs_udp_port") {
+            if (!parse_u32(value, &out->net_outputs_udp_port)) {
+                bad_value();
+            }
         } else if (key == "wheel_ffb") {
             if (!parse_bool(value, &out->wheel_ffb)) {
                 bad_value();
@@ -718,6 +722,7 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     out->link_port      = std::clamp(out->link_port, 1u, 65535u);
     out->link_next_port = std::clamp(out->link_next_port, 1u, 65535u);
     out->net_outputs_port = std::clamp(out->net_outputs_port, 1u, 65535u);
+    out->net_outputs_udp_port = std::min(out->net_outputs_udp_port, 65535u);  // 0 is "off"
     return true;
 }
 
@@ -842,10 +847,13 @@ bool save_config(const std::string& path, const Config& config)
         << "# over TCP like MAME's network output (-output network), for tools\n"
         << "# such as BackForceFeeder, MameHooker or DOFLinx. The default address\n"
         << "# keeps it on this machine; empty net_outputs_ip listens on every\n"
-        << "# interface. Port 8000 is MAME's.\n"
+        << "# interface. Port 8000 is MAME's. A starting game is also announced\n"
+        << "# over UDP to net_outputs_udp_port (Supermodel's 8001, which\n"
+        << "# BackForceFeeder listens on); 0 turns the announcement off.\n"
         << "net_outputs = " << bool_text(config.net_outputs) << "\n"
         << "net_outputs_ip = " << config.net_outputs_ip << "\n"
         << "net_outputs_port = " << config.net_outputs_port << "\n"
+        << "net_outputs_udp_port = " << config.net_outputs_udp_port << "\n"
         << "\n"
         << "# Steering-wheel force feedback: a synthesised centring spring (the\n"
         << "# drive board is not emulated, so this is a feel, not the real motor\n"

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 //
 // Yamaha YMF292-F SCSP: 32 PCM slots, an effects DSP, three timers and a MIDI
-// port.
+// port. ScspMame is the ScspCore the sound board uses by default (see
+// scsp_core.h and SCSP.md).
 //
 // Ported from MAME's src/devices/sound/scsp.h and scsp.cpp (BSD-3-Clause,
 // copyright-holders ElSemi, R. Belmont).
@@ -24,13 +25,14 @@
 #pragma once
 
 #include "core/types.h"
+#include "hw/scsp_core.h"
 #include "hw/scsp_dsp.h"
 
 #include <functional>
 
 namespace sm2::hw {
 
-class Scsp {
+class ScspMame final : public ScspCore {
 public:
     /// 45.1584 MHz / 2 on the Model 2A video board.
     static constexpr u32 kDefaultClock = 22'579'200;
@@ -38,67 +40,38 @@ public:
     /// The sample rate is the clock over this, which is 44100 Hz exactly.
     static constexpr u32 kClockDivider = 512;
 
-    Scsp(ScspMemory& memory, u32 clock);
+    ScspMame(ScspMemory& memory, u32 clock);
 
-    void reset();
+    void reset() override;
 
-    /// Called when a timer or the MIDI FIFO wants the sound 68000's attention.
-    /// `level` is the 68000 interrupt level the SCSP has been programmed to use.
-    using IrqHandler = std::function<void(int level, bool assert)>;
-
-    /// Called when the SCSP wants the *host* CPU board's attention, over the
-    /// MCIEB/MCIPD pair. Wired to the CPU board's interrupt latch.
-    using MainIrqHandler = std::function<void(bool assert)>;
-
-    /// A byte the sound program sent out of the MIDI port, bound for the host.
-    using MidiOutHandler = std::function<void(u8 value)>;
-
-    void set_irq_handler(IrqHandler handler) { m_irq_cb = std::move(handler); }
-    void set_main_irq_handler(MainIrqHandler handler) { m_main_irq_cb = std::move(handler); }
-    void set_midi_out_handler(MidiOutHandler handler) { m_midi_out_cb = std::move(handler); }
+    void set_irq_handler(IrqHandler handler) override { m_irq_cb = std::move(handler); }
+    void set_main_irq_handler(MainIrqHandler handler) override { m_main_irq_cb = std::move(handler); }
+    void set_midi_out_handler(MidiOutHandler handler) override { m_midi_out_cb = std::move(handler); }
 
     // -- register access, from the sound 68000 ------------------------------
     // `offset` is a word index, as MAME's read/write take it.
 
-    [[nodiscard]] u16 read(u32 offset);
-    void write(u32 offset, u16 data, u16 mem_mask = 0xffff);
+    [[nodiscard]] u16 read(u32 offset) override;
+    void write(u32 offset, u16 data, u16 mem_mask) override;
 
     // -- audio --------------------------------------------------------------
 
-    /// Produce `frames` interleaved stereo samples at 44100 Hz.
-    ///
-    /// This is also where time passes for the SCSP: the timers, the envelopes,
-    /// the LFOs and the MIDI transmitter all advance one step per frame, so the
-    /// caller has to keep calling it whether or not anything is listening.
-    void generate(s16* output, u32 frames);
+    /// See ScspCore::generate. 44100 Hz exactly at the Model 2 clock.
+    void generate(s16* output, u32 frames) override;
 
-    [[nodiscard]] u32 sample_rate() const { return m_clock / kClockDivider; }
+    [[nodiscard]] u32 sample_rate() const override { return m_clock / kClockDivider; }
 
-    /// Per-slot output gain in 1/256 units (256 == unity), applied before both
-    /// the direct-out and effect-send mixes so it scales the whole voice. All
-    /// unity leaves the mixer bit-exact. The hook for the per-set gain.
-    void set_slot_gains(const u16 gains[32]);
+    /// Applied before both the direct-out and effect-send mixes, so it scales the
+    /// whole voice.
+    void set_slot_gains(const u16 gains[32]) override;
 
-    /// A byte arrived from the host's UART.
-    void midi_in(u8 value);
+    void midi_in(u8 value) override;
 
     // -- inspection, for the headless bring-up test --------------------------
 
-    struct Stats {
-        u64 samples          = 0;
-        u64 slot_starts      = 0;
-        u64 timer_interrupts = 0;
-        u64 midi_in_bytes    = 0;
-        u64 midi_out_bytes   = 0;
-        u64 dma_transfers    = 0;
-        /// Largest absolute value either output channel has reached, so silence
-        /// can be told from clipping.
-        s32 peak_output      = 0;
-    };
-    [[nodiscard]] const Stats& stats() const { return m_stats; }
+    [[nodiscard]] const Stats& stats() const override { return m_stats; }
 
-    /// How many of the 32 slots are currently sounding.
-    [[nodiscard]] u32 active_slots() const { return m_active_slots; }
+    [[nodiscard]] u32 active_slots() const override { return m_active_slots; }
 
     /// Save/restore the whole chip: control registers, all 32 slots, ring
     /// buffer, IRQ/timer/MIDI/DMA state, the effects DSP and the fixed-seed RNG.
@@ -106,7 +79,7 @@ public:
     /// construction — as are the LFO table/scale pointers inside each slot,
     /// which are re-derived from the slot registers on load. The ScspMemory
     /// back-pointer and the three callbacks are excluded (re-bound by wiring).
-    void serialize(Archive& ar);
+    void serialize(Archive& ar) override;
 
 private:
     enum SCSP_STATE { SCSP_ATTACK, SCSP_DECAY1, SCSP_DECAY2, SCSP_RELEASE };

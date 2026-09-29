@@ -1499,6 +1499,20 @@ void Gui::draw_network_tab(Config& config)
             config.net_outputs_port = static_cast<u32>(std::clamp(port, 1, 65535));
         }
     }
+    {
+        int port = static_cast<int>(config.net_outputs_udp_port);
+        ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::InputInt("Announce port (UDP)", &port)) {
+            config.net_outputs_udp_port = static_cast<u32>(std::clamp(port, 0, 65535));
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Announces the game and the outputs port to tools\n"
+                              "that wait for it, as Supermodel does (8001, which\n"
+                              "BackForceFeeder listens on). 0 turns it off.");
+        }
+    }
     ImGui::EndDisabled();
 
     if (!config.net_outputs) {

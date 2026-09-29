@@ -922,6 +922,7 @@ int main(int argc, char** argv)
     }
     options.config.net_outputs_ip   = from_file.net_outputs_ip;
     options.config.net_outputs_port = from_file.net_outputs_port;
+    options.config.net_outputs_udp_port = from_file.net_outputs_udp_port;
 
     options.config.lightgun_crosshair       = from_file.lightgun_crosshair;
     options.config.lightgun_recoil          = from_file.lightgun_recoil;
@@ -1617,7 +1618,7 @@ int main(int argc, char** argv)
                         (unsigned long long)snd.unmapped_reads,
                         (unsigned long long)snd.unmapped_writes);
 
-            const hw::Scsp::Stats& scsp = the_scsp_board->scsp().stats();
+            const hw::ScspCore::Stats& scsp = the_scsp_board->scsp().stats();
             std::printf("scsp audio        : %llu sample(s) at %u Hz, peak %d/32767, "
                         "%llu dropped\n",
                         (unsigned long long)scsp.samples, the_sound->sample_rate(),
@@ -2298,7 +2299,8 @@ int main(int argc, char** argv)
             net_outputs.sync(options.config.net_outputs && loaded.has_value() ? loaded->game.name
                                                                                : std::string(),
                              options.config.net_outputs_ip,
-                             static_cast<u16>(options.config.net_outputs_port));
+                             static_cast<u16>(options.config.net_outputs_port),
+                             static_cast<u16>(options.config.net_outputs_udp_port));
             net_outputs.set("pause", effective_pause ? 1 : 0);
 
             if (machine_iface && !effective_pause) {

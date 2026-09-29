@@ -64,6 +64,10 @@ public:
 
     [[nodiscard]] bool valid() const { return m_fd != kInvalid; }
 
+    /// Allow send_to() a broadcast address such as 255.255.255.255. False on
+    /// failure.
+    bool set_broadcast(bool enable);
+
     /// Send one datagram to dest_ip:port. False on error, including a full send
     /// buffer, which the caller treats as back-pressure.
     bool send_to(std::span<const u8> data, const std::string& dest_ip, u16 port);
@@ -154,9 +158,13 @@ public:
 
     [[nodiscard]] const std::string& last_error() const { return m_last_error; }
 
+    /// The last open() failed because something else already listens there.
+    [[nodiscard]] bool address_in_use() const { return m_address_in_use; }
+
 private:
     SocketFd    m_fd = kInvalidSocket;
     std::string m_last_error;
+    bool        m_address_in_use = false;
 };
 
 /// Process-wide network startup/teardown (WSAStartup/WSACleanup on Windows, a
