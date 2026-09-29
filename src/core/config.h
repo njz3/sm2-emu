@@ -304,6 +304,21 @@ struct Config {
     /// and the status display; the board negotiates the real link id from frames.
     u32 link_cabinet_index = 0;
 
+    // -- cabinet outputs -----------------------------------------------------
+
+    /// Publish the lamps and the drive-board commands over TCP the way MAME's
+    /// network output does, for tools such as BackForceFeeder, MameHooker or
+    /// DOFLinx. See osd/net_outputs.h.
+    bool net_outputs = false;
+
+    /// Where to listen. The loopback default keeps it on this machine, which
+    /// is where those tools run, and asks nothing of the firewall; blank
+    /// listens on every interface.
+    std::string net_outputs_ip = "127.0.0.1";
+
+    /// MAME's port, which the tools look for.
+    u32 net_outputs_port = 8000;
+
     // -- paths -------------------------------------------------------------
 
     /// ROM archives; a game named with no path loads <rom_dir>/<name>.{zip,7z}.

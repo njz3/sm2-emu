@@ -39,6 +39,7 @@
 #include "osd/frame_pacer.h"
 #include "osd/gui.h"
 #include "osd/input.h"
+#include "osd/net_outputs.h"
 #include "osd/scraper.h"
 #include "osd/window.h"
 #include "render/backend.h"
@@ -160,6 +161,7 @@ struct Options {
         bool screenshot_dir = false;
         bool render_scale = false;
         bool graphics_backend = false;
+        bool net_outputs = false;
     } given;
 
     bool        show_help  = false;
@@ -280,6 +282,10 @@ void print_usage()
         "      --list-games    List the games in the ROM database\n"
         "      --list-gpus     List the Vulkan devices that could be used\n"
         "      --log-level <l> trace, debug, info, warning or error\n"
+        "      --net-outputs   Publish the lamps and drive-board commands like\n"
+        "                      MAME's network output (TCP, port 8000 unless the\n"
+        "                      settings say otherwise), for BackForceFeeder,\n"
+        "                      MameHooker, DOFLinx and the like\n"
         "      --no-vsync      Present without waiting for vertical blank\n"
         "      --nvram <dir>   Directory for saves: NVRAM and EEPROM images\n"
         "      --render-scale <n>  Internal 3D render scale, 1..8 (default 1 =\n"
@@ -383,6 +389,9 @@ void print_usage()
         } else if (std::strcmp(arg, "--lightgun") == 0) {
             out->config.lightgun = true;
             out->given.lightgun  = true;
+        } else if (std::strcmp(arg, "--net-outputs") == 0) {
+            out->config.net_outputs = true;
+            out->given.net_outputs  = true;
         } else if (std::strcmp(arg, "--log-unmapped") == 0) {
             out->log_unmapped = true;
         } else if (std::strcmp(arg, "--boot-test") == 0) {
@@ -907,6 +916,12 @@ int main(int argc, char** argv)
     options.config.link_next_ip        = from_file.link_next_ip;
     options.config.link_next_port      = from_file.link_next_port;
     options.config.link_cabinet_index  = from_file.link_cabinet_index;
+
+    if (!options.given.net_outputs) {
+        options.config.net_outputs = from_file.net_outputs;
+    }
+    options.config.net_outputs_ip   = from_file.net_outputs_ip;
+    options.config.net_outputs_port = from_file.net_outputs_port;
 
     options.config.lightgun_crosshair       = from_file.lightgun_crosshair;
     options.config.lightgun_recoil          = from_file.lightgun_recoil;
@@ -2115,6 +2130,11 @@ int main(int argc, char** argv)
         std::unique_ptr<render::TextureReplacements> replacements;
         std::string                                  replacements_game;
 
+        // Lamps and drive board for BackForceFeeder and the like. Follows the
+        // running game and the settings every frame, so a game change or a toggle
+        // in the overlay needs nothing more.
+        osd::NetOutputs net_outputs;
+
         while (running) {
             const u64 frame_start_ns = SDL_GetTicksNS();
 
@@ -2275,6 +2295,12 @@ int main(int argc, char** argv)
                 }
             }
 
+            net_outputs.sync(options.config.net_outputs && loaded.has_value() ? loaded->game.name
+                                                                               : std::string(),
+                             options.config.net_outputs_ip,
+                             static_cast<u16>(options.config.net_outputs_port));
+            net_outputs.set("pause", effective_pause ? 1 : 0);
+
             if (machine_iface && !effective_pause) {
                 // Inputs are levels, sampled whenever the program polls the I/O
                 // controller during the frame, so they have to be set before the
@@ -2290,8 +2316,11 @@ int main(int argc, char** argv)
                                      options.config.pad_rumble_strength);
                 input.set_present_placement(options.config.aspect_mode,
                                             options.config.scaling_method);
-                input.update_drive_board(loaded->game,
-                                         machine_iface->take_drive_board_writes().view());
+                // Last frame's drive-board bytes, for the wheel here and for the
+                // cabinet outputs once the frame has run.
+                const hw::Model2MachineBase::DriveBoardWrites drive_writes =
+                    machine_iface->take_drive_board_writes();
+                input.update_drive_board(loaded->game, drive_writes.view());
                 input.update_force_feedback(loaded->game);
                 input.update_pad_rumble(loaded->game);
                 if (options.coin_at != 0) {
@@ -2311,6 +2340,8 @@ int main(int argc, char** argv)
                 if (texture_dumper) {
                     texture_dumper->scan(*machine_iface);
                 }
+                osd::publish_cabinet_outputs(net_outputs, loaded->game,
+                                             machine_iface->lamp_output(), drive_writes.view());
                 if (profile_sample) {
                     // Read straight back out rather than timed separately: the
                     // geometry engine runs inside run_frame() (at vblank), not as
@@ -2360,6 +2391,10 @@ int main(int argc, char** argv)
                     break;
                 }
             }
+
+            // Outside the block above, so clients are accepted and told about
+            // the pause while the game is paused too.
+            net_outputs.service();
 
             // Timed as present_wait (see its declaration). The scope closes
             // before the continue below so a skipped frame's SDL_Delay is not
@@ -2604,6 +2639,8 @@ int main(int argc, char** argv)
                     options.config.link_enabled, comm.enabled(), comm.link_alive(),
                     comm.link_id(), comm.link_count()});
             }
+            gui.set_outputs_status(osd::Gui::OutputsStatus{
+                net_outputs.active(), net_outputs.client_count(), net_outputs.error()});
             // GPU capabilities gate the enhancement options in the GUI.
             {
                 const render::Capabilities caps = backend->capabilities();
@@ -3003,6 +3040,9 @@ int main(int argc, char** argv)
             machine_iface->log_unmapped_summary();
             machine_iface->log_burst_summary();
         }
+
+        // Tell the output clients the game has ended.
+        net_outputs.stop();
 
         // Nothing may be destroyed while a submitted command buffer still
         // refers to it, and up to kFramesInFlight frames are outstanding here.

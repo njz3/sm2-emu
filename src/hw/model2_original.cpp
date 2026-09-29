@@ -569,9 +569,10 @@ void Model2Original::timers_w(u32 index, u32 value)
 void Model2Original::lamp_output_w(u8 value)
 {
     // Two coin counters and six outputs. On Desert Tank those are the cannon and
-    // machine-gun recoil motors and four lamps, per MAME's comment block. Recorded
-    // for a future output layer; nothing consumes it yet.
+    // machine-gun recoil motors and four lamps, per MAME's comment block.
+    // Published by the cabinet outputs.
     SM2_TRACE("model2o: outputs = %02x", value);
+    record_lamp_output(value);
 }
 
 void Model2Original::drive_board_write(u8 value)

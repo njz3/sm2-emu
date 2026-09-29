@@ -734,7 +734,10 @@ void Model2B::io_port_a_write(u8 value)
     m_eeprom.set_clk(bit(value, 7) != 0);
 }
 
-void Model2B::lamp_output_w(u8 /*value*/) {}
+void Model2B::lamp_output_w(u8 value)
+{
+    record_lamp_output(value);
+}
 
 void Model2B::drive_board_write(u8 value)
 {

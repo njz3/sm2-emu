@@ -13,7 +13,8 @@
 // express written permission of the author.
 //
 // Cross-platform networking helpers: host interface enumeration (to prefill the
-// cabinet-link settings) and a non-blocking UDP socket for the link transport.
+// cabinet-link settings), a non-blocking UDP socket for the link transport, and a
+// non-blocking TCP listener for the cabinet outputs.
 #pragma once
 
 #include "core/types.h"
@@ -22,6 +23,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace sm2::net {
@@ -82,6 +84,78 @@ private:
 #endif
 
     Fd          m_fd = kInvalid;
+    std::string m_last_error;
+};
+
+// -- non-blocking TCP -------------------------------------------------------
+
+#if defined(_WIN32)
+using SocketFd                           = std::uintptr_t;
+inline constexpr SocketFd kInvalidSocket = static_cast<SocketFd>(~0ull);
+#else
+using SocketFd                           = int;
+inline constexpr SocketFd kInvalidSocket = -1;
+#endif
+
+/// One accepted TCP connection, non-blocking and with Nagle off, so a short
+/// line goes out as soon as it is sent. Only what a line-oriented server needs:
+/// sending, and noticing that the peer went away.
+class TcpConnection {
+public:
+    TcpConnection() = default;
+    ~TcpConnection();
+
+    TcpConnection(const TcpConnection&)            = delete;
+    TcpConnection& operator=(const TcpConnection&) = delete;
+    TcpConnection(TcpConnection&& other) noexcept;
+    TcpConnection& operator=(TcpConnection&& other) noexcept;
+
+    [[nodiscard]] bool valid() const { return m_fd != kInvalidSocket; }
+
+    /// Send as much of `data` as the socket takes without blocking. The number of
+    /// bytes taken, which is 0 when the peer is not reading and the buffer is
+    /// full; nullopt once the connection has failed.
+    [[nodiscard]] std::optional<usize> send(std::string_view data);
+
+    /// Read and discard whatever the peer has sent. False once the peer has
+    /// closed the connection or it has failed.
+    [[nodiscard]] bool drain();
+
+    /// Close the sending side first, so the peer reads an orderly end of stream
+    /// after anything already sent, then release the socket.
+    void close();
+
+private:
+    friend class TcpListener;
+    explicit TcpConnection(SocketFd fd) : m_fd(fd) {}
+
+    SocketFd m_fd = kInvalidSocket;
+};
+
+/// A non-blocking listening socket. Like UdpSocket, a failure to bind surfaces
+/// through valid()/last_error() rather than throwing.
+class TcpListener {
+public:
+    TcpListener() = default;
+    ~TcpListener();
+
+    TcpListener(const TcpListener&)            = delete;
+    TcpListener& operator=(const TcpListener&) = delete;
+
+    /// Listen on bind_ip:port; an empty bind_ip is INADDR_ANY. False on failure.
+    bool open(const std::string& bind_ip, u16 port);
+
+    void close();
+
+    [[nodiscard]] bool valid() const { return m_fd != kInvalidSocket; }
+
+    /// The next waiting connection, or an invalid one when nobody is waiting.
+    [[nodiscard]] TcpConnection accept();
+
+    [[nodiscard]] const std::string& last_error() const { return m_last_error; }
+
+private:
+    SocketFd    m_fd = kInvalidSocket;
     std::string m_last_error;
 };
 

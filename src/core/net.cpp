@@ -35,6 +35,7 @@
 #    include <ifaddrs.h>
 #    include <net/if.h>
 #    include <netinet/in.h>
+#    include <netinet/tcp.h>
 #    include <sys/socket.h>
 #    include <unistd.h>
 #endif
@@ -309,6 +310,214 @@ bool UdpSocket::recv_from(std::vector<u8>& out)
     }
     out.assign(buffer, buffer + n);
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// TCP
+// ---------------------------------------------------------------------------
+
+namespace {
+
+#if defined(_WIN32)
+SOCKET native(SocketFd fd)
+{
+    return static_cast<SOCKET>(fd);
+}
+#else
+int native(SocketFd fd)
+{
+    return fd;
+}
+#endif
+
+void close_socket(SocketFd fd)
+{
+#if defined(_WIN32)
+    ::closesocket(native(fd));
+#else
+    ::close(fd);
+#endif
+}
+
+void set_non_blocking(SocketFd fd)
+{
+#if defined(_WIN32)
+    u_long nonblock = 1;
+    ioctlsocket(native(fd), FIONBIO, &nonblock);
+#else
+    const int fl = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, fl | O_NONBLOCK);
+#endif
+}
+
+/// True when the last socket call failed only because it would have blocked.
+bool would_block()
+{
+#if defined(_WIN32)
+    return WSAGetLastError() == WSAEWOULDBLOCK;
+#else
+    return errno == EAGAIN || errno == EWOULDBLOCK;
+#endif
+}
+
+}  // namespace
+
+TcpConnection::~TcpConnection()
+{
+    close();
+}
+
+TcpConnection::TcpConnection(TcpConnection&& other) noexcept : m_fd(other.m_fd)
+{
+    other.m_fd = kInvalidSocket;
+}
+
+TcpConnection& TcpConnection::operator=(TcpConnection&& other) noexcept
+{
+    if (this != &other) {
+        close();
+        m_fd       = other.m_fd;
+        other.m_fd = kInvalidSocket;
+    }
+    return *this;
+}
+
+std::optional<usize> TcpConnection::send(std::string_view data)
+{
+    if (m_fd == kInvalidSocket) return std::nullopt;
+    if (data.empty()) return usize{0};
+
+#if defined(_WIN32)
+    const int n = ::send(native(m_fd), data.data(), static_cast<int>(data.size()), 0);
+#else
+    int flags = 0;
+#    if defined(MSG_NOSIGNAL)
+    // A peer that has gone becomes an error return here rather than a SIGPIPE
+    // that would kill the emulator. macOS gets SO_NOSIGPIPE in accept() instead.
+    flags = MSG_NOSIGNAL;
+#    endif
+    const ssize_t n = ::send(m_fd, data.data(), data.size(), flags);
+#endif
+
+    if (n >= 0) return static_cast<usize>(n);
+    if (would_block()) return usize{0};
+    return std::nullopt;
+}
+
+bool TcpConnection::drain()
+{
+    if (m_fd == kInvalidSocket) return false;
+
+    char buffer[512];
+    for (;;) {
+#if defined(_WIN32)
+        const int n = ::recv(native(m_fd), buffer, sizeof buffer, 0);
+#else
+        const ssize_t n = ::recv(m_fd, buffer, sizeof buffer, 0);
+#endif
+        if (n > 0) continue;
+        if (n == 0) return false;  // the peer closed its end
+        return would_block();
+    }
+}
+
+void TcpConnection::close()
+{
+    if (m_fd != kInvalidSocket) {
+#if defined(_WIN32)
+        ::shutdown(native(m_fd), SD_SEND);
+#else
+        ::shutdown(m_fd, SHUT_WR);
+#endif
+        close_socket(m_fd);
+        m_fd = kInvalidSocket;
+    }
+}
+
+TcpListener::~TcpListener()
+{
+    close();
+}
+
+bool TcpListener::open(const std::string& bind_ip, u16 port)
+{
+    close();
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port   = htons(port);
+    if (bind_ip.empty()) {
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    } else if (inet_pton(AF_INET, bind_ip.c_str(), &addr.sin_addr) != 1) {
+        m_last_error = "invalid listen address '" + bind_ip + "'";
+        return false;
+    }
+
+#if defined(_WIN32)
+    const SOCKET handle = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (handle == INVALID_SOCKET) {
+        m_last_error = last_socket_error();
+        return false;
+    }
+    const SocketFd fd = static_cast<SocketFd>(handle);
+#else
+    const SocketFd fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (fd < 0) {
+        m_last_error = last_socket_error();
+        return false;
+    }
+    // Restarting a game must not wait out TIME_WAIT on the port. Not on Windows,
+    // where SO_REUSEADDR would also let another process take the port over.
+    int reuse = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
+#endif
+
+    if (::bind(native(fd), reinterpret_cast<sockaddr*>(&addr), sizeof addr) != 0
+        || ::listen(native(fd), 4) != 0) {
+        m_last_error = "listen " + (bind_ip.empty() ? std::string("*") : bind_ip) + ":"
+                     + std::to_string(port) + ": " + last_socket_error();
+        close_socket(fd);
+        return false;
+    }
+
+    set_non_blocking(fd);
+    m_fd = fd;
+    m_last_error.clear();
+    return true;
+}
+
+void TcpListener::close()
+{
+    if (m_fd != kInvalidSocket) {
+        close_socket(m_fd);
+        m_fd = kInvalidSocket;
+    }
+}
+
+TcpConnection TcpListener::accept()
+{
+    if (m_fd == kInvalidSocket) return {};
+
+#if defined(_WIN32)
+    const SOCKET handle = ::accept(native(m_fd), nullptr, nullptr);
+    if (handle == INVALID_SOCKET) return {};
+    const SocketFd fd = static_cast<SocketFd>(handle);
+#else
+    const SocketFd fd = ::accept(m_fd, nullptr, nullptr);
+    if (fd < 0) return {};
+#endif
+
+    // Not every platform hands the listener's non-blocking mode on to the
+    // accepted socket, so set it again.
+    set_non_blocking(fd);
+    int nodelay = 1;
+    setsockopt(native(fd), IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&nodelay),
+               sizeof nodelay);
+#if defined(SO_NOSIGPIPE)
+    int nosigpipe = 1;
+    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, sizeof nosigpipe);
+#endif
+    return TcpConnection(fd);
 }
 
 // ---------------------------------------------------------------------------

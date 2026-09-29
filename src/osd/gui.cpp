@@ -1471,6 +1471,49 @@ void Gui::draw_network_tab(Config& config)
         ImGui::BulletText("%s  %s / %s", iface.name.c_str(), iface.ipv4.c_str(),
                           iface.subnet_mask.c_str());
     }
+
+    ImGui::SeparatorText("Cabinet outputs");
+
+    ImGui::Checkbox("Publish lamps and drive board", &config.net_outputs);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Sends the cabinet lamps and the drive-board commands the way MAME's\n"
+            "network output does, for BackForceFeeder, MameHooker, DOFLinx and\n"
+            "the like. Takes effect straight away.");
+    }
+
+    ImGui::BeginDisabled(!config.net_outputs);
+    text_field("Outputs IP", config.net_outputs_ip, 180.0f);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("127.0.0.1 keeps it on this machine, where those tools\n"
+                          "run. Blank listens on every interface.");
+    }
+    {
+        int port = static_cast<int>(config.net_outputs_port);
+        ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::InputInt("Outputs port", &port)) {
+            config.net_outputs_port = static_cast<u32>(std::clamp(port, 1, 65535));
+        }
+    }
+    ImGui::EndDisabled();
+
+    if (!config.net_outputs) {
+        ImGui::TextDisabled("Off.");
+    } else if (!m_outputs_status.error.empty()) {
+        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Not listening: %s",
+                           m_outputs_status.error.c_str());
+    } else if (!m_outputs_status.listening) {
+        ImGui::TextDisabled("Starts with the next game.");
+    } else if (m_outputs_status.clients == 0) {
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Listening; no tool connected.");
+    } else {
+        ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%zu tool(s) connected.",
+                           m_outputs_status.clients);
+    }
 }
 
 // ---------------------------------------------------------------------------

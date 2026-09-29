@@ -795,7 +795,10 @@ void Model2C::io_port_a_write(u8 value)
     m_eeprom.set_clk(bit(value, 7) != 0);
 }
 
-void Model2C::lamp_output_w(u8 /*value*/) {}
+void Model2C::lamp_output_w(u8 value)
+{
+    record_lamp_output(value);
+}
 
 // ---------------------------------------------------------------------------
 // Lightgun interface board (837-12079)
