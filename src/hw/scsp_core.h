@@ -22,12 +22,38 @@
 #include "core/types.h"
 
 #include <functional>
+#include <optional>
+#include <string_view>
 
 namespace sm2 {
 class Archive;
 }
 
 namespace sm2::hw {
+
+/// Which emulation of the chip. The value is what a save state records, so it
+/// never changes for an existing core.
+enum class ScspCoreKind : u8 {
+    Mame     = 0,  ///< ScspMame, ported from MAME. The default.
+    Mednafen = 1,  ///< Being brought over from Mednafen; see SCSP.md.
+};
+
+/// The name the settings and the command line use: "mame" or "mednafen".
+[[nodiscard]] constexpr const char* scsp_core_name(ScspCoreKind kind)
+{
+    switch (kind) {
+        case ScspCoreKind::Mame:     return "mame";
+        case ScspCoreKind::Mednafen: return "mednafen";
+    }
+    return "unknown";
+}
+
+[[nodiscard]] constexpr std::optional<ScspCoreKind> parse_scsp_core(std::string_view name)
+{
+    if (name == "mame") return ScspCoreKind::Mame;
+    if (name == "mednafen") return ScspCoreKind::Mednafen;
+    return std::nullopt;
+}
 
 class ScspCore {
 public:
@@ -55,10 +81,13 @@ public:
     virtual void set_midi_out_handler(MidiOutHandler handler) = 0;
 
     // -- register access, from the sound 68000 ------------------------------
-    // `offset` is a word index, as MAME's read/write take it.
+    // `offset` is a word index, as MAME's read/write take it. `mem_mask` says
+    // which byte lanes the 68000 drove: some registers have side effects on
+    // one lane only (reading the MIDI flags must not take a byte out of the
+    // input FIFO, which reading the data lane does).
 
-    [[nodiscard]] virtual u16 read(u32 offset)             = 0;
-    virtual void write(u32 offset, u16 data, u16 mem_mask) = 0;
+    [[nodiscard]] virtual u16 read(u32 offset, u16 mem_mask) = 0;
+    virtual void write(u32 offset, u16 data, u16 mem_mask)   = 0;
 
     // -- audio --------------------------------------------------------------
 
@@ -85,6 +114,7 @@ public:
         u64 slot_starts      = 0;
         u64 timer_interrupts = 0;
         u64 midi_in_bytes    = 0;
+        u64 midi_in_dropped  = 0;  ///< Arrived with the input FIFO full.
         u64 midi_out_bytes   = 0;
         u64 dma_transfers    = 0;
         /// Largest absolute value either output channel has reached, so silence

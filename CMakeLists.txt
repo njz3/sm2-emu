@@ -78,6 +78,11 @@ option(SM2_BUILD_VULKAN         "Build the Vulkan backend"                 OFF)
 option(SM2_BUILD_OPENGL_DESKTOP "Build the OpenGL 4.3 core desktop backend" ON)
 option(SM2_BUILD_OPENGL_ES      "Build the OpenGL ES 3.1 backend (ARM)"    OFF)
 
+# The second SCSP sound chip core, chosen at run time with scsp_core = mednafen.
+# It is written after Mednafen's hardware-tested model of the chip and is still
+# being brought up; see SCSP.md. Off leaves only the MAME-derived core.
+option(SM2_SCSP_MEDNAFEN "Build the second SCSP core (scsp_core = mednafen)" ON)
+
 # Per-device light guns on Linux, read straight from evdev via libudev. SDL
 # merges all mice into one pointer, so this is the only way to tell two guns
 # apart. AUTO builds it when libudev is present and skips it otherwise; ON turns
@@ -159,6 +164,11 @@ if(SM2_BUILD_VULKAN)
     message(STATUS "  Vulkan target   : 1.3 core (dynamic rendering, synchronization2)")
     message(STATUS "  Vulkan headers  : ${Vulkan_VERSION}")
     message(STATUS "  validation      : ${SM2_ENABLE_VALIDATION}")
+endif()
+if(SM2_SCSP_MEDNAFEN)
+    message(STATUS "  SCSP cores      : mame, mednafen (in progress)")
+else()
+    message(STATUS "  SCSP cores      : mame")
 endif()
 message(STATUS "  glslc           : ${SM2_GLSLC}")
 message(STATUS "  SDL3            : ${SM2_SDL3_ORIGIN}")

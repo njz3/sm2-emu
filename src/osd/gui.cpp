@@ -1114,6 +1114,35 @@ bool Gui::draw_volume_slider(Config& config, const VolumeFamily& family)
 
 void Gui::draw_audio_tab(Config& config)
 {
+    ImGui::Text("SCSP sound chip");
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Which emulation of the Model 2A/2B/2C sound chip to use.\n"
+                          "Applies from the next game launch, and a save state only\n"
+                          "loads with the one it was made with. Mednafen's is being\n"
+                          "brought over (SCSP.md): slots, FM and the effects DSP\n"
+                          "are in; it is still being compared game by game.");
+    }
+    {
+        const bool  mednafen = config.scsp_core == "mednafen";
+        const char* kMame    = "MAME";
+        const char* kMdfn    = "Mednafen (in progress)";
+        ImGui::SetNextItemWidth(260.0f);
+        if (ImGui::BeginCombo("##scsp_core", mednafen ? kMdfn : kMame)) {
+            if (ImGui::Selectable(kMame, !mednafen)) {
+                config.scsp_core = "mame";
+            }
+            if (ImGui::Selectable(kMdfn, mednafen)) {
+                config.scsp_core = "mednafen";
+            }
+            ImGui::EndCombo();
+        }
+    }
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
     ImGui::Checkbox("Per-game volume", &config.game_volume);
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");

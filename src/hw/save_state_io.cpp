@@ -120,9 +120,10 @@ bool load_state_from_file(const std::string& path, const std::string& game, u32 
     }
 
     Archive load_ar(buffer.data() + payload_offset, buffer.size() - payload_offset);
+    load_ar.set_format_version(parsed.version);
     serialize(load_ar);
     if (load_ar.failed()) {
-        SM2_ERROR("save-state: '%s' is truncated or corrupt — rolling back",
+        SM2_ERROR("save-state: '%s' is truncated, corrupt or unusable here — rolling back",
                   path.c_str());
         Archive restore_ar(rollback.data(), rollback.size());
         serialize(restore_ar);

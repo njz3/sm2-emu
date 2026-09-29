@@ -81,6 +81,17 @@ public:
     /// check it once after the whole payload rather than per field.
     [[nodiscard]] bool failed() const { return m_failed; }
 
+    /// For a serialize() that finds the data unusable rather than short (a
+    /// state written by another SCSP core, say): fails the load the same way,
+    /// so the loader rolls the machine back. The caller logs why.
+    void mark_failed() { m_failed = true; }
+
+    /// The save-state format version of what is being read, so a serialize()
+    /// can still read what an older version wrote. Saving always writes the
+    /// current version (state::kFormatVersion), which is also the default.
+    [[nodiscard]] u32 format_version() const;
+    void set_format_version(u32 version) { m_format_version = version; }
+
     /// Bytes written so far (Save) or consumed so far (Load).
     [[nodiscard]] usize position() const { return m_pos; }
 
@@ -98,6 +109,8 @@ private:
 
     usize m_pos    = 0;
     bool  m_failed = false;
+
+    u32 m_format_version = 0;  ///< 0 means the current version.
 };
 
 // ---------------------------------------------------------------------------
@@ -118,15 +131,26 @@ private:
 // Load reads and validates the header BEFORE the payload, so a wrong magic,
 // version, game or board is rejected without touching the running machine
 // (req 3.2 / 4.1).
+//
+// Versions:
+//   1  the first format
+//   2  the sound board records which SCSP core wrote its state (SCSP.md).
+//      Version 1 files still load: they can only come from the MAME-derived
+//      core, and Model2Sound reads them as such.
 
 namespace state {
 
 inline constexpr char     kMagic[8]      = {'S', 'M', '2', 'S', 'T', 'A', 'T', 'E'};
-inline constexpr u32      kFormatVersion = 1;
+inline constexpr u32      kFormatVersion = 2;
+
+/// The oldest version read_header() accepts. Every serialize() that changed
+/// layout since has to keep reading this one (see Archive::format_version).
+inline constexpr u32 kOldestReadableVersion = 1;
 
 /// Header fields, in file order. The game name and board are supplied by the
 /// caller so this stays free of the rom layer.
 struct Header {
+    u32         version = kFormatVersion;  ///< Filled by read_header; write_header ignores it.
     std::string game;
     u32         board = 0;
 };
@@ -145,5 +169,10 @@ void write_header(Archive& ar, const Header& header);
                                usize& payload_offset);
 
 }  // namespace state
+
+inline u32 Archive::format_version() const
+{
+    return m_format_version != 0 ? m_format_version : state::kFormatVersion;
+}
 
 }  // namespace sm2

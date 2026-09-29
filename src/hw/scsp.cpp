@@ -1619,7 +1619,7 @@ void ScspMame::set_slot_gains(const u16 gains[32])
 	m_slot_gain_active = any;
 }
 
-u16 ScspMame::read(u32 offset)
+u16 ScspMame::read(u32 offset, u16 /*mem_mask*/)
 {
 	return r16(offset * 2);
 }

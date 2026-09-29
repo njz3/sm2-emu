@@ -20,9 +20,13 @@
 #include "core/archive.h"
 #include "core/log.h"
 #include "hw/scsp.h"
+#if defined(SM2_HAVE_SCSP_MEDNAFEN)
+#    include "hw/scsp_mdfn.h"
+#endif
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <unordered_map>
 
 namespace sm2::hw {
@@ -83,14 +87,43 @@ constexpr usize kMaxPendingFrames = 4 * 800;
 /// presumably arranges it in some way that amounts to this.
 constexpr usize kResetVectorBytes = 16;
 
+/// From save-state format 2 on, the SCSP's state is preceded by this marker and
+/// the ScspCoreKind that wrote it, so a state is never read by a core with
+/// another layout. The marker also catches a payload that is out of step by
+/// then. Format 1 predates the choice: it only ever held ScspMame's state.
+constexpr char kScspCoreMarker[8]       = {'S', 'C', 'S', 'P', 'C', 'O', 'R', 'E'};
+constexpr u32  kFirstFormatWithScspCore = 2;
+
+/// The SCSP emulations this build has; null for one it has not.
+[[nodiscard]] std::unique_ptr<ScspCore> make_scsp(ScspCoreKind kind, ScspMemory& memory)
+{
+    switch (kind) {
+        case ScspCoreKind::Mame:
+            return std::make_unique<ScspMame>(memory, kScspClock);
+        case ScspCoreKind::Mednafen:
+#if defined(SM2_HAVE_SCSP_MEDNAFEN)
+            return std::make_unique<ScspMednafen>(memory, kScspClock);
+#else
+            break;  // built with SM2_SCSP_MEDNAFEN=OFF
+#endif
+    }
+    return nullptr;
+}
+
 }  // namespace
 
-Model2Sound::Model2Sound()
-    : m_cpu(*this), m_scsp(std::make_unique<ScspMame>(*this, kScspClock))
+Model2Sound::Model2Sound() : m_cpu(*this), m_scsp(make_scsp(ScspCoreKind::Mame, *this))
 {
     m_ram.assign(kRamSize, 0);
     m_pending.reserve(kMaxPendingFrames * 2);
+    m_slot_gains.fill(256);
+    wire_scsp();
+}
 
+Model2Sound::~Model2Sound() = default;
+
+void Model2Sound::wire_scsp()
+{
     // The SCSP's interrupts go to the sound 68000, and only there: on Model 2 the
     // main_irq callback, which on a Saturn would reach the SH-2, is left unwired,
     // as MAME leaves it. The host's sound interrupt comes from the UART instead.
@@ -101,9 +134,30 @@ Model2Sound::Model2Sound()
         }
         m_cpu.set_irq_line(level, assert);
     });
+    if (m_midi_out_handler) {
+        m_scsp->set_midi_out_handler(m_midi_out_handler);
+    }
+    m_scsp->set_slot_gains(m_slot_gains.data());
 }
 
-Model2Sound::~Model2Sound() = default;
+bool Model2Sound::set_scsp_core(ScspCoreKind kind)
+{
+    if (kind == m_scsp_kind) {
+        return true;
+    }
+    std::unique_ptr<ScspCore> core = make_scsp(kind, *this);
+    if (!core) {
+        SM2_WARN("sound: this build has no '%s' SCSP core (see SM2_SCSP_MEDNAFEN); "
+                 "staying with '%s'",
+                 scsp_core_name(kind), scsp_core_name(m_scsp_kind));
+        return false;
+    }
+    m_scsp      = std::move(core);
+    m_scsp_kind = kind;
+    wire_scsp();
+    SM2_INFO("sound: SCSP core '%s'", scsp_core_name(kind));
+    return true;
+}
 
 void Model2Sound::attach(std::span<const u8> program_rom, std::span<const u8> samples)
 {
@@ -123,7 +177,8 @@ void Model2Sound::attach_dsb2(std::span<const u8> dsb_program, std::span<const u
 
 void Model2Sound::set_midi_out_handler(ScspCore::MidiOutHandler handler)
 {
-    m_scsp->set_midi_out_handler(std::move(handler));
+    m_midi_out_handler = std::move(handler);
+    m_scsp->set_midi_out_handler(m_midi_out_handler);
 }
 
 void Model2Sound::midi_in(u8 value)
@@ -167,6 +222,32 @@ void Model2Sound::serialize(Archive& ar)
 {
     ar.bytes(m_ram.data(), m_ram.size());
     m_cpu.serialize(ar);
+
+    // Which core wrote the SCSP state that follows; see kScspCoreMarker.
+    ScspCoreKind written = ScspCoreKind::Mame;
+    if (ar.format_version() >= kFirstFormatWithScspCore) {
+        char marker[sizeof(kScspCoreMarker)];
+        std::memcpy(marker, kScspCoreMarker, sizeof(marker));
+        u8 kind = static_cast<u8>(m_scsp_kind);
+        ar.bytes(marker, sizeof(marker));
+        ar.raw(kind);
+        if (ar.loading() && !ar.failed()
+            && std::memcmp(marker, kScspCoreMarker, sizeof(marker)) != 0) {
+            SM2_ERROR("save-state: the sound board's state is out of step "
+                      "(no SCSP core marker)");
+            ar.mark_failed();
+            return;
+        }
+        written = static_cast<ScspCoreKind>(kind);
+    }
+    if (ar.loading() && !ar.failed() && written != m_scsp_kind) {
+        SM2_ERROR("save-state: saved with the '%s' SCSP core, but this game runs the "
+                  "'%s' one; set scsp_core = %s to load it",
+                  scsp_core_name(written), scsp_core_name(m_scsp_kind),
+                  scsp_core_name(written));
+        ar.mark_failed();
+        return;
+    }
     m_scsp->serialize(ar);
     m_dsb.serialize(ar);
     m_dsb2.serialize(ar);
@@ -348,7 +429,7 @@ u16 Model2Sound::read16(u32 address)
 
     if (address >= kScspBase && address < kScspBase + kScspSize) {
         ++m_counters.scsp_reads;
-        return m_scsp->read((address - kScspBase) >> 1);
+        return m_scsp->read((address - kScspBase) >> 1, 0xffff);
     }
 
     // The banking register is write-only. MAME maps no reader at all, so a read
@@ -410,9 +491,8 @@ void Model2Sound::configure_balance(const std::string& game_name)
 
     const auto it = kFlatGain.find(game_name);
     if (it != kFlatGain.end()) {
-        std::array<u16, 32> gains;
-        gains.fill(it->second);
-        m_scsp->set_slot_gains(gains.data());
+        m_slot_gains.fill(it->second);
+        m_scsp->set_slot_gains(m_slot_gains.data());
     }
 }
 
@@ -450,6 +530,17 @@ void Model2Sound::write16(u32 address, u16 value)
 
 u8 Model2Sound::read8(u32 address)
 {
+    // The SCSP is told which lane was read, since some of its registers act on
+    // one lane only (see ScspCore::read).
+    const u32 masked = address & kAddressMask;
+    if (masked >= kScspBase && masked < kScspBase + kScspSize) {
+        bus_wait(masked);
+        ++m_counters.scsp_reads;
+        const bool low  = (masked & 1) != 0;
+        const u16  word = m_scsp->read((masked - kScspBase) >> 1, low ? 0x00ff : 0xff00);
+        return low ? static_cast<u8>(word) : static_cast<u8>(word >> 8);
+    }
+
     // Byte lane 0 of the word is the high half on a big-endian bus.
     const u16 word = read16(address & ~1u);
     return (address & 1) != 0 ? static_cast<u8>(word) : static_cast<u8>(word >> 8);

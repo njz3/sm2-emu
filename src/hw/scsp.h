@@ -51,7 +51,8 @@ public:
     // -- register access, from the sound 68000 ------------------------------
     // `offset` is a word index, as MAME's read/write take it.
 
-    [[nodiscard]] u16 read(u32 offset) override;
+    /// `mem_mask` is ignored, as MAME's read ignores it.
+    [[nodiscard]] u16 read(u32 offset, u16 mem_mask) override;
     void write(u32 offset, u16 data, u16 mem_mask) override;
 
     // -- audio --------------------------------------------------------------

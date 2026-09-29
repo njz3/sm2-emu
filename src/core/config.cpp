@@ -663,6 +663,13 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
                 problems->push_back(path + ":" + std::to_string(number)
                                     + ": unknown setting '" + key + "'");
             }
+        } else if (key == "scsp_core") {
+            const std::string choice = lowered(value);
+            if (choice == "mame" || choice == "mednafen") {
+                out->scsp_core = choice;
+            } else {
+                bad_value();
+            }
         } else if (key == "game_volume") {
             if (!parse_bool(value, &out->game_volume)) {
                 bad_value();
@@ -910,6 +917,12 @@ bool save_config(const std::string& path, const Config& config)
         }
     }
     out << "\n"
+        << "# SCSP sound chip emulation for the Model 2A/2B/2C sound board: mame\n"
+        << "# or mednafen (being brought over, see SCSP.md). Applies from the\n"
+        << "# next game launch; a save state only loads with the core it was\n"
+        << "# made with.\n"
+        << "scsp_core = " << config.scsp_core << "\n"
+        << "\n"
         << "# Per-game volume, 0..150 percent of the default (100). One\n"
         << "# volume_<parent set> line per game family, e.g. volume_srallyc.\n"
         << "game_volume = " << bool_text(config.game_volume) << "\n";

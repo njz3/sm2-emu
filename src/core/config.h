@@ -262,6 +262,12 @@ struct Config {
 
     // -- audio -------------------------------------------------------------
 
+    /// Which emulation of the SCSP sound chip the Model 2A/2B/2C sound board
+    /// uses: "mame" (the default) or "mednafen", the one being brought over
+    /// (SCSP.md). Applies from the next game launch. A build without the
+    /// requested core keeps "mame" and says so.
+    std::string scsp_core = "mame";
+
     /// Per-game volume; off plays every game at its default level.
     bool game_volume = false;
 
