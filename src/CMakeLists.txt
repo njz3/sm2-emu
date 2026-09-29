@@ -271,6 +271,12 @@ target_link_libraries(sm2_hw
     PRIVATE
         sm2_warnings
 )
+# The second SCSP core (see SCSP.md). Held to the strict warning profile: it
+# is our own code, not a port kept diffable against an upstream.
+if(SM2_SCSP_MEDNAFEN)
+    target_sources(sm2_hw PRIVATE hw/scsp_mdfn.cpp)
+    target_compile_definitions(sm2_hw PRIVATE SM2_HAVE_SCSP_MEDNAFEN=1)
+endif()
 
 # ---------------------------------------------------------------------------
 # sm2_osd — window, input, audio, config

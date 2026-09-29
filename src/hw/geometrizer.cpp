@@ -151,7 +151,11 @@ void Geometrizer::serialize(Archive& ar)
     ar.raw(unused);
 
     // State the display list sets once and never repeats: lighting, texture
-    // parameters, polygon RAM and the raster's texture and log tables.
+    // parameters, polygon RAM and the raster's texture and log tables. In the
+    // save-state format from version 4 on; an older state leaves it as it is.
+    if (ar.format_version() < 4) {
+        return;
+    }
     RasterState& raster = *m_raster;
     ar.raw(raster.viewport);
     ar.raw(raster.center);

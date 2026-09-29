@@ -35,6 +35,7 @@
 #include "hw/dsb2.h"
 #include "hw/sound_board.h"
 
+#include <array>
 #include <memory>
 #include <span>
 #include <string>
@@ -68,6 +69,15 @@ public:
     void attach_dsb2(std::span<const u8> dsb_program, std::span<const u8> dsb_mpeg);
 
     void reset();
+
+    /// Put an SCSP of `kind` in place of the current one, keeping its wiring:
+    /// the 68000's interrupts, the MIDI output and the per-set gain. Meant for
+    /// load time, before the machine's reset, since the new chip starts from
+    /// power-on. False, keeping the current core, when this build has no such
+    /// core (see SCSP.md).
+    bool set_scsp_core(ScspCoreKind kind);
+
+    [[nodiscard]] ScspCoreKind scsp_core() const { return m_scsp_kind; }
 
     /// Apply the per-set flat gain that levels loudness across the library.
     void configure_balance(const std::string& game_name);
@@ -164,6 +174,9 @@ private:
     /// Charge the 68000 the wait state RAM and the SCSP impose on an access.
     void bus_wait(u32 address);
 
+    /// Give the current SCSP its interrupt line, MIDI output and gains.
+    void wire_scsp();
+
     /// Generate the SCSP's next sample into m_pending.
     void generate_sample();
 
@@ -173,6 +186,12 @@ private:
     /// SCSP's constructor only stores the pointer. Behind ScspCore so another
     /// emulation of the chip can take its place (SCSP.md).
     std::unique_ptr<ScspCore> m_scsp;
+    ScspCoreKind              m_scsp_kind = ScspCoreKind::Mame;
+
+    /// What wire_scsp() hands a new core, kept since the machine sets them once
+    /// at init, before the core may be replaced.
+    ScspCore::MidiOutHandler m_midi_out_handler;
+    std::array<u16, 32>      m_slot_gains{};
 
     /// The MPEG music boards, present only on DSB titles. A set carries at
     /// most one; both are inert otherwise. m_dsb is the Z80 board (stcc),

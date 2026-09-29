@@ -35,6 +35,7 @@
 #include "hw/model2_softrender.h"
 #include "hw/model2_softrender_async.h"
 #include "hw/save_state_io.h"
+#include "hw/scsp_core.h"
 #include "osd/audio.h"
 #include "osd/outputs.h"
 #include "osd/frame_pacer.h"
@@ -110,6 +111,13 @@ enum class GraphicsBackendChoice {
     return false;
 }
 
+/// The SCSP core the settings ask for. The file and --scsp-core are checked
+/// when read, so nothing unknown gets here; it would fall back to mame.
+[[nodiscard]] sm2::hw::ScspCoreKind scsp_core_of(const sm2::Config& config)
+{
+    return sm2::hw::parse_scsp_core(config.scsp_core).value_or(sm2::hw::ScspCoreKind::Mame);
+}
+
 /// Lets SDL deliver joystick events while the window is not in front. The SDL
 /// environment variable still takes precedence.
 void apply_input_background(bool on)
@@ -178,6 +186,8 @@ struct Options {
         bool screenshot_dir = false;
         bool render_scale = false;
         bool graphics_backend = false;
+        bool outputs_network = false;
+        bool scsp_core = false;
     } given;
 
     bool        show_help  = false;
@@ -304,6 +314,9 @@ void print_usage()
         "                      for BackForceFeeder, MameHooker, DOFLinx and the like\n"
         "      --no-vsync      Present without waiting for vertical blank\n"
         "      --nvram <dir>   Directory for saves: NVRAM and EEPROM images\n"
+        "      --scsp-core <mame|mednafen>\n"
+        "                      SCSP sound chip emulation for the Model 2A/2B/2C\n"
+        "                      sound board (see SCSP.md)\n"
         "      --render-scale <n>  Internal 3D render scale, 1..8 (default 1 =\n"
         "                      native, 8 = ~4K). GPU backends only; native under\n"
         "                      software; auto-reduced if the GPU cannot allocate it\n"
@@ -541,6 +554,13 @@ void print_usage()
             out->given.screenshot_dir = true;
         } else if (takes_value("--dump-audio", &out->dump_audio)) {
             // handled
+        } else if (takes_value("--scsp-core", &out->config.scsp_core)) {
+            if (!out->show_help && !sm2::hw::parse_scsp_core(out->config.scsp_core)) {
+                SM2_ERROR("--scsp-core does not accept '%s' (valid: mame, mednafen)",
+                          out->config.scsp_core.c_str());
+                return false;
+            }
+            out->given.scsp_core = true;
         } else if (std::strcmp(arg, "--dump-textures") == 0) {
             out->dump_textures = true;
         } else if (takes_value("--poly-log", &out->poly_log)) {
@@ -725,7 +745,8 @@ struct LoadedMachine {
                                                      const std::string& rom_path,
                                                      const std::string& game_name,
                                                      const std::string& nvram_dir,
-                                                     bool               log_unmapped)
+                                                     bool               log_unmapped,
+                                                     sm2::hw::ScspCoreKind scsp_core)
 {
     using namespace sm2;
     std::optional<rom::LoadResult> result = rom::RomLoader::load(database, rom_path, game_name);
@@ -764,6 +785,12 @@ struct LoadedMachine {
     } else {
         SM2_ERROR("internal error: create_machine returned an unexpected machine type");
         return std::nullopt;
+    }
+
+    // Before the reset below, so the game boots on the SCSP core the settings
+    // ask for. The original Model 2 has the Model 1 sound board, with no SCSP.
+    if (auto* scsp_board = dynamic_cast<hw::Model2Sound*>(out.sound_board)) {
+        static_cast<void>(scsp_board->set_scsp_core(scsp_core));
     }
 
     out.machine_iface->set_nvram_directory(nvram_dir);
@@ -988,6 +1015,10 @@ int main(int argc, char** argv)
     options.config.link_next_port      = from_file.link_next_port;
     options.config.link_cabinet_index  = from_file.link_cabinet_index;
 
+    if (!options.given.scsp_core) {
+        options.config.scsp_core = from_file.scsp_core;
+    }
+
     options.config.lightgun_crosshair       = from_file.lightgun_crosshair;
     options.config.lightgun_hide_flash      = from_file.lightgun_hide_flash;
     options.config.lightgun_recoil          = from_file.lightgun_recoil;
@@ -1174,7 +1205,8 @@ int main(int argc, char** argv)
     std::optional<LoadedMachine> loaded;
     if (!options.rom_path.empty()) {
         loaded = load_game(database, options.rom_path, options.game,
-                           options.config.nvram_dir, options.log_unmapped);
+                           options.config.nvram_dir, options.log_unmapped,
+                           scsp_core_of(options.config));
         if (!loaded.has_value()) {
             return 1;
         }
@@ -1410,6 +1442,29 @@ int main(int argc, char** argv)
                     std::fclose(h);
                 }
                 expect_refused_and_intact("wrong-version", wrong_version);
+            }
+
+            // 4. Wrong SCSP core: the sound board's core id, the byte after its
+            // "SCSPCORE" marker, names another core. Only boards with an SCSP
+            // write the marker.
+            {
+                static constexpr char kMarker[] = "SCSPCORE";
+                const auto found = std::search(before.begin(), before.end(), kMarker,
+                                               kMarker + sizeof(kMarker) - 1);
+                const usize id = static_cast<usize>(found - before.begin())
+                               + sizeof(kMarker) - 1;
+                if (found != before.end() && id < before.size()) {
+                    const std::string wrong_core =
+                        (fs::path(dir) / "wrong_scsp_core.sm2state").string();
+                    std::vector<u8> img = before;
+                    img[id]             = static_cast<u8>(img[id] ^ 1);
+                    std::FILE* h = std::fopen(wrong_core.c_str(), "wb");
+                    if (h) {
+                        std::fwrite(img.data(), 1, img.size(), h);
+                        std::fclose(h);
+                    }
+                    expect_refused_and_intact("wrong-scsp-core", wrong_core);
+                }
             }
         }
 
@@ -1691,6 +1746,8 @@ int main(int argc, char** argv)
                         (unsigned long long)snd.unmapped_reads,
                         (unsigned long long)snd.unmapped_writes);
 
+            std::printf("scsp core         : %s\n",
+                        hw::scsp_core_name(the_scsp_board->scsp_core()));
             const hw::ScspCore::Stats& scsp = the_scsp_board->scsp().stats();
             std::printf("scsp audio        : %llu sample(s) at %u Hz, peak %d/32767, "
                         "%llu dropped\n",
@@ -1705,6 +1762,10 @@ int main(int argc, char** argv)
                         (unsigned long long)scsp.dma_transfers,
                         (unsigned long long)scsp.midi_in_bytes,
                         (unsigned long long)scsp.midi_out_bytes);
+            if (scsp.midi_in_dropped != 0) {
+                std::printf("scsp midi dropped : %llu byte(s) arrived with the input FIFO full\n",
+                            (unsigned long long)scsp.midi_in_dropped);
+            }
         } else if (the_m1_board != nullptr) {
             const hw::M1Audio::Counters& snd = the_m1_board->counters();
             std::printf("sound 68000       : %s\n",
