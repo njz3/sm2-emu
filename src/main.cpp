@@ -298,6 +298,10 @@ void print_usage()
         "      --list-games    List the games in the ROM database\n"
         "      --list-gpus     List the Vulkan devices that could be used\n"
         "      --log-level <l> trace, debug, info, warning or error\n"
+        "      --net-outputs   Publish the lamps and drive-board commands like\n"
+        "                      MAME's network output (TCP, port 8000 unless the\n"
+        "                      settings say otherwise, announced over UDP 8001),\n"
+        "                      for BackForceFeeder, MameHooker, DOFLinx and the like\n"
         "      --no-vsync      Present without waiting for vertical blank\n"
         "      --nvram <dir>   Directory for saves: NVRAM and EEPROM images\n"
         "      --render-scale <n>  Internal 3D render scale, 1..8 (default 1 =\n"
@@ -401,6 +405,9 @@ void print_usage()
         } else if (std::strcmp(arg, "--lightgun") == 0) {
             out->config.lightgun = true;
             out->given.lightgun  = true;
+        } else if (std::strcmp(arg, "--net-outputs") == 0) {
+            out->config.outputs_network = true;
+            out->given.outputs_network  = true;
         } else if (std::strcmp(arg, "--log-unmapped") == 0) {
             out->log_unmapped = true;
         } else if (std::strcmp(arg, "--boot-test") == 0) {
