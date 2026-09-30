@@ -263,25 +263,6 @@ void UdpSocket::close()
     }
 }
 
-bool UdpSocket::set_broadcast(bool enable)
-{
-    if (m_fd == kInvalid) return false;
-
-    const int value = enable ? 1 : 0;
-    if (setsockopt(
-#if defined(_WIN32)
-            static_cast<SOCKET>(m_fd),
-#else
-            m_fd,
-#endif
-            SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&value), sizeof value)
-        != 0) {
-        m_last_error = last_socket_error();
-        return false;
-    }
-    return true;
-}
-
 bool UdpSocket::send_to(std::span<const u8> data, const std::string& dest_ip, u16 port)
 {
     if (m_fd == kInvalid) return false;
@@ -332,224 +313,193 @@ bool UdpSocket::recv_from(std::vector<u8>& out)
 }
 
 // ---------------------------------------------------------------------------
-// TCP
+// Process startup / teardown
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// TcpServer
 // ---------------------------------------------------------------------------
 
 namespace {
 
-#if defined(_WIN32)
-SOCKET native(SocketFd fd)
-{
-    return static_cast<SOCKET>(fd);
-}
-#else
-int native(SocketFd fd)
-{
-    return fd;
-}
-#endif
+/// Largest backlog a client may build up before it is dropped.
+constexpr usize kMaxPending = 64 * 1024;
 
-void close_socket(SocketFd fd)
-{
 #if defined(_WIN32)
-    ::closesocket(native(fd));
-#else
-    ::close(fd);
-#endif
-}
-
-void set_non_blocking(SocketFd fd)
+void close_fd(std::uintptr_t fd) { ::closesocket(static_cast<SOCKET>(fd)); }
+void set_nonblocking(std::uintptr_t fd)
 {
-#if defined(_WIN32)
     u_long nonblock = 1;
-    ioctlsocket(native(fd), FIONBIO, &nonblock);
+    ioctlsocket(static_cast<SOCKET>(fd), FIONBIO, &nonblock);
+}
+bool would_block() { return WSAGetLastError() == WSAEWOULDBLOCK; }
 #else
+void close_fd(int fd) { ::close(fd); }
+void set_nonblocking(int fd)
+{
     const int fl = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, fl | O_NONBLOCK);
-#endif
 }
-
-/// True when the last socket call failed only because it would have blocked.
 bool would_block()
 {
-#if defined(_WIN32)
-    return WSAGetLastError() == WSAEWOULDBLOCK;
-#else
-    return errno == EAGAIN || errno == EWOULDBLOCK;
+#if EAGAIN != EWOULDBLOCK
+    if (errno == EWOULDBLOCK) return true;
 #endif
+    return errno == EAGAIN;
 }
+#endif
 
 }  // namespace
 
-TcpConnection::~TcpConnection()
+TcpServer::~TcpServer()
 {
     close();
 }
 
-TcpConnection::TcpConnection(TcpConnection&& other) noexcept : m_fd(other.m_fd)
-{
-    other.m_fd = kInvalidSocket;
-}
-
-TcpConnection& TcpConnection::operator=(TcpConnection&& other) noexcept
-{
-    if (this != &other) {
-        close();
-        m_fd       = other.m_fd;
-        other.m_fd = kInvalidSocket;
-    }
-    return *this;
-}
-
-std::optional<usize> TcpConnection::send(std::string_view data)
-{
-    if (m_fd == kInvalidSocket) return std::nullopt;
-    if (data.empty()) return usize{0};
-
-#if defined(_WIN32)
-    const int n = ::send(native(m_fd), data.data(), static_cast<int>(data.size()), 0);
-#else
-    int flags = 0;
-#    if defined(MSG_NOSIGNAL)
-    // A peer that has gone becomes an error return here rather than a SIGPIPE
-    // that would kill the emulator. macOS gets SO_NOSIGPIPE in accept() instead.
-    flags = MSG_NOSIGNAL;
-#    endif
-    const ssize_t n = ::send(m_fd, data.data(), data.size(), flags);
-#endif
-
-    if (n >= 0) return static_cast<usize>(n);
-    if (would_block()) return usize{0};
-    return std::nullopt;
-}
-
-bool TcpConnection::drain()
-{
-    if (m_fd == kInvalidSocket) return false;
-
-    char buffer[512];
-    for (;;) {
-#if defined(_WIN32)
-        const int n = ::recv(native(m_fd), buffer, sizeof buffer, 0);
-#else
-        const ssize_t n = ::recv(m_fd, buffer, sizeof buffer, 0);
-#endif
-        if (n > 0) continue;
-        if (n == 0) return false;  // the peer closed its end
-        return would_block();
-    }
-}
-
-void TcpConnection::close()
-{
-    if (m_fd != kInvalidSocket) {
-#if defined(_WIN32)
-        ::shutdown(native(m_fd), SD_SEND);
-#else
-        ::shutdown(m_fd, SHUT_WR);
-#endif
-        close_socket(m_fd);
-        m_fd = kInvalidSocket;
-    }
-}
-
-TcpListener::~TcpListener()
-{
-    close();
-}
-
-bool TcpListener::open(const std::string& bind_ip, u16 port)
+bool TcpServer::open(u16 port)
 {
     close();
     m_address_in_use = false;
 
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port   = htons(port);
-    if (bind_ip.empty()) {
-        addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    } else if (inet_pton(AF_INET, bind_ip.c_str(), &addr.sin_addr) != 1) {
-        m_last_error = "invalid listen address '" + bind_ip + "'";
-        return false;
-    }
-
 #if defined(_WIN32)
-    const SOCKET handle = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (handle == INVALID_SOCKET) {
+    const Fd fd = static_cast<Fd>(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    if (fd == static_cast<Fd>(INVALID_SOCKET)) {
         m_last_error = last_socket_error();
         return false;
     }
-    const SocketFd fd = static_cast<SocketFd>(handle);
 #else
-    const SocketFd fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    const Fd fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd < 0) {
         m_last_error = last_socket_error();
         return false;
     }
-    // Restarting a game must not wait out TIME_WAIT on the port. Not on Windows,
-    // where SO_REUSEADDR would also let another process take the port over.
-    int reuse = 1;
+    // Rebind straight away after a restart instead of waiting out TIME_WAIT.
+    const int reuse = 1;
     setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
 #endif
 
-    if (::bind(native(fd), reinterpret_cast<sockaddr*>(&addr), sizeof addr) != 0
-        || ::listen(native(fd), 4) != 0) {
+    sockaddr_in addr{};
+    addr.sin_family      = AF_INET;
+    addr.sin_port        = htons(port);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (::bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof addr) != 0
+        || ::listen(fd, SOMAXCONN) != 0) {
 #if defined(_WIN32)
         m_address_in_use = WSAGetLastError() == WSAEADDRINUSE;
 #else
         m_address_in_use = errno == EADDRINUSE;
 #endif
-        m_last_error = "listen " + (bind_ip.empty() ? std::string("*") : bind_ip) + ":"
-                     + std::to_string(port) + ": "
-                     + (m_address_in_use ? std::string("address already in use")
-                                         : last_socket_error());
-        close_socket(fd);
+        m_last_error = "listen *:" + std::to_string(port) + ": " + last_socket_error();
+        close_fd(fd);
         return false;
     }
-
-    set_non_blocking(fd);
-    m_fd = fd;
-    m_last_error.clear();
+    set_nonblocking(fd);
+    m_listen = fd;
     return true;
 }
 
-void TcpListener::close()
+void TcpServer::close()
 {
-    if (m_fd != kInvalidSocket) {
-        close_socket(m_fd);
-        m_fd = kInvalidSocket;
+    for (Client& client : m_clients) {
+        close_fd(client.fd);
+    }
+    m_clients.clear();
+    if (m_listen != kInvalid) {
+        close_fd(m_listen);
+        m_listen = kInvalid;
     }
 }
 
-TcpConnection TcpListener::accept()
+std::optional<u64> TcpServer::accept_one()
 {
-    if (m_fd == kInvalidSocket) return {};
-
+    if (m_listen == kInvalid) {
+        return std::nullopt;
+    }
 #if defined(_WIN32)
-    const SOCKET handle = ::accept(native(m_fd), nullptr, nullptr);
-    if (handle == INVALID_SOCKET) return {};
-    const SocketFd fd = static_cast<SocketFd>(handle);
+    const Fd fd = static_cast<Fd>(::accept(static_cast<SOCKET>(m_listen), nullptr, nullptr));
+    if (fd == static_cast<Fd>(INVALID_SOCKET)) {
+        return std::nullopt;
+    }
 #else
-    const SocketFd fd = ::accept(m_fd, nullptr, nullptr);
-    if (fd < 0) return {};
+    const Fd fd = ::accept(m_listen, nullptr, nullptr);
+    if (fd < 0) {
+        return std::nullopt;
+    }
 #endif
-
-    // Not every platform hands the listener's non-blocking mode on to the
-    // accepted socket, so set it again.
-    set_non_blocking(fd);
-    int nodelay = 1;
-    setsockopt(native(fd), IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&nodelay),
+    set_nonblocking(fd);
+    const int nodelay = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&nodelay),
                sizeof nodelay);
-#if defined(SO_NOSIGPIPE)
-    int nosigpipe = 1;
-    setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &nosigpipe, sizeof nosigpipe);
-#endif
-    return TcpConnection(fd);
+    Client client;
+    client.id = m_next_id++;
+    client.fd = fd;
+    m_clients.push_back(std::move(client));
+    return m_clients.back().id;
 }
 
-// ---------------------------------------------------------------------------
-// Process startup / teardown
-// ---------------------------------------------------------------------------
+void TcpServer::send(u64 client, std::string_view text)
+{
+    for (Client& c : m_clients) {
+        if (c.id == client) {
+            c.pending.append(text);
+        }
+    }
+}
+
+void TcpServer::broadcast(std::string_view text)
+{
+    for (Client& c : m_clients) {
+        c.pending.append(text);
+    }
+}
+
+void TcpServer::flush()
+{
+#if defined(MSG_NOSIGNAL)
+    constexpr int kSendFlags = MSG_NOSIGNAL;
+#else
+    constexpr int kSendFlags = 0;
+#endif
+    for (usize i = 0; i < m_clients.size();) {
+        Client& c    = m_clients[i];
+        bool    dead = false;
+
+        // Clients never need to talk to us; read and discard, which is also how
+        // a closed connection shows up.
+        char scratch[256];
+        for (;;) {
+            const auto got = ::recv(c.fd, scratch, sizeof scratch, 0);
+            if (got > 0) {
+                continue;
+            }
+            if (got == 0 || !would_block()) {
+                dead = true;
+            }
+            break;
+        }
+
+        while (!dead && !c.pending.empty()) {
+            const auto sent = ::send(c.fd, c.pending.data(),
+                                     static_cast<int>(c.pending.size()), kSendFlags);
+            if (sent > 0) {
+                c.pending.erase(0, static_cast<usize>(sent));
+            } else {
+                dead = sent < 0 && !would_block();
+                break;
+            }
+        }
+        if (c.pending.size() > kMaxPending) {
+            dead = true;
+        }
+
+        if (dead) {
+            close_fd(c.fd);
+            m_clients.erase(m_clients.begin() + static_cast<std::ptrdiff_t>(i));
+        } else {
+            ++i;
+        }
+    }
+}
 
 #if defined(_WIN32)
 

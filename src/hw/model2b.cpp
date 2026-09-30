@@ -736,7 +736,7 @@ void Model2B::io_port_a_write(u8 value)
 
 void Model2B::lamp_output_w(u8 value)
 {
-    record_lamp_output(value);
+    record_lamp_latch(value);
 }
 
 void Model2B::drive_board_write(u8 value)
@@ -1283,6 +1283,7 @@ u8* Model2B::hot_write(u32 address, u32 width)
 
 u8 Model2B::read8(u32 address)
 {
+    charge_area(address);
     if (const u8* p = hot_read(address, 1)) return *p;
     const Window w = resolve(address);
     if (w.base != nullptr) return *w.base;
@@ -1291,6 +1292,7 @@ u8 Model2B::read8(u32 address)
 
 u16 Model2B::read16(u32 address)
 {
+    charge_area(address);
     if (const u8* p = hot_read(address, 2)) {
         u16 v;
         std::memcpy(&v, p, sizeof(v));
@@ -1301,8 +1303,17 @@ u16 Model2B::read16(u32 address)
     return static_cast<u16>(register_read(address, 2) & 0xffff);
 }
 
+u32 Model2B::fetch32(u32 address)
+{
+    m_fetching  = true;
+    const u32 v = read32(address);
+    m_fetching  = false;
+    return v;
+}
+
 u32 Model2B::read32(u32 address)
 {
+    charge_area(address);
     if (const u8* p = hot_read(address, 4)) {
         u32 v;
         std::memcpy(&v, p, sizeof(v));
@@ -1324,6 +1335,7 @@ u32 Model2B::read32(u32 address)
 // read_dword_flags.
 std::pair<u8, u16> Model2B::read8_flags(u32 address)
 {
+    charge_area(address);
     if (const u8* p = hot_read(address, 1)) return {*p, cpu::kBusFlagBurst};
     const Window w = resolve(address);
     if (w.base != nullptr) {
@@ -1364,6 +1376,7 @@ u16 Model2B::write8_flags(u32 address, u8 value)
 
 std::pair<u32, u16> Model2B::read32_flags(u32 address)
 {
+    charge_area(address);
     if (const u8* p = hot_read(address, 4)) {
         u32 v;
         std::memcpy(&v, p, sizeof(v));
@@ -1381,6 +1394,7 @@ std::pair<u32, u16> Model2B::read32_flags(u32 address)
 
 void Model2B::write8(u32 address, u8 value)
 {
+    charge_area(address);
     if (u8* p = hot_write(address, 1)) {
         *p = value;
         return;
@@ -1397,6 +1411,7 @@ void Model2B::write8(u32 address, u8 value)
 
 void Model2B::write16(u32 address, u16 value)
 {
+    charge_area(address);
     if (u8* p = hot_write(address, 2)) {
         std::memcpy(p, &value, sizeof(value));
         return;
@@ -1413,6 +1428,7 @@ void Model2B::write16(u32 address, u16 value)
 
 void Model2B::write32(u32 address, u32 value)
 {
+    charge_area(address);
     if (u8* p = hot_write(address, 4)) {
         std::memcpy(p, &value, sizeof(value));
         return;
@@ -1429,6 +1445,7 @@ void Model2B::write32(u32 address, u32 value)
 
 u16 Model2B::write32_flags(u32 address, u32 value)
 {
+    charge_area(address);
     if (u8* p = hot_write(address, 4)) {
         std::memcpy(p, &value, sizeof(value));
         return cpu::kBusFlagBurst;

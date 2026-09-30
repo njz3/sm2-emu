@@ -538,20 +538,6 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->link_cabinet_index)) {
                 bad_value();
             }
-        } else if (key == "net_outputs") {
-            if (!parse_bool(value, &out->net_outputs)) {
-                bad_value();
-            }
-        } else if (key == "net_outputs_ip") {
-            out->net_outputs_ip = value;
-        } else if (key == "net_outputs_port") {
-            if (!parse_u32(value, &out->net_outputs_port)) {
-                bad_value();
-            }
-        } else if (key == "net_outputs_udp_port") {
-            if (!parse_u32(value, &out->net_outputs_udp_port)) {
-                bad_value();
-            }
         } else if (key == "wheel_ffb") {
             if (!parse_bool(value, &out->wheel_ffb)) {
                 bad_value();
@@ -570,6 +556,26 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             }
         } else if (key == "pad_rumble") {
             if (!parse_bool(value, &out->pad_rumble)) {
+                bad_value();
+            }
+        } else if (key == "outputs_network" || key == "net_outputs") {
+            // net_outputs* are the names an earlier build of this fork wrote.
+            if (!parse_bool(value, &out->outputs_network)) {
+                bad_value();
+            }
+        } else if (key == "outputs_network_port" || key == "net_outputs_port") {
+            if (!parse_u32(value, &out->outputs_network_port)) {
+                bad_value();
+            }
+        } else if (key == "outputs_network_udp_port" || key == "net_outputs_udp_port") {
+            if (!parse_u32(value, &out->outputs_network_udp_port)) {
+                bad_value();
+            }
+        } else if (key == "net_outputs_ip") {
+            // The outputs listen on every interface now; the old setting is
+            // read and dropped.
+        } else if (key == "outputs_windows") {
+            if (!parse_bool(value, &out->outputs_windows)) {
                 bad_value();
             }
         } else if (key == "pad_rumble_strength") {
@@ -713,6 +719,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     out->wheel_ffb_strength    = std::min(out->wheel_ffb_strength, 100u);
     out->wheel_rumble_strength = std::min(out->wheel_rumble_strength, 100u);
     out->pad_rumble_strength = std::min(out->pad_rumble_strength, 100u);
+    if (out->outputs_network_port == 0 || out->outputs_network_port > 65535) {
+        out->outputs_network_port = 8000;
+    }
+    out->outputs_network_udp_port = std::min(out->outputs_network_udp_port, 65535u);  // 0 is "off"
     // A sane rotation range: tight enough to be usable, and never zero (which
     // would divide by zero when scaling the steering).
     out->wheel_steer_degrees = std::clamp(out->wheel_steer_degrees, 90u, 1080u);
@@ -728,8 +738,6 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     // A UDP port is 16-bit; floor at 1 since 0 binds an ephemeral port.
     out->link_port      = std::clamp(out->link_port, 1u, 65535u);
     out->link_next_port = std::clamp(out->link_next_port, 1u, 65535u);
-    out->net_outputs_port = std::clamp(out->net_outputs_port, 1u, 65535u);
-    out->net_outputs_udp_port = std::min(out->net_outputs_udp_port, 65535u);  // 0 is "off"
     return true;
 }
 
@@ -850,18 +858,6 @@ bool save_config(const std::string& path, const Config& config)
         << "# Where this cabinet sits in the ring, 0-based (bookkeeping only).\n"
         << "link_cabinet_index = " << config.link_cabinet_index << "\n"
         << "\n"
-        << "# Cabinet outputs: the lamps and the drive-board commands, published\n"
-        << "# over TCP like MAME's network output (-output network), for tools\n"
-        << "# such as BackForceFeeder, MameHooker or DOFLinx. The default address\n"
-        << "# keeps it on this machine; empty net_outputs_ip listens on every\n"
-        << "# interface. Port 8000 is MAME's. A starting game is also announced\n"
-        << "# over UDP to net_outputs_udp_port (Supermodel's 8001, which\n"
-        << "# BackForceFeeder listens on); 0 turns the announcement off.\n"
-        << "net_outputs = " << bool_text(config.net_outputs) << "\n"
-        << "net_outputs_ip = " << config.net_outputs_ip << "\n"
-        << "net_outputs_port = " << config.net_outputs_port << "\n"
-        << "net_outputs_udp_port = " << config.net_outputs_udp_port << "\n"
-        << "\n"
         << "# Steering-wheel force feedback: a synthesised centring spring (the\n"
         << "# drive board is not emulated, so this is a feel, not the real motor\n"
         << "# force). Strength is 0..100 percent of the wheel's maximum torque.\n"
@@ -876,6 +872,16 @@ bool save_config(const std::string& path, const Config& config)
         << "# buzz that rises with steering angle. 0..100 percent.\n"
         << "pad_rumble = " << bool_text(config.pad_rumble) << "\n"
         << "pad_rumble_strength = " << config.pad_rumble_strength << "\n"
+        << "# Cabinet lamps and drive-board bytes for MAMEHooker, DOFLinx and\n"
+        << "# similar tools, in MAME's formats: over TCP (network) and, on\n"
+        << "# Windows, as window messages. With the network outputs on, a starting\n"
+        << "# game is also announced over UDP to outputs_network_udp_port, as\n"
+        << "# Supermodel does on 8001, which BackForceFeeder waits for; 0 turns\n"
+        << "# the announcement off.\n"
+        << "outputs_network = " << bool_text(config.outputs_network) << "\n"
+        << "outputs_network_port = " << config.outputs_network_port << "\n"
+        << "outputs_network_udp_port = " << config.outputs_network_udp_port << "\n"
+        << "outputs_windows = " << bool_text(config.outputs_windows) << "\n"
         << "# Your wheel's own physical rotation range (a G-series PC wheel is\n"
         << "# ~900). The cabinet's ~240 of lock is mapped onto it, so matching\n"
         << "# your wheel gives arcade-like response.\n"

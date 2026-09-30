@@ -284,11 +284,11 @@ endif()
 
 add_library(sm2_osd STATIC
     osd/audio.cpp
+    osd/outputs.cpp
     osd/drive_command.cpp
     osd/frame_pacer.cpp
     osd/gui.cpp
     osd/input.cpp
-    osd/net_outputs.cpp
     osd/scraper.cpp
     osd/wheel_ffb.cpp
     osd/window.cpp

@@ -1503,7 +1503,7 @@ void Gui::draw_network_tab(Config& config)
 
     ImGui::SeparatorText("Cabinet outputs");
 
-    ImGui::Checkbox("Publish lamps and drive board", &config.net_outputs);
+    ImGui::Checkbox("Network outputs (MAME protocol)", &config.outputs_network);
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
@@ -1513,44 +1513,45 @@ void Gui::draw_network_tab(Config& config)
             "the like. Takes effect straight away.");
     }
 
-    ImGui::BeginDisabled(!config.net_outputs);
-    text_field("Outputs IP", config.net_outputs_ip, 180.0f);
-    ImGui::SameLine();
-    ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("127.0.0.1 keeps it on this machine, where those tools\n"
-                          "run. Blank listens on every interface.");
-    }
+    ImGui::BeginDisabled(!config.outputs_network);
     {
-        int port = static_cast<int>(config.net_outputs_port);
+        int port = static_cast<int>(config.outputs_network_port);
         ImGui::SetNextItemWidth(120.0f);
         if (ImGui::InputInt("Outputs port", &port)) {
-            config.net_outputs_port = static_cast<u32>(std::clamp(port, 1, 65535));
+            config.outputs_network_port = static_cast<u32>(std::clamp(port, 1, 65535));
         }
     }
     {
-        int port = static_cast<int>(config.net_outputs_udp_port);
+        int port = static_cast<int>(config.outputs_network_udp_port);
         ImGui::SetNextItemWidth(120.0f);
         if (ImGui::InputInt("Announce port (UDP)", &port)) {
-            config.net_outputs_udp_port = static_cast<u32>(std::clamp(port, 0, 65535));
+            config.outputs_network_udp_port = static_cast<u32>(std::clamp(port, 0, 65535));
         }
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Announces the game and the outputs port to tools\n"
-                              "that wait for it, as Supermodel does (8001, which\n"
-                              "BackForceFeeder listens on). 0 turns it off.");
+            ImGui::SetTooltip("Announces the game and the outputs port to tools on\n"
+                              "this machine that wait for it, as Supermodel does\n"
+                              "(8001, which BackForceFeeder listens on). 0 turns it off.");
         }
     }
     ImGui::EndDisabled();
 
-    if (!config.net_outputs) {
-        ImGui::TextDisabled("Off.");
+    ImGui::Checkbox("Windows outputs (MAMEOutput messages)", &config.outputs_windows);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("The same outputs over MAME's Windows-message protocol,\n"
+                          "for tools that speak that one. Windows only.");
+    }
+
+    if (!config.outputs_network) {
+        ImGui::TextDisabled("Network outputs off.");
     } else if (!m_outputs_status.error.empty()) {
         ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Not listening: %s",
                            m_outputs_status.error.c_str());
     } else if (!m_outputs_status.listening) {
-        ImGui::TextDisabled("Starts with the next game.");
+        ImGui::TextDisabled("Not listening.");
     } else if (m_outputs_status.clients == 0) {
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "Listening; no tool connected.");
     } else {

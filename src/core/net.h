@@ -13,8 +13,7 @@
 // express written permission of the author.
 //
 // Cross-platform networking helpers: host interface enumeration (to prefill the
-// cabinet-link settings), a non-blocking UDP socket for the link transport, and a
-// non-blocking TCP listener for the cabinet outputs.
+// cabinet-link settings) and a non-blocking UDP socket for the link transport.
 #pragma once
 
 #include "core/types.h"
@@ -64,10 +63,6 @@ public:
 
     [[nodiscard]] bool valid() const { return m_fd != kInvalid; }
 
-    /// Allow send_to() a broadcast address such as 255.255.255.255. False on
-    /// failure.
-    bool set_broadcast(bool enable);
-
     /// Send one datagram to dest_ip:port. False on error, including a full send
     /// buffer, which the caller treats as back-pressure.
     bool send_to(std::span<const u8> data, const std::string& dest_ip, u16 port);
@@ -91,84 +86,71 @@ private:
     std::string m_last_error;
 };
 
-// -- non-blocking TCP -------------------------------------------------------
-
-#if defined(_WIN32)
-using SocketFd                           = std::uintptr_t;
-inline constexpr SocketFd kInvalidSocket = static_cast<SocketFd>(~0ull);
-#else
-using SocketFd                           = int;
-inline constexpr SocketFd kInvalidSocket = -1;
-#endif
-
-/// One accepted TCP connection, non-blocking and with Nagle off, so a short
-/// line goes out as soon as it is sent. Only what a line-oriented server needs:
-/// sending, and noticing that the peer went away.
-class TcpConnection {
+/// Process-wide network startup/teardown (WSAStartup/WSACleanup on Windows, a
+/// no-op elsewhere). Refcounted, so safe to call in matched pairs.
+/// A non-blocking TCP server that queues text for its clients. Accepting,
+/// flushing and dropping clients all happen in poll(), so nothing blocks the
+/// caller; a client that stops reading is disconnected rather than buffered
+/// without limit.
+class TcpServer {
 public:
-    TcpConnection() = default;
-    ~TcpConnection();
+    TcpServer() = default;
+    ~TcpServer();
 
-    TcpConnection(const TcpConnection&)            = delete;
-    TcpConnection& operator=(const TcpConnection&) = delete;
-    TcpConnection(TcpConnection&& other) noexcept;
-    TcpConnection& operator=(TcpConnection&& other) noexcept;
+    TcpServer(const TcpServer&)            = delete;
+    TcpServer& operator=(const TcpServer&) = delete;
 
-    [[nodiscard]] bool valid() const { return m_fd != kInvalidSocket; }
-
-    /// Send as much of `data` as the socket takes without blocking. The number of
-    /// bytes taken, which is 0 when the peer is not reading and the buffer is
-    /// full; nullopt once the connection has failed.
-    [[nodiscard]] std::optional<usize> send(std::string_view data);
-
-    /// Read and discard whatever the peer has sent. False once the peer has
-    /// closed the connection or it has failed.
-    [[nodiscard]] bool drain();
-
-    /// Close the sending side first, so the peer reads an orderly end of stream
-    /// after anything already sent, then release the socket.
+    /// Listen on every interface at port. False on failure.
+    bool open(u16 port);
     void close();
+    [[nodiscard]] bool valid() const { return m_listen != kInvalid; }
 
-private:
-    friend class TcpListener;
-    explicit TcpConnection(SocketFd fd) : m_fd(fd) {}
+    /// Accept waiting connections, calling on_connect(id) for each so the caller
+    /// can greet it, then flush queued text and drop closed clients.
+    template <typename OnConnect>
+    void poll(OnConnect&& on_connect)
+    {
+        while (const std::optional<u64> id = accept_one()) {
+            on_connect(*id);
+        }
+        flush();
+    }
 
-    SocketFd m_fd = kInvalidSocket;
-};
+    /// Queue text for one client, or for every client.
+    void send(u64 client, std::string_view text);
+    void broadcast(std::string_view text);
 
-/// A non-blocking listening socket. Like UdpSocket, a failure to bind surfaces
-/// through valid()/last_error() rather than throwing.
-class TcpListener {
-public:
-    TcpListener() = default;
-    ~TcpListener();
-
-    TcpListener(const TcpListener&)            = delete;
-    TcpListener& operator=(const TcpListener&) = delete;
-
-    /// Listen on bind_ip:port; an empty bind_ip is INADDR_ANY. False on failure.
-    bool open(const std::string& bind_ip, u16 port);
-
-    void close();
-
-    [[nodiscard]] bool valid() const { return m_fd != kInvalidSocket; }
-
-    /// The next waiting connection, or an invalid one when nobody is waiting.
-    [[nodiscard]] TcpConnection accept();
-
+    [[nodiscard]] usize client_count() const { return m_clients.size(); }
     [[nodiscard]] const std::string& last_error() const { return m_last_error; }
 
-    /// The last open() failed because something else already listens there.
+    /// The last open() failed because something else already listens on the port.
     [[nodiscard]] bool address_in_use() const { return m_address_in_use; }
 
 private:
-    SocketFd    m_fd = kInvalidSocket;
-    std::string m_last_error;
-    bool        m_address_in_use = false;
+#if defined(_WIN32)
+    using Fd                       = std::uintptr_t;
+    static constexpr Fd kInvalid   = static_cast<Fd>(~0ull);
+#else
+    using Fd                       = int;
+    static constexpr Fd kInvalid   = -1;
+#endif
+
+    struct Client {
+        u64         id = 0;
+        Fd          fd = kInvalid;
+        std::string pending;
+    };
+
+    std::optional<u64> accept_one();
+    void flush();
+
+    Fd                  m_listen  = kInvalid;
+    u64                 m_next_id = 1;
+    std::vector<Client> m_clients;
+    std::string         m_last_error;
+    bool                m_address_in_use = false;
 };
 
-/// Process-wide network startup/teardown (WSAStartup/WSACleanup on Windows, a
-/// no-op elsewhere). Refcounted, so safe to call in matched pairs.
 bool startup();
 void shutdown();
 

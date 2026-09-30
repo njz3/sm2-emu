@@ -17,6 +17,7 @@
 #include "core/types.h"
 #include "cpu/bus.h"
 #include "cpu/i960/i960.h"
+#include "hw/model2_area_timing.h"
 #include "hw/copro_tgp.h"
 #include "hw/geometrizer.h"
 #include "hw/i8251.h"
@@ -241,6 +242,7 @@ public:
     u8  read8(u32 address) override;
     u16 read16(u32 address) override;
     u32 read32(u32 address) override;
+    u32 fetch32(u32 address) override;
     void write8(u32 address, u8 value) override;
     void write16(u32 address, u16 value) override;
     void write32(u32 address, u32 value) override;
@@ -370,6 +372,12 @@ private:
     std::vector<u16> m_framebuffer_b;
     std::vector<u8>  m_nvram;         ///< 16 KB battery-backed SRAM at 0x01d00000
     std::vector<u8>  m_cpu_control;
+    bool             m_fetching = false;  ///< Set while fetch32 reads, which pays no area waits.
+
+    void charge_area(u32 address)
+    {
+        if (!m_fetching) m_cpu.add_wait_cycles(area_wait_cycles(address, m_cpu_control));
+    }
     std::vector<u8>  m_comm_ram;      ///< 16 KB link board shared RAM
 
     /// daytonam's simulated protection state (Protection::DaytonaMaxxPic).

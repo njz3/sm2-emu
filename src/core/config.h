@@ -242,6 +242,22 @@ struct Config {
     /// Rumble strength, 0..100 percent of the pad's motor range.
     u32 pad_rumble_strength = 60;
 
+    // -- cabinet outputs ---------------------------------------------------
+
+    /// Publish lamps and drive-board bytes over MAME's network output protocol.
+    bool outputs_network = false;
+
+    /// TCP port for the network outputs; MAME uses 8000.
+    u32 outputs_network_port = 8000;
+
+    /// UDP port for Supermodel's announcement of a starting game, which
+    /// BackForceFeeder waits for before it connects; 8001 is Supermodel's.
+    /// 0 sends none.
+    u32 outputs_network_udp_port = 8001;
+
+    /// Publish the same outputs over MAME's Windows-message protocol (Windows only).
+    bool outputs_windows = false;
+
     // -- light-gun buttons -------------------------------------------------
 
     /// Actions a gun's buttons can drive. Reload doubles as Missile on titles
@@ -309,25 +325,6 @@ struct Config {
     /// This cabinet's 0-based position in the ring, for the operator's bookkeeping
     /// and the status display; the board negotiates the real link id from frames.
     u32 link_cabinet_index = 0;
-
-    // -- cabinet outputs -----------------------------------------------------
-
-    /// Publish the lamps and the drive-board commands over TCP the way MAME's
-    /// network output does, for tools such as BackForceFeeder, MameHooker or
-    /// DOFLinx. See osd/net_outputs.h.
-    bool net_outputs = false;
-
-    /// Where to listen. The loopback default keeps it on this machine, which
-    /// is where those tools run, and asks nothing of the firewall; blank
-    /// listens on every interface.
-    std::string net_outputs_ip = "127.0.0.1";
-
-    /// MAME's port, which the tools look for.
-    u32 net_outputs_port = 8000;
-
-    /// Where Supermodel's UDP announcement of a starting game goes, which
-    /// BackForceFeeder waits for. 8001 is Supermodel's; 0 sends none.
-    u32 net_outputs_udp_port = 8001;
 
     // -- paths -------------------------------------------------------------
 

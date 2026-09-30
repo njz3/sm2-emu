@@ -63,7 +63,6 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <optional>
 #include <span>
 #include <string>
 
@@ -336,10 +335,8 @@ public:
         return writes;
     }
 
-    /// The byte the game last wrote to its lamp and coin-counter port, for the
-    /// cabinet outputs. nullopt until the game first writes it. Which bit drives
-    /// which lamp is per cabinet; see osd/net_outputs.cpp.
-    [[nodiscard]] std::optional<u8> lamp_output() const { return m_lamp_output; }
+    /// The last value the game wrote to its lamp/coin-counter latch.
+    [[nodiscard]] u8 lamp_latch() const { return m_lamp_latch; }
 
     /// Log every access that lands outside a mapped region. Off by default.
     virtual void set_log_unmapped(bool enable) = 0;
@@ -374,9 +371,9 @@ protected:
     DriveBoardWrites m_drive_board_writes;
 
     /// Called by each board's lamp_output_w.
-    void record_lamp_output(u8 value) { m_lamp_output = value; }
+    void record_lamp_latch(u8 value) { m_lamp_latch = value; }
 
-    std::optional<u8> m_lamp_output;
+    u8 m_lamp_latch = 0;
 
     /// Zero the per-frame accumulators. Called at the top of run_frame().
     void reset_core_profile()
