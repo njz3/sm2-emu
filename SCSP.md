@@ -82,6 +82,9 @@ which lists the original documents.
   arcade), from [this YouTube playlist](https://www.youtube.com/watch?v=-OJo965t4RM&list=PLRtaAHG_k8HAGFmns9WruFpFW23dYb0JF&index=1),
   supplied as a FLAC file.
 - Daytona USA, "Let's Go Away (Advertisement)", supplied as a FLAC file.
+- Dynamite Cop / Dynamite Deka 2, attract mode recorded on **real hardware** (Game Nexus,
+  [YouTube](https://www.youtube.com/watch?v=FfdDF_Bu85Y)), supplied as the video's AAC audio
+  (118 s, about 128 kbit/s).
 
 ## Goal
 
@@ -708,6 +711,43 @@ pltkids, segawski, skisuprg, waverunr. hpyagu98 could not be loaded: backup ROM 
   upstream constants were fitted on hotd, whose DSP load they therefore already absorb, and
   there is no hardware recording to fit a new model on.
 
+## Check against a hardware recording: Dynamite Cop
+
+The attract mode of a real Dynamite Cop / Dynamite Deka 2 cabinet (see "Audio references")
+against 3 minutes of attract captured on each core, after the merge with upstream's
+main-CPU wait states. The recording lines up with both `dynamcop` and `dyndeka2`
+(chroma match 0.93–0.98); the stretch used is 20–116 s of the recording, its first 8 s
+being silent. Scripts: [tools/hw_fit.py](tools/hw_fit.py) (tempo),
+[tools/fine_pitch.py](tools/fine_pitch.py) (pitch on a 1-cent grid),
+[tools/hw_wetness.py](tools/hw_wetness.py) (reverb indicators, octave-band balance).
+
+| | Hardware | mame core | mednafen core |
+|---|---|---|---|
+| Tempo (`dynamcop` / `dyndeka2`) | — | +0.65% / +0.59% | +0.64% / +0.59% |
+| Pitch | — | +0.1 cent | +0.0 cent |
+| L/R correlation | 0.774 | 0.777 | 0.777 |
+| side/mid | −10.1 dB | −10.4 dB | −10.4 dB |
+| Envelope dips | 9.7 dB | 9.0 dB | 9.0 dB |
+| 2–4 kHz / 4–8 kHz / 8–16 kHz, against 500 Hz–1 kHz | −4.1 / −10.4 / −17.7 dB | −3.2 / −8.1 / −12.8 dB | −3.2 / −8.5 / −14.1 dB |
+
+- **Reverb: on a par with the hardware.** Stereo width, left/right correlation and the
+  envelope's dips match within the measurement's precision on both cores. This is the
+  first check of the effects DSP (step 8) against a cabinet rather than against mame, on
+  the game where the DSP matters most.
+- **Pitch: exact.** Within a cent, so the SCSP's sample clock is right.
+- **Tempo: 0.6% fast on both cores.** Pitch being exact, this is timing rather than the
+  audio clock, the same way as Sega Rally against its soundtrack: its pitch is also
+  exact (+0.3 cent with the same method) and its tempo +0.49%. Two references, one of them
+  a cabinet, now point to a sound 68000 still slightly too fast after the MSVC fix, i.e. the
+  bus contention fitted on hotd being a little short. Recalibrating `kContentionCycles` /
+  `kBusWaitCycles` against these references is the obvious next step, to be weighed against
+  upstream's hotd fit.
+- **Tone: the cabinet is darker above 2 kHz** (1–5 dB depending on the band); mednafen is a
+  little closer than mame at the top. It may be the board's output stage, the cabinet's
+  amplifier, or the recording chain; a single recording cannot tell them apart.
+- Daytona, for the record, measured the same way against its soundtrack: pitch +7.5 cents
+  (+0.43%) with a tempo of −0.10%. That is the Model 1 sound board (MultiPCM), not the SCSP.
+
 ## Check against the official manual
 
 Source: Sega's *SCSP User's Manual* (Sega Enterprises, 1997), read in its English HTML
@@ -873,8 +913,9 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
 |---|---|---|---|---|
 | hotd | FM, tempo (contention fitted on it), DSP from 30 s of attract | — | — | cores equivalent over 3 min of attract; FM to be recorded in play |
 | vf2 | DSP reverb | — | — | |
+| dynamcop | DSP reverb (strongest use) | ⚠️ | ⚠️ | against a cabinet recording: reverb and pitch match, tempo 0.6% fast on both cores |
 | doa | DSP, MADRS | — | — | |
-| daytona | original Model 2 | — | — | Model 1 sound board, no SCSP; aligns with its OST at −0.10% |
+| daytona | original Model 2 | — | — | Model 1 sound board, no SCSP; aligns with its OST at −0.10% tempo, pitch +7.5 cents |
 | srallyc | MSLC (end-of-music beeps) | ⚠️ | ⚠️ | tempo +0.49% against the OST (+2.5% before the 68000 fix); drier than the OST, but no DSP program in attract |
 | stcc | DSB (MPEG music) | — | — | only the effects go through the SCSP |
 | indy500 | | — | — | |
@@ -969,3 +1010,7 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
   core over 90 s on the 24 sets with a gain that play: levels 0.0 to +0.3 dB from mame,
   same clipping, bus load within 3%, key-ons within 0.3%. Nothing to change (see "Step 10
   findings").
+- **2026-09-30**: checked against a hardware recording of Dynamite Cop's attract mode:
+  reverb and pitch match the cabinet on both cores; tempo 0.6% fast on both, like Sega
+  Rally against its soundtrack, pointing at the sound 68000's bus contention. Added
+  `tools/hw_fit.py`, `tools/fine_pitch.py` and `tools/hw_wetness.py`.
