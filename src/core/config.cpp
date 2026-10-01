@@ -561,6 +561,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->wheel_ffb_strength)) {
                 bad_value();
             }
+        } else if (key == "wheel_panel_spring") {
+            if (!parse_u32(value, &out->wheel_panel_spring)) {
+                bad_value();
+            }
         } else if (key == "wheel_ffb_invert") {
             if (!parse_bool(value, &out->wheel_ffb_invert)) {
                 bad_value();
@@ -775,6 +779,7 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     out->window_width  = std::max(out->window_width, 256u);
     out->window_height = std::max(out->window_height, 192u);
     out->wheel_ffb_strength    = std::min(out->wheel_ffb_strength, 100u);
+    out->wheel_panel_spring    = std::min(out->wheel_panel_spring, 100u);
     out->wheel_rumble_strength = std::min(out->wheel_rumble_strength, 100u);
     out->pad_rumble_strength = std::min(out->pad_rumble_strength, 100u);
     out->pad_stick_sensitivity = std::clamp(out->pad_stick_sensitivity, 25u, 300u);
@@ -922,6 +927,10 @@ bool save_config(const std::string& path, const Config& config)
         << "# force). Strength is 0..100 percent of the wheel's maximum torque.\n"
         << "wheel_ffb = " << bool_text(config.wheel_ffb) << "\n"
         << "wheel_ffb_strength = " << config.wheel_ffb_strength << "\n"
+        << "# Sega Rally Championship and Daytona USA only, all their versions:\n"
+        << "# their panel's light centring spring, 0..100 percent of the strength\n"
+        << "# above. The other games' panels have none.\n"
+        << "wheel_panel_spring = " << config.wheel_panel_spring << "\n"
         << "# Reverses the force, for a wheel whose driver pushes the wrong way:\n"
         << "# one that pulls away from the centre instead of bringing it back.\n"
         << "wheel_ffb_invert = " << bool_text(config.wheel_ffb_invert) << "\n"

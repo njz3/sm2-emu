@@ -179,6 +179,12 @@ struct Config {
     /// Centring resistance, 0..100 percent of the wheel's maximum torque.
     u32 wheel_ffb_strength = 30;
 
+    /// The centring spring of the Sega Rally Championship and Daytona USA
+    /// panel, all their versions, 0..100 percent of the resistance above where
+    /// it is strongest. Very light on a cabinet: it brings the wheel back and is
+    /// barely felt when held against. The other games' panels have none.
+    u32 wheel_panel_spring = 20;
+
     /// Reverses the wheel's force, for a driver that pushes right on the
     /// positive force with which DirectInput, SDL and Linux push left.
     bool wheel_ffb_invert = false;
