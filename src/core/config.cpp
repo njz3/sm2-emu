@@ -669,6 +669,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->wheel_ffb_strength)) {
                 bad_value();
             }
+        } else if (key == "wheel_panel_spring") {
+            if (!parse_u32(value, &out->wheel_panel_spring)) {
+                bad_value();
+            }
         } else if (key == "wheel_indy_deadband") {
             if (!parse_u32(value, &out->wheel_indy_deadband)) {
                 bad_value();
@@ -916,6 +920,7 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     out->window_width  = std::max(out->window_width, 256u);
     out->window_height = std::max(out->window_height, 192u);
     out->wheel_ffb_strength    = std::min(out->wheel_ffb_strength, 100u);
+    out->wheel_panel_spring    = std::min(out->wheel_panel_spring, 100u);
     out->wheel_indy_full_power = std::clamp(out->wheel_indy_full_power, 1u, 63u);
     out->wheel_indy_deadband   = std::min(out->wheel_indy_deadband, out->wheel_indy_full_power - 1);
     out->wheel_shift_neutral_ms = std::min(out->wheel_shift_neutral_ms, 500u);
@@ -1077,6 +1082,10 @@ bool save_config(const std::string& path, const Config& config)
         << "# force). Strength is 0..100 percent of the wheel's maximum torque.\n"
         << "wheel_ffb = " << bool_text(config.wheel_ffb) << "\n"
         << "wheel_ffb_strength = " << config.wheel_ffb_strength << "\n"
+        << "# Sega Rally Championship and Daytona USA only, all their versions:\n"
+        << "# their panel's light centring spring, 0..100 percent of the strength\n"
+        << "# above. The other games' panels have none.\n"
+        << "wheel_panel_spring = " << config.wheel_panel_spring << "\n"
         << "# Indy 500, Touring Car, Over Rev and Super GT 24h: the drive board's\n"
         << "# power (0..63) that gives no torque yet, and the one that gives the\n"
         << "# wheel's full strength. 0 and 63: the torque in proportion to the\n"

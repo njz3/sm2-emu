@@ -219,10 +219,6 @@ int centring_spring(int deflection, int full)
 constexpr double kDriveBoardIrqHz = 1000.0;
 constexpr double kMachineHz       = 57.5245;
 
-/// The Sega Rally / Daytona panel spring, as a percentage of the wheel's
-/// strength. It is very light on a cabinet.
-constexpr int kPanelSpringPercent = 20;
-
 /// Sega Rally's start-up calibration finds the power that holds the wheel this
 /// many counts (out of 128) off centre each way, against the panel spring.
 constexpr int kRallyCalibCountsRight = 30;
@@ -1284,11 +1280,12 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             return stiction * std::clamp(velocity, -kFullSpeed, kFullSpeed) / kFullSpeed;
         };
 
-        // The Sega Rally and Daytona panel has a light spring. The EPR-18261
-        // panels are direct drive and have none.
+        // The Sega Rally and Daytona panel has a light spring, the user's share
+        // of the strength. The EPR-18261 panels are direct drive and have none.
         const bool panel_spring = game.drive_protocol == rom::DriveProtocol::Rally
                                || game.drive_protocol == rom::DriveProtocol::Daytona;
-        const int  panel_full   = ceiling * kPanelSpringPercent / 100;
+        const int  panel_full =
+            ceiling * static_cast<int>(std::min(m_wheel_settings.panel_spring, 100u)) / 100;
         const int  baseline     = panel_spring ? spring(panel_full) : 0;
 
         // Positive levels push the wheel left, as WheelForce::set_force takes them.

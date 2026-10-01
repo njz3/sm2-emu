@@ -106,6 +106,9 @@ public:
     struct WheelSettings {
         bool ffb           = true;
         u32  strength      = 50;
+        /// The light centring spring of the Sega Rally and Daytona USA panel,
+        /// 0..100 percent of `strength`; no other game has one.
+        u32  panel_spring  = 20;
         /// Indy 500's family: the drive board's power giving no torque yet, and
         /// the one giving the full strength (see Config::wheel_indy_deadband).
         u32  indy_deadband   = 0;

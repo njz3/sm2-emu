@@ -190,6 +190,10 @@ struct Config {
     /// Centring resistance, 0..100 percent of the wheel's maximum torque.
     u32 wheel_ffb_strength = 30;
 
+    /// The Sega Rally / Daytona panel spring, 0..100 percent of the wheel's
+    /// strength. Very light on a cabinet; the other panels have none.
+    u32 wheel_panel_spring = 20;
+
     /// EPR-18261 boards: the motor power (0..63) below which there is no
     /// torque, and the power that gives full strength. Linear in between.
     u32 wheel_indy_deadband   = 0;

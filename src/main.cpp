@@ -131,6 +131,7 @@ void apply_input_background(bool on)
     sm2::osd::Input::WheelSettings w;
     w.ffb             = c.wheel_ffb;
     w.strength        = c.wheel_ffb_strength;
+    w.panel_spring    = c.wheel_panel_spring;
     w.indy_deadband   = c.wheel_indy_deadband;
     w.indy_full_power = c.wheel_indy_full_power;
     w.ffb_invert      = c.wheel_ffb_invert;
@@ -973,6 +974,7 @@ int main(int argc, char** argv)
     options.config.language            = from_file.language;
     options.config.wheel_ffb           = from_file.wheel_ffb;
     options.config.wheel_ffb_strength  = from_file.wheel_ffb_strength;
+    options.config.wheel_panel_spring  = from_file.wheel_panel_spring;
     options.config.wheel_indy_deadband   = from_file.wheel_indy_deadband;
     options.config.wheel_indy_full_power = from_file.wheel_indy_full_power;
     options.config.wheel_ffb_invert    = from_file.wheel_ffb_invert;
