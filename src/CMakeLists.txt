@@ -285,9 +285,11 @@ endif()
 add_library(sm2_osd STATIC
     osd/audio.cpp
     osd/outputs.cpp
+    osd/daytona_board.cpp
     osd/drive_command.cpp
     osd/frame_pacer.cpp
     osd/gui.cpp
+    osd/indy_board.cpp
     osd/input.cpp
     osd/scraper.cpp
     osd/wheel_ffb.cpp
