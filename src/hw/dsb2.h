@@ -57,6 +57,10 @@ public:
     /// resampler bridges the difference.
     void mix(s16* dst, u32 frames, u32 out_rate);
 
+    /// Output level in 1/256 units, for headroom where the music and the SCSP
+    /// share one 16-bit clamp.
+    void set_gain(u16 gain) { m_gain = gain; }
+
     // -- cpu::Bus (68000, big-endian) ---------------------------------------
 
     u8   read8(u32 address) override;
@@ -107,6 +111,7 @@ private:
     s16 m_audio_buf[1152 * 2] = {};
 
     u32 m_mp_start = 0, m_mp_end = 0, m_mp_vol = 0x7f, m_mp_pan = 0;
+    s32 m_gain = 256;
     u32 m_start = 0, m_end = 0, m_rom_bank = 0;
     s32 m_mp_pos = 0, m_audio_pos = 0, m_audio_avail = 0;
     bool    m_playing = false;

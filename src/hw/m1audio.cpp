@@ -62,10 +62,8 @@ constexpr u32 kOutputRate = kPcmClock / MultiPcm::kClockDivider;
 /// without bound. Four frames' worth at ~760 frames each.
 constexpr usize kMaxPendingFrames = 4 * 800;
 
-/// The board's mixer, as percentages of full scale. MAME's segam1audio routes
-/// each MultiPCM to the speaker at 0.5 and the YM3438 at 0.30; those are the
-/// numbers, and they are what keeps two 16-bit PCM chips from clipping the bus
-/// the moment they both sound.
+/// The board's mixer balance, as percentages: each MultiPCM at 0.5 and the
+/// YM3438 at 0.30, as MAME's segam1audio routes them.
 constexpr s32 kGainPcm = 50;
 constexpr s32 kGainYm  = 30;
 
@@ -355,7 +353,7 @@ void M1Audio::generate_audio(u32 host_cycles)
     m_pending.resize(before + static_cast<usize>(frames) * 2);
     for (usize i = 0; i < static_cast<usize>(frames) * 2; ++i) {
         m_pending[before + i] =
-            static_cast<s16>(std::clamp(accum[i], -32768, 32767));
+            static_cast<s16>(std::clamp(accum[i] * m_gain >> 8, -32768, 32767));
     }
 
     // Nothing is draining in a headless run, so drop the oldest rather than grow.

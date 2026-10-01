@@ -26,6 +26,7 @@
 #include "render/geometry.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 namespace sm2::osd {
@@ -541,6 +542,17 @@ void Input::add_wheel(SDL_JoystickID id)
         return;
     }
 
+    // An untyped device needs steering plus a pedal axis. Keyboard and mouse
+    // receivers expose a one-axis "System Control" joystick that would otherwise
+    // take the driving controls from the gamepad.
+    if (type != SDL_JOYSTICK_TYPE_WHEEL && SDL_GetNumJoystickAxes(handle) < 2) {
+        const char* name = SDL_GetJoystickName(handle);
+        SM2_DEBUG("joystick %s has %d axis, not taken as a wheel",
+                  name != nullptr ? name : "?", SDL_GetNumJoystickAxes(handle));
+        SDL_CloseJoystick(handle);
+        return;
+    }
+
     m_wheel            = Wheel{};
     m_wheel.handle     = handle;
     m_wheel.id         = id;
@@ -802,16 +814,17 @@ u8 Input::sample_channel(const rom::AnalogChannel& channel) const
         return static_cast<u8>(value + 0.5f);
     };
 
-    // Snap a centred (self-centring) stick axis to exact centre within a small
-    // deadzone, so a resting stick reads the channel's true centre (0x80) rather
-    // than a count or two off it -- a half-LSB of the 16-bit-to-fraction map plus
-    // the pad's own noise -- which a steering-cycled menu would read as drift.
+    // A released stick does not always spring back to zero; a worn one can settle
+    // a fifth of the way out. Read that as exact centre, and rescale beyond it so
+    // the output rises from centre instead of jumping to a few percent of lock.
     const auto centred_fraction = [](s16 raw) {
-        constexpr int kCentreDead = 3000;
-        if (std::abs(static_cast<int>(raw)) < kCentreDead) {
+        constexpr float kCentreDead = 8000.0f;
+        const float value = std::max(static_cast<float>(raw), -32767.0f);
+        const float past  = std::abs(value) - kCentreDead;
+        if (past <= 0.0f) {
             return 0.5f;
         }
-        return static_cast<float>(static_cast<int>(raw) + 32768) / 65535.0f;
+        return 0.5f + std::copysign(past / (32767.0f - kCentreDead), value) * 0.5f;
     };
 
     float fraction = 0.0f;

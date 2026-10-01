@@ -114,9 +114,7 @@ s32 M68000::run(s32 cycles)
 
     m_running = true;
     m_stalled = 0;
-    // m_stalled is filled in by the bus callbacks during m68k_execute, so it has
-    // to be read after the call returns: the operands of a + are unsequenced,
-    // and MSVC loads the member first, which lost every wait state.
+    // Separate statement: stall() updates m_stalled during the call.
     const s32 executed = m68k_execute(cycles);
     const s32 used     = executed + m_stalled;
     m_running = false;

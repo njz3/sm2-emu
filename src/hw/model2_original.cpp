@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <string>
+#include <unordered_map>
 #include <bit>
 #include <cstdio>
 #include <cstring>
@@ -255,6 +256,17 @@ bool Model2Original::init(const rom::GameSpec& game, rom::RomSet roms)
     // which is the whole connection.
     m_m1audio.attach(m_roms.region("m1audio:sndcpu"), m_roms.region("m1audio:pcm1"),
                      m_roms.region("m1audio:pcm2"));
+    // Per-set board level in 1/256 units, so the loudest in-game mix sits just
+    // under full scale.
+    static const std::unordered_map<std::string, u16> kSoundGain = {
+        {"daytona", 117}, {"daytona93", 117}, {"daytonam", 117},
+        {"daytonas", 117}, {"daytonase", 117},
+        {"desert", 111},
+        {"vcop", 181}, {"vcopa", 181},
+    };
+    if (const auto it = kSoundGain.find(game.name); it != kSoundGain.end()) {
+        m_m1audio.set_gain(it->second);
+    }
     m_uart.set_tx_handler([this](u8 value) { m_m1audio.write_txd(value); });
     m_m1audio.set_rxd_handler([this](u8 value) { m_uart.write_rxd(value); });
     m_uart.set_ready_handler([this] { sound_ready_w(); });

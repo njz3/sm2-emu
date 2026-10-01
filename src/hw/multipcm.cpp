@@ -600,9 +600,8 @@ void MultiPcm::generate(s32* accum, u32 frames, s32 gain_percent)
                                       >> kTlShift);
         }
 
-        // MAME: stream.put_int_clamp(0, i, smpl, 32768).
-        left  = std::clamp(left, -32768, 32767);
-        right = std::clamp(right, -32768, 32767);
+        // Unclamped: the voices sum well past 16 bits, and the board scales the
+        // mix down before its one clamp.
 
         accum[frame * 2 + 0] += left * gain_percent / 100;
         accum[frame * 2 + 1] += right * gain_percent / 100;

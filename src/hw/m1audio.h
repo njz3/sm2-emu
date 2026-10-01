@@ -67,6 +67,10 @@ public:
                 std::span<const u8> pcm1,
                 std::span<const u8> pcm2);
 
+    /// Output level in 1/256 units. The two MultiPCMs and the YM3438 can sum
+    /// well past full scale, so each set is brought under the final clamp.
+    void set_gain(u16 gain) { m_gain = gain; }
+
     void reset();
 
     /// Advance the board by the equivalent of `host_cycles` of the host i960's
@@ -165,6 +169,7 @@ private:
 
     u64 m_cpu_debt    = 0;  ///< Numerator carried between run() calls, 2/5.
     u64 m_sample_debt = 0;  ///< Numerator for the 44643 Hz sample clock.
+    s32 m_gain        = 256;
 
     /// Sound cycles the last slice ran past its allowance, owed to the next one.
     u64 m_cycle_overshoot = 0;

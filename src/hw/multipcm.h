@@ -64,10 +64,7 @@ public:
     /// This is where time passes for the chip: envelopes and LFOs advance per
     /// frame, so it has to be called whether or not anyone is listening.
     ///
-    /// The chip's own sum is clamped to 16 bits before the gain, which is where
-    /// MAME clamps too -- put_int_clamp on the way into the stream, then the
-    /// speaker's route gain. Clamping after the gain instead would let one chip
-    /// swing further than it can on hardware.
+    /// The chip's sum is left unclamped; the board scales and clamps the mix.
     void generate(s32* accum, u32 frames, s32 gain_percent);
 
     [[nodiscard]] u32 sample_rate() const { return m_rate_hz; }
