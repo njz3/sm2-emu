@@ -24,10 +24,9 @@ DriveCommand make(Effect effect, int steps, int full_steps, bool held = false)
     return {effect, steps * kDriveFull / full_steps, held};
 }
 
-// Daytona, Indy 500, Touring Car, Over Rev and Super GT: effect in the high
-// nibble, strength in the low one. Indy 500's board, which the last four share,
-// is IndyBoard for a force-feedback wheel; this reading is only what pads and
-// plain rumble get of it.
+// Indy 500, Touring Car, Over Rev and Super GT: effect in the high nibble,
+// strength in the low one. Their board is IndyBoard for a force-feedback
+// wheel; this reading is only what pads and plain rumble get of it.
 //   0x1x  spring       0..7
 //   0x2x  friction     0..7
 //   0x3x  centring     0..12
@@ -36,7 +35,7 @@ DriveCommand make(Effect effect, int steps, int full_steps, bool held = false)
 //   0x6x  push right   0 releases, up to 7
 // 0x0x and 0x7x are the boot handshake. Indy 500 follows each effect with two
 // parameter bytes, 0xbx then 0xax, not yet understood.
-DriveCommand decode_daytona(u8 value)
+DriveCommand decode_indy(u8 value)
 {
     constexpr DriveCommand kOther{Effect::Other};
     const int low = value & 0x0f;
@@ -48,6 +47,30 @@ DriveCommand decode_daytona(u8 value)
         case 0x50: return low <= 7  ? make(Effect::PushLeft, low, 7) : kOther;
         case 0x60: return low <= 7  ? make(Effect::PushRight, low, 7) : kOther;
         default:   return kOther;
+    }
+}
+
+// Daytona's board works out its forces from the wheel's position (see
+// DaytonaBoard), which a force-feedback wheel follows. This is only the gist
+// of a byte, for what has no such wheel: pads and plain rumble.
+//   0x00-0x04, 0x08, 0x09, 0x0b, 0x0c  forces off
+//   0x2x  brake (n <= 7)      0x3x  centring spring
+//   0x4x  push away from the centre: shakes, on a pad
+//   0x5x  push left           0x6x  push right   (0x50, 0x60 push too)
+//   other 0x1x-0x6x: no effect; 0x7x and up: settings and questions.
+DriveCommand decode_daytona(u8 value)
+{
+    const int n = value & 0x07;
+    switch (value >> 4) {
+        case 0x0:
+            return (value == 0x0a || n >= 5) ? DriveCommand{Effect::Other} : DriveCommand{};
+        case 0x2: return value & 0x08 ? DriveCommand{} : make(Effect::Friction, n + 1, 8);
+        case 0x3: return make(Effect::Spring, n + 1, 8);
+        case 0x4: return value & 0x08 ? DriveCommand{} : make(Effect::Vibrate, n + 1, 8);
+        case 0x5: return value & 0x08 ? DriveCommand{} : make(Effect::PushLeft, n + 1, 8);
+        case 0x6: return value & 0x08 ? DriveCommand{} : make(Effect::PushRight, n + 1, 8);
+        case 0x1: return DriveCommand{};
+        default:  return DriveCommand{Effect::Other};
     }
 }
 
@@ -82,7 +105,7 @@ DriveCommand decode_rally(u8 value)
 DriveCommand decode_drive_command(rom::DriveProtocol protocol, u8 value)
 {
     switch (protocol) {
-        case rom::DriveProtocol::Indy:  return decode_daytona(value);
+        case rom::DriveProtocol::Indy:  return decode_indy(value);
         case rom::DriveProtocol::Rally: return decode_rally(value);
         case rom::DriveProtocol::Daytona:
         default: return decode_daytona(value);
