@@ -244,6 +244,11 @@ struct Config {
     /// another is selected or GearNeutral pressed.
     bool wheel_shifter_neutral = true;
 
+    /// A sequential shift (paddles, RB/LB) from one gear to another passes
+    /// through neutral this long, in milliseconds, as a lever crosses the
+    /// gate's centre; 0 shifts straight. Clamped to 0..500.
+    u32 wheel_shift_neutral_ms = 100;
+
     /// Which wheel axis drives each analogue control, or -1 to auto-detect
     /// (steering is axis 0; pedals are found by which axes rest at an extreme).
     /// The GUI calibration sets these when a wheel's layout differs.

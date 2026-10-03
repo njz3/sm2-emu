@@ -681,6 +681,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_bool(value, &out->wheel_shifter_neutral)) {
                 bad_value();
             }
+        } else if (key == "wheel_shift_neutral_ms") {
+            if (!parse_u32(value, &out->wheel_shift_neutral_ms)) {
+                bad_value();
+            }
         } else if (key == "wheel_steer_axis") {
             if (!parse_s32(value, &out->wheel_steer_axis)) {
                 bad_value();
@@ -799,6 +803,7 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     out->window_width  = std::max(out->window_width, 256u);
     out->window_height = std::max(out->window_height, 192u);
     out->wheel_ffb_strength    = std::min(out->wheel_ffb_strength, 100u);
+    out->wheel_shift_neutral_ms = std::min(out->wheel_shift_neutral_ms, 500u);
     out->wheel_rumble_strength = std::min(out->wheel_rumble_strength, 100u);
     out->pad_rumble_strength = std::min(out->pad_rumble_strength, 100u);
     out->pad_stick_sensitivity = std::clamp(out->pad_stick_sensitivity, 25u, 300u);
@@ -1003,6 +1008,10 @@ bool save_config(const std::string& path, const Config& config)
         << "# With an H shifter bound: its lever in none of the gears is in neutral,\n"
         << "# as on the cabinet. Off, the last gear stays until another is chosen.\n"
         << "wheel_shifter_neutral = " << bool_text(config.wheel_shifter_neutral) << "\n"
+        << "# A paddle or RB/LB shift from one gear to another passes through\n"
+        << "# neutral this long, in ms, as a lever crosses the gate; 0 shifts\n"
+        << "# straight. 0..500.\n"
+        << "wheel_shift_neutral_ms = " << config.wheel_shift_neutral_ms << "\n"
         << "# Wheel axes, or -1 to auto-detect (steering axis 0; pedals by rest\n"
         << "# position). Set by the GUI calibration when a wheel differs.\n"
         << "wheel_steer_axis = " << config.wheel_steer_axis << "\n"

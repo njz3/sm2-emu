@@ -2536,8 +2536,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
     // and RB/LB step through the gate instead.
     if (game.gearbox) {
         if (m_gear_game != game.name) {
-            m_wheel_gear = game.start_gear;
-            m_gear_game  = game.name;
+            m_wheel_gear           = game.start_gear;
+            m_gear_game            = game.name;
+            m_shift_neutral_frames = 0;
         }
 
         u8 gears = 0;
@@ -2586,10 +2587,20 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             gears |= 0x01;
             m_wheel_gear = 0;
         }
+        if (gears != 0) {
+            m_shift_neutral_frames = 0;  // a lever in a position needs no crossing
+        }
 
         // Paddles and the pad's gear buttons (RB/LB unless remapped) step through
         // the gate, neutral included, edge-detected and sharing m_wheel_gear.
+        // Going from one gear to another crosses neutral for a moment, as a
+        // lever does through the gate's centre: shift_neutral_ms in frames of
+        // the machine's 57.5245 Hz.
+        constexpr double kFrameHz = 57.5245;
+        const u32 crossing = static_cast<u32>(
+            m_wheel_settings.shift_neutral_ms * kFrameHz / 1000.0 + 0.999);
         const auto step = [&](bool up, bool down, bool* up_held, bool* down_held) {
+            const u32 from = m_wheel_gear;
             if (up && !*up_held && m_wheel_gear < 4) {
                 ++m_wheel_gear;
             }
@@ -2598,6 +2609,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             }
             *up_held   = up;
             *down_held = down;
+            if (m_wheel_gear != from && from != 0 && m_wheel_gear != 0) {
+                m_shift_neutral_frames = crossing;
+            }
         };
         bool sequential = false;
         if (m_wheel.handle != nullptr) {
@@ -2617,11 +2631,15 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (h_shifter && m_wheel_settings.shifter_neutral) {
                 // The H shifter's lever is in none of the gears: neutral, as
                 // on the cabinet.
-                gears        = 0x01;
-                m_wheel_gear = 0;
+                gears                  = 0x01;
+                m_wheel_gear           = 0;
+                m_shift_neutral_frames = 0;
             } else if (sequential) {
-                gears = static_cast<u8>(1u << m_wheel_gear);
+                gears = static_cast<u8>(m_shift_neutral_frames > 0 ? 0x01 : 1u << m_wheel_gear);
             }
+        }
+        if (m_shift_neutral_frames > 0) {
+            --m_shift_neutral_frames;
         }
 
         inputs->gears = gears;
