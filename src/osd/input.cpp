@@ -2529,9 +2529,11 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
 
     // Gear selector. The shifter's positions are exposed as one bit each and the
     // machine turns them into the code its program expects. Nothing held means
-    // "hold the last gear", which is what the real gate does between positions.
+    // "hold the last gear", as MAME does between positions.
     //
-    // F1 to F4 select gears 1 to 4 (GEARS bits 1..4) and F5 is neutral (bit 0).
+    // F1 to F4 select gears 1 to 4 (GEARS bits 1..4) and F5 is neutral (bit 0),
+    // as do the wheel buttons of an H shifter (Gear1..4, GearNeutral). Paddles
+    // and RB/LB step through the gate instead.
     if (game.gearbox) {
         if (m_gear_game != game.name) {
             m_wheel_gear = game.start_gear;
@@ -2555,48 +2557,69 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             }
         }
 
-        // Paddle shifters step through the gate, neutral included.
-        if (m_wheel.handle != nullptr) {
-            const int count = SDL_GetNumJoystickButtons(m_wheel.handle);
-            const auto role_held = [&](Config::WheelRole role) {
-                const s32 button = m_wheel_settings.buttons[static_cast<usize>(role)];
-                return button >= 0 && button < count
-                    && SDL_GetJoystickButton(m_wheel.handle, button);
-            };
-            const bool up   = role_held(Config::WheelRole::GearUp);
-            const bool down = role_held(Config::WheelRole::GearDown);
-            bool shifted = false;
-            if (up && !m_gear_up_held && m_wheel_gear < 4) {
-                ++m_wheel_gear;
-                shifted = true;
-            }
-            if (down && !m_gear_down_held && m_wheel_gear > 0) {
-                --m_wheel_gear;
-                shifted = true;
-            }
-            m_gear_up_held   = up;
-            m_gear_down_held = down;
-            if (shifted || gears == 0) {
-                gears = static_cast<u8>(1u << m_wheel_gear);
+        const int  wheel_buttons = m_wheel.handle != nullptr
+                                     ? SDL_GetNumJoystickButtons(m_wheel.handle) : 0;
+        const auto role_bound    = [&](Config::WheelRole role) {
+            const s32 button = m_wheel_settings.buttons[static_cast<usize>(role)];
+            return button >= 0 && button < wheel_buttons;
+        };
+        const auto role_held = [&](Config::WheelRole role) {
+            return role_bound(role)
+                && SDL_GetJoystickButton(m_wheel.handle,
+                                         m_wheel_settings.buttons[static_cast<usize>(role)]);
+        };
+
+        // An H shifter: a button per gear, and maybe one for neutral.
+        static constexpr Config::WheelRole kGearRoles[4] = {
+            Config::WheelRole::Gear1, Config::WheelRole::Gear2,
+            Config::WheelRole::Gear3, Config::WheelRole::Gear4,
+        };
+        bool h_shifter = false;
+        for (u32 gear = 0; gear < 4; ++gear) {
+            h_shifter |= role_bound(kGearRoles[gear]);
+            if (role_held(kGearRoles[gear])) {
+                gears |= static_cast<u8>(1u << (gear + 1));
+                m_wheel_gear = gear + 1;
             }
         }
+        if (role_held(Config::WheelRole::GearNeutral)) {
+            gears |= 0x01;
+            m_wheel_gear = 0;
+        }
 
-        // Gamepad shifter: RB up, LB down, edge-detected, sharing m_wheel_gear.
-        if (pad_for(0) != nullptr) {
-            const bool up   = pad_role_held(0, Config::PadRole::GearUp);
-            const bool down = pad_role_held(0, Config::PadRole::GearDown);
-            bool shifted = false;
-            if (up && !m_pad_gear_up_held && m_wheel_gear < 4) {
+        // Paddles and the pad's gear buttons (RB/LB unless remapped) step through
+        // the gate, neutral included, edge-detected and sharing m_wheel_gear.
+        const auto step = [&](bool up, bool down, bool* up_held, bool* down_held) {
+            if (up && !*up_held && m_wheel_gear < 4) {
                 ++m_wheel_gear;
-                shifted = true;
             }
-            if (down && !m_pad_gear_down_held && m_wheel_gear > 0) {
+            if (down && !*down_held && m_wheel_gear > 0) {
                 --m_wheel_gear;
-                shifted = true;
             }
-            m_pad_gear_up_held   = up;
-            m_pad_gear_down_held = down;
-            if (shifted || gears == 0) {
+            *up_held   = up;
+            *down_held = down;
+        };
+        bool sequential = false;
+        if (m_wheel.handle != nullptr) {
+            sequential = true;
+            step(role_held(Config::WheelRole::GearUp), role_held(Config::WheelRole::GearDown),
+                 &m_gear_up_held, &m_gear_down_held);
+        }
+        if (pad_for(0) != nullptr) {
+            sequential = true;
+            step(pad_role_held(0, Config::PadRole::GearUp),
+                 pad_role_held(0, Config::PadRole::GearDown),
+                 &m_pad_gear_up_held, &m_pad_gear_down_held);
+        }
+
+        // A position held (a key, an H shifter's button) wins over the paddles.
+        if (gears == 0) {
+            if (h_shifter && m_wheel_settings.shifter_neutral) {
+                // The H shifter's lever is in none of the gears: neutral, as
+                // on the cabinet.
+                gears        = 0x01;
+                m_wheel_gear = 0;
+            } else if (sequential) {
                 gears = static_cast<u8>(1u << m_wheel_gear);
             }
         }

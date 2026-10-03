@@ -1016,6 +1016,11 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
         {"Button 4",   Config::WheelRole::Button4},
         {"Shift up",   Config::WheelRole::GearUp},
         {"Shift down", Config::WheelRole::GearDown},
+        {"Gear 1",     Config::WheelRole::Gear1},
+        {"Gear 2",     Config::WheelRole::Gear2},
+        {"Gear 3",     Config::WheelRole::Gear3},
+        {"Gear 4",     Config::WheelRole::Gear4},
+        {"Neutral",    Config::WheelRole::GearNeutral},
         {"Test",       Config::WheelRole::Test},
         {"Service",    Config::WheelRole::Service},
         {"Menu (F10)", Config::WheelRole::Menu},
@@ -1057,6 +1062,21 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
         ImGui::PopID();
     }
     ImGui::EndDisabled();
+
+    // -- gear shifter -------------------------------------------------------
+    ImGui::Separator();
+    ImGui::Text("Gear shifter");
+    ImGui::TextDisabled("Daytona USA and Sega Rally Championship, all versions.");
+
+    ImGui::Checkbox("Neutral when no gear is engaged", &config.wheel_shifter_neutral);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("With an H shifter bound to Gear 1..4: its lever in none\n"
+                          "of the gears is in neutral, as on the cabinet. Off, the\n"
+                          "last gear stays engaged until another is selected or\n"
+                          "Neutral is pressed.");
+    }
 }
 
 // ---------------------------------------------------------------------------

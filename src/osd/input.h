@@ -118,6 +118,9 @@ public:
         std::array<s32, Config::kWheelRoleCount> buttons =
             Config{}.wheel_buttons;
 
+        /// An H shifter's lever in none of the gears is in neutral.
+        bool shifter_neutral = true;
+
         /// Wheel axis per analogue control, or -1 to auto-detect. Invert flags
         /// apply to a pedal that reads high released, low pressed.
         s32  steer_axis   = -1;

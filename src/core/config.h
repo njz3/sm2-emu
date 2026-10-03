@@ -208,10 +208,11 @@ struct Config {
     /// arcade buttons, which is also where a driving cabinet's view-change / VR
     /// buttons land (e.g. Daytona's VR1..VR4). Test/Service are the operator
     /// coin-door buttons; Menu is the emulator overlay (F10), not a machine
-    /// input. Keep kCount last.
+    /// input. Gear1..4 and GearNeutral are an H shifter's positions, for the
+    /// games with a gate gearbox. Keep kCount last.
     enum class WheelRole : u32 {
         Start, Coin, Button1, Button2, Button3, Button4, GearUp, GearDown,
-        Test, Service, Menu, kCount
+        Test, Service, Menu, Gear1, Gear2, Gear3, Gear4, GearNeutral, kCount
     };
     static constexpr u32 kWheelRoleCount = static_cast<u32>(WheelRole::kCount);
 
@@ -231,7 +232,17 @@ struct Config {
         -1,  // Test
         -1,  // Service
         -1,  // Menu
+        -1,  // Gear1
+        -1,  // Gear2
+        -1,  // Gear3
+        -1,  // Gear4
+        -1,  // GearNeutral
     };
+
+    /// An H shifter (Gear1..4 bound) whose lever is in none of the gears is in
+    /// neutral, as on the cabinet. Off, the last gear stays engaged until
+    /// another is selected or GearNeutral pressed.
+    bool wheel_shifter_neutral = true;
 
     /// Which wheel axis drives each analogue control, or -1 to auto-detect
     /// (steering is axis 0; pedals are found by which axes rest at an extreme).
