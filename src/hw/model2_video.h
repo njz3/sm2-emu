@@ -74,6 +74,12 @@ public:
     /// deferred character decode.
     void compose();
 
+    /// Hide the gun games' shot flash. Call after each frame with its IN1 port.
+    void filter_gun_flash(bool enabled, u8 in1);
+
+    /// Whether the front tilemap pair's window mask is ignored this frame.
+    [[nodiscard]] bool window_mask_a_hidden() const { return m_tiles.window_mask_a_hidden(); }
+
     /// Draw one framebuffer bank over the layers already in `below()`.
     ///
     /// Only used in render test mode, where the DSP stops drawing and clearing the
@@ -160,6 +166,10 @@ private:
     [[nodiscard]] u32 shade_colour(u16 colour, u32 shade) const;
 
     Segaic24Tile m_tiles;
+
+    u8   m_triggers_held      = 0;
+    bool m_trigger_pressed    = false;
+    bool m_window_mask_a_full = false;
 
     std::span<const u16> m_palette_ram;
     std::span<const u16> m_colour_translate;

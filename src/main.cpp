@@ -966,6 +966,7 @@ int main(int argc, char** argv)
     }
 
     options.config.lightgun_crosshair       = from_file.lightgun_crosshair;
+    options.config.lightgun_hide_flash      = from_file.lightgun_hide_flash;
     options.config.lightgun_recoil          = from_file.lightgun_recoil;
     options.config.lightgun_recoil_strength = from_file.lightgun_recoil_strength;
     options.config.sinden_border            = from_file.sinden_border;
@@ -1465,6 +1466,10 @@ int main(int argc, char** argv)
                 machine_iface->inputs().in1 = static_cast<u8>(0xff & ~press.in1);
             }
             machine_iface->run_frame();
+            if (loaded->game.lightgun.present) {
+                machine_iface->video().filter_gun_flash(options.config.lightgun_hide_flash,
+                                                        machine_iface->inputs().in1);
+            }
             if (texture_dumper) {
                 texture_dumper->scan(*machine_iface);
             }
@@ -2389,6 +2394,7 @@ int main(int argc, char** argv)
                                      options.config.pad_rumble_strength);
                 input.set_present_placement(options.config.aspect_mode,
                                             options.config.scaling_method);
+                input.set_sinden_border(options.config.sinden_border);
                 const auto drive_writes = machine_iface->take_drive_board_writes();
                 input.update_drive_board(loaded->game, drive_writes.view());
                 outputs.update(machine_iface->lamp_latch(), drive_writes.view());
@@ -2407,6 +2413,10 @@ int main(int argc, char** argv)
                 {
                     auto scope = core::maybe_scope(stage_run_frame, profile_sample);
                     machine_iface->run_frame();
+                }
+                if (loaded->game.lightgun.present) {
+                    machine_iface->video().filter_gun_flash(options.config.lightgun_hide_flash,
+                                                            machine_iface->inputs().in1);
                 }
                 if (texture_dumper) {
                     texture_dumper->scan(*machine_iface);

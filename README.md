@@ -263,10 +263,28 @@ in the settings overlay (`F10`):
   tab (steering range, pedal axes, button mapping). Synthesised centring
   resistance and road/engine rumble are provided for wheels with a motor, since
   the drive board's real force is not replayed.
-- **Light guns** over evdev on Linux (any `ID_INPUT_GUN` device),
-  including on-screen recoil for guns with a motor and an optional Sinden border if necessary;
-  the mouse remains the fallback aiming device on every platform.
+- **Light guns**, with one gun per player: the first gun found is player 1 and
+  the second is player 2. On Linux, any evdev device tagged `ID_INPUT_GUN` is
+  used, and guns with a motor get recoil. Windows is covered below. A Sinden
+  border is available if the gun needs one, and the mouse remains the fallback
+  aiming device on every platform. A gun calibrated to the whole screen is
+  mapped onto the game image, so no 4:3 mode is needed and shooting a side bar
+  counts as off screen. With the Sinden border on, the gun aims against that
+  border instead.
 - **Gamepad rumble** on the driving games, driven from the emulated drive board.
+
+#### Light guns on Windows
+
+- **Detection:** a mouse counts as a gun if its HID product name contains
+  "gun" or "aimtrak", which is meant to cover GUN4IR, Sinden and AimTrak guns.
+- **Mode:** the guns must be in absolute mouse mode and plugged in before
+  sm2-emu starts.
+- **Aim:** the gun's position on the monitor is mapped onto the window, so
+  aim also works windowed.
+- **Buttons:** only the five mouse buttons are read. The default coin, start
+  and hat bindings do nothing, because the guns send those as keyboard or
+  gamepad input.
+- **Recoil:** there is no recoil on Windows.
 
 ### Save states
 

@@ -197,7 +197,8 @@ void TilemapPass::upload(std::span<const u32> below, std::span<const u32> above)
 void TilemapPass::dispatch_compose(const hw::Model2MachineBase& machine,
                                    const hw::Model2Video&       video)
 {
-    const bool tile_changed  = m_tile_generation != machine.tile_generation();
+    const bool tile_changed  = m_tile_generation != machine.tile_generation()
+                            || m_window_mask_a_hidden != video.window_mask_a_hidden();
     const bool char_changed  = m_char_generation != machine.char_generation();
     const bool table_changed = m_table_generation != machine.table_generation();
     if (!tile_changed && !char_changed && !table_changed) {
@@ -206,7 +207,17 @@ void TilemapPass::dispatch_compose(const hw::Model2MachineBase& machine,
 
     if (tile_changed) {
         const std::span<const u8> tile_ram = machine.tile_ram();
-        m_tile_ram.write(tile_ram.data(), std::min<usize>(kTileRamBytes, tile_ram.size()));
+        const usize bytes = std::min<usize>(kTileRamBytes, tile_ram.size());
+        m_window_mask_a_hidden = video.window_mask_a_hidden();
+        if (m_window_mask_a_hidden && bytes >= hw::Segaic24Tile::kWindowMaskAOffset
+                                                + hw::Segaic24Tile::kWindowMaskABytes) {
+            m_tile_ram_scratch.assign(tile_ram.begin(), tile_ram.begin() + bytes);
+            std::memset(m_tile_ram_scratch.data() + hw::Segaic24Tile::kWindowMaskAOffset, 0,
+                        hw::Segaic24Tile::kWindowMaskABytes);
+            m_tile_ram.write(m_tile_ram_scratch.data(), bytes);
+        } else {
+            m_tile_ram.write(tile_ram.data(), bytes);
+        }
         m_tile_generation = machine.tile_generation();
     }
     if (char_changed) {

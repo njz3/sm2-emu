@@ -297,8 +297,12 @@ add_library(sm2_osd STATIC
 )
 if(SM2_HAVE_EVDEV)
     target_sources(sm2_osd PRIVATE osd/evdev_gun.cpp)
-    target_compile_definitions(sm2_osd PUBLIC SM2_HAVE_EVDEV=1)
+    target_compile_definitions(sm2_osd PUBLIC SM2_HAVE_EVDEV=1 SM2_HAVE_LIGHTGUNS=1)
     target_link_libraries(sm2_osd PRIVATE PkgConfig::UDEV)
+elseif(SM2_PLATFORM_WINDOWS)
+    target_sources(sm2_osd PRIVATE osd/rawinput_gun.cpp)
+    target_compile_definitions(sm2_osd PUBLIC SM2_HAVE_LIGHTGUNS=1)
+    target_link_libraries(sm2_osd PRIVATE hid cfgmgr32)
 endif()
 target_link_libraries(sm2_osd
     PUBLIC

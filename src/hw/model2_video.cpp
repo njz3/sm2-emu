@@ -53,11 +53,10 @@ Model2Video::Model2Video()
     , m_below(static_cast<usize>(kWidth) * kHeight, 0)
     , m_above(static_cast<usize>(kWidth) * kHeight, 0)
 {
-    // Bias 64, gain 51: the monitor showed nothing below a quarter scale and
-    // reached full white early. Without this the whole image is washed out.
+    // Black at 40, higher crushes shadow detail.
     for (u32 index = 0; index < 256; ++index) {
         const double raw =
-            std::max((static_cast<double>(index) - 64.0) * 255.0 / 191.0, 0.0);
+            std::max((static_cast<double>(index) - 40.0) * 255.0 / 215.0, 0.0);
         m_gamma[index] = static_cast<u8>(raw);
     }
 }
@@ -152,6 +151,22 @@ void Model2Video::build_tone_curve(std::span<u32> out) const
                           translate(kBlueBlockBase, component, shade));
         }
     }
+}
+
+void Model2Video::filter_gun_flash(bool enabled, u8 in1)
+{
+    const u8   held    = static_cast<u8>(~in1 & 0x03);
+    const bool pressed = (held & ~m_triggers_held) != 0;
+    const bool full    = m_tiles.window_mask_a_full();
+
+    // A flash shows the front tilemap pair's window over the whole screen for one
+    // frame after a shot. Fades hold the same mask, so one already up is left alone.
+    m_tiles.set_window_mask_a_hidden(enabled && full && !m_window_mask_a_full
+                                     && (pressed || m_trigger_pressed));
+
+    m_triggers_held      = held;
+    m_trigger_pressed    = pressed;
+    m_window_mask_a_full = full;
 }
 
 void Model2Video::swap_layers(std::vector<u32>& below, std::vector<u32>& above)

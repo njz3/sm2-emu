@@ -23,6 +23,7 @@
 #include "render/geometry.h"
 
 #include <span>
+#include <vector>
 
 namespace sm2::hw {
 class Model2MachineBase;
@@ -105,6 +106,8 @@ private:
     u64 m_tile_generation  = 0;
     u64 m_char_generation  = 0;
     u64 m_table_generation = 0;
+    bool m_window_mask_a_hidden = false;
+    std::vector<u8> m_tile_ram_scratch;
 
     static constexpr usize kTileRamBytes = 0x10000;
     static constexpr usize kCharRamBytes = 0x80000;

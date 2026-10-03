@@ -116,7 +116,7 @@ SoftRenderer::SoftRenderer()
 {
     for (u32 index = 0; index < 256; ++index) {
         m_gamma[index] = static_cast<u8>(
-            std::max((static_cast<double>(index) - 64.0) * 255.0 / 191.0, 0.0));
+            std::max((static_cast<double>(index) - 40.0) * 255.0 / 215.0, 0.0));
     }
 }
 

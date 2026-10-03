@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.24)
 #
 
 project(sm2-emu
-    VERSION     0.9.27
+    VERSION     0.9.31
     DESCRIPTION "Sega Model 2 arcade emulator"
     LANGUAGES   C CXX
 )
@@ -87,6 +87,7 @@ option(SM2_SCSP_MEDNAFEN "Build the second SCSP core (scsp_core = mednafen)" ON)
 # merges all mice into one pointer, so this is the only way to tell two guns
 # apart. AUTO builds it when libudev is present and skips it otherwise; ON turns
 # a missing libudev into a hard error, OFF forces the single-mouse path.
+# Windows does the same job with Raw Input, which is always built.
 set(SM2_EVDEV "AUTO" CACHE STRING "evdev light guns via libudev: AUTO, ON or OFF")
 set_property(CACHE SM2_EVDEV PROPERTY STRINGS AUTO ON OFF)
 

@@ -155,6 +155,7 @@ private:
         u64 tile_generation  = 0;
         u64 char_generation  = 0;
         u64 table_generation = 0;
+        bool window_mask_a_hidden = false;
     };
 
     /// Two surfaces per frame in flight: recording frame N+1 must not overwrite

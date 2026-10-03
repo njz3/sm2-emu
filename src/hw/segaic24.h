@@ -83,6 +83,10 @@ public:
     static constexpr u32 kScreenWidth  = 496;
     static constexpr u32 kScreenHeight = 384;
 
+    /// Byte offset and size of pair A's window mask in tile RAM.
+    static constexpr u32 kWindowMaskAOffset = 0xc000;
+    static constexpr u32 kWindowMaskABytes  = kScreenHeight * 4 * 2;
+
     /// Per-pixel flag bits, matching MAME's tilemap layer flags so the ported
     /// comparison against `tpri` reads the same.
     static constexpr u8 kPixelOpaque   = 0x10;  ///< TILEMAP_PIXEL_LAYER0
@@ -131,6 +135,13 @@ public:
               u32*                 dest,
               u32                  dest_stride);
 
+    /// Draw pair A as if its window mask were clear. Tile RAM is not changed.
+    void set_window_mask_a_hidden(bool hidden) { m_window_mask_a_hidden = hidden; }
+    [[nodiscard]] bool window_mask_a_hidden() const { return m_window_mask_a_hidden; }
+
+    /// Whether pair A's window mask covers the whole screen.
+    [[nodiscard]] bool window_mask_a_full() const;
+
     // -- diagnostics -------------------------------------------------------
 
     /// Cached pixel map of one layer: palette indices, 512x512, row order.
@@ -153,6 +164,7 @@ private:
         /// Whether the window mask applies at all. It does not in the split
         /// modes, which choose between the pair by position instead.
         bool                 masked      = true;
+        bool                 mask_hidden = false;  ///< Treat the mask as clear.
     };
 
     /// One 16-bit word of tile RAM, addressed the way the chip sees it.
@@ -214,6 +226,8 @@ private:
 
     /// Number of set entries in m_cell_dirty, same reasoning.
     u32 m_cell_dirty_count = 0;
+
+    bool m_window_mask_a_hidden = false;
 };
 
 }  // namespace sm2::hw

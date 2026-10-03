@@ -37,7 +37,7 @@ constexpr u32 kNameTableEndBytes = 0x8000;
 constexpr u32 kRowScrollTable = 0x4000;  ///< +0x200 per layer, one word per line
 constexpr u32 kHorizontalScroll = 0x5000;  ///< +1 per layer, bit 15 enables rowscroll
 constexpr u32 kVerticalScroll   = 0x5004;  ///< +1 per layer, bit 15 disables the layer
-constexpr u32 kWindowMaskA      = 0x6000;  ///< four words per line, 64 flags of 8 px
+constexpr u32 kWindowMaskA      = Segaic24Tile::kWindowMaskAOffset / 2;  ///< four words per line, 64 flags of 8 px
 constexpr u32 kWindowMaskB      = 0x6800;
 
 }  // namespace
@@ -238,6 +238,16 @@ u16 Segaic24Tile::tile_word(u32 word_index) const
     return static_cast<u16>(m_tile_ram[offset] | (m_tile_ram[offset + 1] << 8));
 }
 
+bool Segaic24Tile::window_mask_a_full() const
+{
+    for (u32 word = 0; word < kScreenHeight * 4; ++word) {
+        if (tile_word(kWindowMaskA + word) != 0xffff) {
+            return false;
+        }
+    }
+    return true;
+}
+
 std::span<const u16> Segaic24Tile::pixmap(u32 layer) const
 {
     if (layer >= kLayerCount) {
@@ -291,6 +301,7 @@ void Segaic24Tile::draw(u32                  layer_and_category,
     // complement of the mask.
     state.window = (layer & 1) != 0;
     state.masked = true;
+    state.mask_hidden = m_window_mask_a_hidden && state.mask_base == kWindowMaskA;
 
     if ((ctrl & 0x6000) != 0) {
         // A split mode. The pair's two layers supply opposite sides of a boundary,
@@ -495,7 +506,7 @@ void Segaic24Tile::draw_rect(const DrawState& state,
         while (llx > 0) {
             // In the split modes the pair is chosen by position, so the mask does
             // not take part and every pixel of the selected layer is a candidate.
-            u16 m = state.masked ? tile_word(mask_word) : u16{0};
+            u16 m = state.masked && !state.mask_hidden ? tile_word(mask_word) : u16{0};
             ++mask_word;
             if (win && state.masked) {
                 m = static_cast<u16>(~m);

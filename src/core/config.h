@@ -108,6 +108,9 @@ struct Config {
     /// itself, which still hides the cursor and enables the gun paths.
     bool lightgun_crosshair = true;
 
+    /// Hide the white flash the gun games show on each shot.
+    bool lightgun_hide_flash = false;
+
     /// Fire the gun's recoil / rumble motor on each shot, for guns that have one
     /// (Sinden and similar, exposed as a force-feedback device). No effect on a
     /// gun without a motor. Strength is 0..100 percent.

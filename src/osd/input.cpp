@@ -19,8 +19,8 @@
 #include "osd/drive_command.h"
 #include "osd/wheel_ffb.h"
 
-#ifdef SM2_HAVE_EVDEV
-#include "osd/evdev_gun.h"
+#ifdef SM2_HAVE_LIGHTGUNS
+#include "osd/light_guns.h"
 #endif
 
 #include "render/geometry.h"
@@ -387,10 +387,10 @@ bool Input::init(const WheelSettings& wheel)
         SM2_INFO("no gamepad found; the keyboard covers both players");
     }
 
-#ifdef SM2_HAVE_EVDEV
+#ifdef SM2_HAVE_LIGHTGUNS
     // Open any per-device light guns. If none are present the pointer stays the
     // gun source, so this failing to find anything is not an error.
-    m_guns = std::make_unique<EvdevGuns>();
+    m_guns = std::make_unique<LightGuns>();
     if (!m_guns->init() || m_guns->count() == 0) {
         m_guns.reset();
     }
@@ -1402,20 +1402,63 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
     }
     std::array<bool, kPlayers> on_mouse = {true, true};
 
-#ifdef SM2_HAVE_EVDEV
+#ifdef SM2_HAVE_LIGHTGUNS
     // Gun 0 drives player 1, gun 1 player 2. A player with no gun keeps the
     // mouse (aim and buttons), so one gun plus the mouse gives two aims.
     if (m_guns) {
         m_guns->poll();
-        const auto from_gun = [&](const EvdevGuns::Gun& g, usize player) {
+
+        // A gun reports where it points on the whole screen, so map that through
+        // the window onto the letterboxed image; aiming at a side bar then reads
+        // as off screen. A gun aiming against the Sinden border already reports
+        // positions on the image.
+        float screen_x = 0.0f;
+        float screen_y = 0.0f;
+        float screen_w = 1.0f;
+        float screen_h = 1.0f;
+        render::Letterbox gun_box{0.0f, 0.0f, 1.0f, 1.0f};
+        SDL_Window* window = SDL_GetKeyboardFocus();
+        if (window == nullptr) {
+            window = SDL_GetMouseFocus();
+        }
+        SDL_Rect display{};
+        int win_x = 0;
+        int win_y = 0;
+        int win_w = 0;
+        int win_h = 0;
+        int pix_w = 0;
+        int pix_h = 0;
+        if (!m_sinden_border && window != nullptr
+            && SDL_GetDisplayBounds(SDL_GetDisplayForWindow(window), &display)
+            && SDL_GetWindowPosition(window, &win_x, &win_y)
+            && SDL_GetWindowSize(window, &win_w, &win_h)
+            && SDL_GetWindowSizeInPixels(window, &pix_w, &pix_h)
+            && win_w > 0 && win_h > 0 && display.w > 0 && display.h > 0) {
+            const render::Letterbox box = render::compute_letterbox(
+                static_cast<u32>(pix_w), static_cast<u32>(pix_h), m_present_aspect,
+                m_present_method);
+            if (box.width > 0.0f && box.height > 0.0f) {
+                screen_x = static_cast<float>(display.x - win_x) / static_cast<float>(win_w);
+                screen_y = static_cast<float>(display.y - win_y) / static_cast<float>(win_h);
+                screen_w = static_cast<float>(display.w) / static_cast<float>(win_w);
+                screen_h = static_cast<float>(display.h) / static_cast<float>(win_h);
+                gun_box  = {box.x / static_cast<float>(pix_w), box.y / static_cast<float>(pix_h),
+                            box.width / static_cast<float>(pix_w),
+                            box.height / static_cast<float>(pix_h)};
+            }
+        }
+
+        const auto from_gun = [&](const LightGuns::Gun& g, usize player) {
             const auto& bind = m_gun_buttons[player];
             const auto held  = [&](usize role) {
                 const u32 code = bind[role];
                 return code != 0 && g.held(static_cast<u16>(code));
             };
             GunInput gi;
-            gi.x = g.x;
-            gi.y = g.y;
+            const float wx = screen_x + g.x * screen_w;  // 0..1 across the window
+            const float wy = screen_y + g.y * screen_h;
+            gi.x = std::clamp((wx - gun_box.x) / gun_box.width, 0.0f, 1.0f);
+            gi.y = std::clamp((wy - gun_box.y) / gun_box.height, 0.0f, 1.0f);
             const bool reload = held(GrReload);
             if (has_missile) {
                 gi.trigger = held(GrTrigger);
@@ -1539,7 +1582,7 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
     // 2's crosshair only shows when a second gun is actually aiming it, so a
     // single-mouse session does not paint two overlapping crosshairs.
     bool p2_active = pad_for(1) != nullptr;  // a 2nd pad aims player 2
-#ifdef SM2_HAVE_EVDEV
+#ifdef SM2_HAVE_LIGHTGUNS
     p2_active = p2_active || (m_guns && m_guns->count() >= 2);
 #endif
     // Positional-gun titles draw their own in-game crosshair, so suppress ours
@@ -1576,18 +1619,9 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         inputs->gun_p2y = fraction_to_gun(p2.y, spec.p2y);
     }
 
-    // Triggers, active low. Player 1 is always IN1 bit 0. Player 2 differs by
-    // title: Virtua Cop 1/2 and Rail Chase 2 put it on IN1 bit 1; House of the
-    // Dead keeps the stock two-player layout with it on IN2 bit 0. The game's
-    // lightgun spec carries which.
+    // Triggers, active low: player 1 on IN1 bit 0, player 2 on IN1 bit 1.
     if (p1.trigger) inputs->in1 &= static_cast<u8>(~kButton1);
-    if (p2.trigger) {
-        if (spec.p2_trigger_on_in2) {
-            inputs->in2 &= static_cast<u8>(~kButton1);
-        } else {
-            inputs->in1 &= static_cast<u8>(~kButton2);
-        }
-    }
+    if (p2.trigger) inputs->in1 &= static_cast<u8>(~kButton2);
 
     // Missile (bel): P1 IN1 0x10, P2 IN1 0x20.
     if (p1.missile) inputs->in1 &= static_cast<u8>(~0x10);
@@ -2492,7 +2526,7 @@ std::vector<std::string> Input::gamepad_names() const
 
 usize Input::gun_count() const
 {
-#ifdef SM2_HAVE_EVDEV
+#ifdef SM2_HAVE_LIGHTGUNS
     return m_guns ? m_guns->count() : 0;
 #else
     return 0;
@@ -2501,7 +2535,7 @@ usize Input::gun_count() const
 
 std::string Input::gun_name(usize index) const
 {
-#ifdef SM2_HAVE_EVDEV
+#ifdef SM2_HAVE_LIGHTGUNS
     if (m_guns && index < m_guns->count()) {
         return m_guns->gun(index).name;
     }
@@ -2513,7 +2547,7 @@ std::string Input::gun_name(usize index) const
 
 u16 Input::gun_take_last_pressed(usize index) const
 {
-#ifdef SM2_HAVE_EVDEV
+#ifdef SM2_HAVE_LIGHTGUNS
     if (m_guns && index < m_guns->count()) {
         m_guns->poll();  // ensure fresh while the overlay is open
         return m_guns->take_last_pressed(index);
