@@ -179,6 +179,10 @@ struct Config {
     /// Centring resistance, 0..100 percent of the wheel's maximum torque.
     u32 wheel_ffb_strength = 30;
 
+    /// Reverses the wheel's force, for a driver that pushes right on the
+    /// positive force with which DirectInput, SDL and Linux push left.
+    bool wheel_ffb_invert = false;
+
     /// A synthesised road/engine rumble: a vibration that rises with the
     /// throttle and with hard steering. Used on games without force feedback;
     /// a wheel delivering force feedback does not also rumble.

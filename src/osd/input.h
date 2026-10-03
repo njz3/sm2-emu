@@ -100,6 +100,9 @@ public:
     struct WheelSettings {
         bool ffb           = true;
         u32  strength      = 50;
+        /// Reverses the force, for a driver that pushes right on the positive
+        /// force with which DirectInput, SDL and Linux push left.
+        bool ffb_invert    = false;
         u32  steer_degrees = 270;
         u32  lock_degrees  = 240;  ///< physical rotation for full game lock.
 

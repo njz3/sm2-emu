@@ -550,6 +550,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->wheel_ffb_strength)) {
                 bad_value();
             }
+        } else if (key == "wheel_ffb_invert") {
+            if (!parse_bool(value, &out->wheel_ffb_invert)) {
+                bad_value();
+            }
         } else if (key == "wheel_rumble") {
             if (!parse_bool(value, &out->wheel_rumble)) {
                 bad_value();
@@ -852,6 +856,9 @@ bool save_config(const std::string& path, const Config& config)
         << "# force). Strength is 0..100 percent of the wheel's maximum torque.\n"
         << "wheel_ffb = " << bool_text(config.wheel_ffb) << "\n"
         << "wheel_ffb_strength = " << config.wheel_ffb_strength << "\n"
+        << "# Reverses the force, for a wheel whose driver pushes the wrong way:\n"
+        << "# one that pulls away from the centre instead of bringing it back.\n"
+        << "wheel_ffb_invert = " << bool_text(config.wheel_ffb_invert) << "\n"
         << "# A synthesised engine/road rumble. Games with force feedback use that\n"
         << "# instead, and then nothing rumbles, pads included.\n"
         << "wheel_rumble = " << bool_text(config.wheel_rumble) << "\n"

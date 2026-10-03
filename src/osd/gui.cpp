@@ -857,6 +857,15 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
         resistance = ((resistance + 5) / 10) * 10;  // snap to 10 % steps
         config.wheel_ffb_strength = static_cast<u32>(std::clamp(resistance, 0, 100));
     }
+
+    ImGui::Checkbox("Invert force feedback", &config.wheel_ffb_invert);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("For a wheel whose driver pushes the wrong way: it pulls\n"
+                          "away from the centre instead of bringing it back, and\n"
+                          "the game's forces go the opposite way.");
+    }
     ImGui::EndDisabled();
 
     // Synthetic engine/road rumble, since the game streams no continuous buzz.
