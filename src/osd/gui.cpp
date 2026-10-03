@@ -1058,6 +1058,19 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
                           "last gear stays engaged until another is selected or\n"
                           "Neutral is pressed.");
     }
+
+    int neutral_ms = static_cast<int>(config.wheel_shift_neutral_ms);
+    if (ImGui::SliderInt("Neutral between gears", &neutral_ms, 0, 500, "%d ms")) {
+        neutral_ms = ((neutral_ms + 5) / 10) * 10;  // snap to 10 ms steps
+        config.wheel_shift_neutral_ms = static_cast<u32>(std::clamp(neutral_ms, 0, 500));
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Shift up / Shift down (and a gamepad's RB / LB) from one\n"
+                          "gear to another pass through neutral this long, as a\n"
+                          "lever crosses the gate's centre. 0 shifts straight.");
+    }
 }
 
 // ---------------------------------------------------------------------------
