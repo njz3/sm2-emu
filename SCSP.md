@@ -255,6 +255,9 @@ listening test has been done yet.
   and the residuals showing tempo irregularities; pitch to 5 cents from the long-term
   spectrum — [tools/find_pieces.py](tools/find_pieces.py),
   [tools/tempo_fit.py](tools/tempo_fit.py), [tools/ost_compare.py](tools/ost_compare.py);
+  the same over a chosen stretch from a given start, [tools/hw_fit.py](tools/hw_fit.py)
+  (see the method note under "Tempo and the fixed wait states"), and pitch to a cent,
+  [tools/fine_pitch.py](tools/fine_pitch.py);
 - reverb indicators: left/right correlation over 50 ms windows, side/mid energy ratio,
   and the depth of the loudness envelope's dips (reverb decorrelates the channels and
   fills the dips) — [tools/wetness.py](tools/wetness.py), `ost_compare.py`;
@@ -520,8 +523,8 @@ by about 10%.
 
 Effect on Sega Rally after the fix: +0.49% instead of +2.5%, irregularities of 6 ms
 instead of 40 ms, chroma correlation 0.894 instead of 0.866. Both cores give the same
-result within 0.01%. The fix affects both cores, since it is the 68000 that changes, and
-should go upstream.
+result within 0.01%. The fix affects both cores, since it is the 68000 that changes;
+upstream took it in 8e1e7c3 (2026-10-01).
 
 Consequences on the 16 A/B games (25 s):
 - 15 captures change on each core (stcc is silent);
@@ -532,7 +535,10 @@ Consequences on the 16 A/B games (25 s):
 - `--savestate-test 900` PASS on vf2, hotd and bel, on both cores.
 
 +0.5% remains. It may be the OST (Saturn version), the contention fitted on hotd, or the
-contention model itself. A recording from a cabinet would settle it.
+contention model itself. A recording from a cabinet would settle it. **Since then**: more
+waiting barely moves it (+0.37% at four fixed cycles instead of two), and Dynamite Cop's
+cabinet recording shows a similar error that does not depend on the 68000 at all; see
+"Tempo and the fixed wait states".
 
 **Reverb.** On the same passage, the captures are drier than the OST:
 - side/mid ratio −13.0 dB against −10.8 dB;
@@ -665,7 +671,9 @@ from a fresh NVRAM, with a temporary trace of `active_slots()` per sample (remov
 - **Bus contention** (`Model2Sound::bus_wait`): the sound 68000's wait states grow with
   `active_slots()`, with constants fitted upstream on the mame core. The two cores define
   an active slot slightly differently: mame until the release ends, the new core until it
-  stops reading memory (0x3C0 or a one-shot's end).
+  stops reading memory (0x3C0 or a one-shot's end). Upstream later dropped the fixed part
+  of the wait states (88d5557); this branch keeps it (see "Tempo and the fixed wait
+  states").
 
 | Game | RMS mame | RMS mednafen | Difference | Spectrum | Clipped mame / mednafen | Bus load mame / mednafen | Key-ons mame / mednafen |
 |---|---|---|---|---|---|---|---|
@@ -697,6 +705,10 @@ from a fresh NVRAM, with a temporary trace of `active_slots()` per sample (remov
 (RMS from 5 s on; stcc's music is on the DSB. desert and vcop have no SCSP, Model 1 sound
 board, and are identical. Silent over 90 s of attract: airwlkrs, indy500, lastbrnx, manxtt,
 pltkids, segawski, skisuprg, waverunr. hpyagu98 could not be loaded: backup ROM missing.)
+
+These levels predate upstream's new per-game gains (cb57c0a, merged on 2026-10-01): the
+absolute figures are out of date, the differences between the cores are not, since a gain
+applies to both cores alike.
 
 **Conclusions: nothing to change.**
 - The new core is 0.0 to 0.3 dB louder than mame on every game, never more: well under
@@ -737,16 +749,62 @@ being silent. Scripts: [tools/hw_fit.py](tools/hw_fit.py) (tempo),
 - **Pitch: exact.** Within a cent, so the SCSP's sample clock is right.
 - **Tempo: 0.6% fast on both cores.** Pitch being exact, this is timing rather than the
   audio clock, the same way as Sega Rally against its soundtrack: its pitch is also
-  exact (+0.3 cent with the same method) and its tempo +0.49%. Two references, one of them
-  a cabinet, now point to a sound 68000 still slightly too fast after the MSVC fix, i.e. the
-  bus contention fitted on hotd being a little short. Recalibrating `kContentionCycles` /
-  `kBusWaitCycles` against these references is the obvious next step, to be weighed against
-  upstream's hotd fit.
+  exact (+0.3 cent with the same method) and its tempo +0.49%. ~~Two references, one of
+  them a cabinet, now point to a sound 68000 still slightly too fast after the MSVC fix,
+  i.e. the bus contention fitted on hotd being a little short.~~ **Disproved on
+  2026-10-03**: Dynamite Cop's tempo does not move with the sound 68000's wait states
+  (+0.66% to +0.63% from zero to four fixed cycles), so recalibrating the contention cannot
+  fix it; see "Tempo and the fixed wait states".
 - **Tone: the cabinet is darker above 2 kHz** (1–5 dB depending on the band); mednafen is a
   little closer than mame at the top. It may be the board's output stage, the cabinet's
   amplifier, or the recording chain; a single recording cannot tell them apart.
 - Daytona, for the record, measured the same way against its soundtrack: pitch +7.5 cents
   (+0.43%) with a tempo of −0.10%. That is the Model 1 sound board (MultiPCM), not the SCSP.
+
+## Tempo and the fixed wait states
+
+Upstream's 88d5557 (2026-10-01, "improve hotd sound fidelity") dropped the fixed two wait
+cycles of `Model2Sound::bus_wait`, keeping only the contention term. Measured on
+2026-10-03 after merging it (013bfff): 3 minutes of attract on each core from a fresh
+NVRAM, with the fixed part set from 0 to 4 cycles per access by a temporary environment
+variable (removed since).
+
+| Fixed wait cycles | Sega Rally against the OST | Dynamite Cop against the cabinet |
+|---|---|---|
+| 0 (upstream) | +1.45% (17 ms) | +0.66% (56 ms) |
+| 1 | +0.78% (10 ms) | — |
+| 2 (before 88d5557; restored) | +0.48% (6 ms) | +0.65% (44 ms) |
+| 3 | +0.45% (6 ms) | — |
+| 4 | +0.37% (6 ms) | +0.63% (42 ms) |
+
+Tempo against the reference, with the fit's residual rms in brackets, on the mame core;
+the mednafen core gives the same figures within 0.01% (checked at 0 and 2 cycles on Sega
+Rally, at 0 on Dynamite Cop). Sega Rally was fitted on two passes of its attract loop,
+which agree within 0.01%.
+
+- **Sega Rally depends on the sound 68000's speed**: steeply up to two fixed cycles, then
+  hardly. Without them its music is three times further from the soundtrack. Its tempo
+  stays steady at every setting.
+- **Dynamite Cop does not**: 0.03% across the whole range. Its 0.65% is therefore not the
+  68000's speed, which disproves the conclusion first drawn from the cabinet recording.
+- **The fixed two cycles are restored on this branch** (`kBusWaitCycles = 2` in
+  [model2_sound.cpp](src/hw/model2_sound.cpp)). Captures with it are bit-identical to the
+  sweep's two-cycle ones. Upstream made the change for House of the Dead, against a board
+  capture not available here; these figures are to go upstream so the two can be
+  reconciled.
+- **What remains** (+0.4% on Sega Rally, +0.65% on Dynamite Cop, pitch exact on both) is
+  not the 68000's speed. Next candidates: the period of the SCSP timers the sound programs
+  run on (their settings can be traced, on dynamcop first), the interrupt latency, or for
+  Sega Rally the Saturn soundtrack itself.
+
+**Method note.** `tools/tempo_fit.py` finds each pass of the reference from its first piece
+alone, and "Power Games" repeats sections. At 0 and 1 fixed cycle it latched onto a repeat
+16 s later and reported tempos from −0.4% to +4.3% with residuals of 100 to 230 ms, a false
+irregular tempo.
+The figures above come from `tools/hw_fit.py`, with the start imposed:
+`python tools/hw_fit.py tools <OST> 4 48 24.3 name=capture.wav` (the pass at 28.3 s; 77.6
+for the next one). Before trusting `tempo_fit.py` on Sega Rally, check that it reports the
+passes at about 28.3, 81.6 and 134.7 s.
 
 ## Check against the official manual
 
@@ -911,12 +969,12 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
 
 | Game | Feature | mame | mednafen | Notes |
 |---|---|---|---|---|
-| hotd | FM, tempo (contention fitted on it), DSP from 30 s of attract | — | — | cores equivalent over 3 min of attract; FM to be recorded in play |
+| hotd | FM, tempo (contention fitted on it), DSP from 30 s of attract | — | — | cores equivalent over 3 min of attract; FM to be recorded in play; upstream dropped the fixed wait states for it, kept here for Sega Rally |
 | vf2 | DSP reverb | — | — | |
-| dynamcop | DSP reverb (strongest use) | ⚠️ | ⚠️ | against a cabinet recording: reverb and pitch match, tempo 0.6% fast on both cores |
+| dynamcop | DSP reverb (strongest use) | ⚠️ | ⚠️ | against a cabinet recording: reverb and pitch match, tempo 0.65% fast on both cores, whatever the sound 68000's wait states |
 | doa | DSP, MADRS | — | — | |
 | daytona | original Model 2 | — | — | Model 1 sound board, no SCSP; aligns with its OST at −0.10% tempo, pitch +7.5 cents |
-| srallyc | MSLC (end-of-music beeps) | ⚠️ | ⚠️ | tempo +0.49% against the OST (+2.5% before the 68000 fix); drier than the OST, but no DSP program in attract |
+| srallyc | MSLC (end-of-music beeps) | ⚠️ | ⚠️ | tempo +0.48% against the OST with the fixed wait states (+1.45% without, +2.5% before the 68000 fix); drier than the OST, but no DSP program in attract |
 | stcc | DSB (MPEG music) | — | — | only the effects go through the SCSP |
 | indy500 | | — | — | |
 | vcop | original Model 2 | — | — | |
@@ -1014,3 +1072,11 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
   reverb and pitch match the cabinet on both cores; tempo 0.6% fast on both, like Sega
   Rally against its soundtrack, pointing at the sound 68000's bus contention. Added
   `tools/hw_fit.py`, `tools/fine_pitch.py` and `tools/hw_wetness.py`.
+- **2026-10-01**: merged upstream main (8da7bbd): upstream's take of the 68000 fix
+  (8e1e7c3), new per-game gains (cb57c0a; step 10's absolute levels are now out of date)
+  and the fixed wait states dropped (88d5557).
+- **2026-10-03**: tempo measured again after merging upstream once more (013bfff): Sega
+  Rally +1.45% without the fixed wait states and +0.48% with them, Dynamite Cop +0.65%
+  either way. The fixed two cycles are restored (`kBusWaitCycles`), the conclusion drawn
+  from the Dynamite Cop recording is corrected, and a method note warns about
+  `tempo_fit.py` on repeated sections. See "Tempo and the fixed wait states".
