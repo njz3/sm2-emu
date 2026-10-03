@@ -24,8 +24,10 @@ DriveCommand make(Effect effect, int steps, int full_steps, bool held = false)
     return {effect, steps * kDriveFull / full_steps, held};
 }
 
-// Daytona: effect in the high nibble, strength in the low one, decoded the
-// way the drive board's program (epr-16488) does.
+// Daytona's bytes: effect in the high nibble, strength in the low one, decoded
+// the way its drive board's program (EPR-16488A) does. A force-feedback wheel
+// gets Daytona's board itself (DaytonaBoard); this reading is what pads and
+// plain rumble get of it.
 //   0x1x  motor off
 //   0x2x  friction     0..7
 //   0x3x  centring     0..7; 8..15 are the same strengths with a wider deadzone
