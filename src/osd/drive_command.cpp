@@ -24,8 +24,10 @@ DriveCommand make(Effect effect, int steps, int full_steps, bool held = false)
     return {effect, steps * kDriveFull / full_steps, held};
 }
 
-// Daytona, Indy 500 and Touring Car: effect in the high nibble,
-// strength in the low one.
+// Daytona, Indy 500, Touring Car, Over Rev and Super GT: effect in the high
+// nibble, strength in the low one. Indy 500's board, which the last four share,
+// is IndyBoard for a force-feedback wheel; this reading is only what pads and
+// plain rumble get of it.
 //   0x1x  spring       0..7
 //   0x2x  friction     0..7
 //   0x3x  centring     0..12
@@ -47,23 +49,6 @@ DriveCommand decode_daytona(u8 value)
         case 0x60: return low <= 7  ? make(Effect::PushRight, low, 7) : kOther;
         default:   return kOther;
     }
-}
-
-// Touring Car uses Daytona's bytes but streams its pushes every frame as a
-// centring torque worked out from the car, which lags the wheel: swinging from
-// one turn into the next, it still pushes the old way and throws the wheel. So
-// only its strength is used, as a spring about the wheel's own position. It
-// idles at 1, so strength runs from 1 (none) to 7 (full).
-DriveCommand decode_stcc(u8 value)
-{
-    DriveCommand command = decode_daytona(value);
-    if (command.is_push()) {
-        const int low    = value & 0x0f;
-        command.effect   = Effect::Spring;
-        command.strength = low <= 1 ? 0 : (low - 1) * kDriveFull / 6;
-        command.held     = true;
-    }
-    return command;
 }
 
 // Sega Rally streams a torque every frame, strength in the low five bits:
@@ -97,7 +82,7 @@ DriveCommand decode_rally(u8 value)
 DriveCommand decode_drive_command(rom::DriveProtocol protocol, u8 value)
 {
     switch (protocol) {
-        case rom::DriveProtocol::Stcc:  return decode_stcc(value);
+        case rom::DriveProtocol::Indy:  return decode_daytona(value);
         case rom::DriveProtocol::Rally: return decode_rally(value);
         case rom::DriveProtocol::Daytona:
         default: return decode_daytona(value);
