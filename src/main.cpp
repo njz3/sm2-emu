@@ -120,6 +120,7 @@ enum class GraphicsBackendChoice {
     w.rumble          = c.wheel_rumble;
     w.rumble_strength = c.wheel_rumble_strength;
     w.buttons       = c.wheel_buttons;
+    w.shifter_neutral = c.wheel_shifter_neutral;
     w.steer_axis    = c.wheel_steer_axis;
     w.accel_axis    = c.wheel_accel_axis;
     w.brake_axis    = c.wheel_brake_axis;
@@ -892,6 +893,7 @@ int main(int argc, char** argv)
     options.config.wheel_rumble          = from_file.wheel_rumble;
     options.config.wheel_rumble_strength = from_file.wheel_rumble_strength;
     options.config.wheel_buttons       = from_file.wheel_buttons;
+    options.config.wheel_shifter_neutral = from_file.wheel_shifter_neutral;
     options.config.wheel_steer_axis    = from_file.wheel_steer_axis;
     options.config.wheel_accel_axis    = from_file.wheel_accel_axis;
     options.config.wheel_brake_axis    = from_file.wheel_brake_axis;
