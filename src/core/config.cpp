@@ -677,6 +677,14 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_bool(value, &out->wheel_brake_invert)) {
                 bad_value();
             }
+        } else if (key == "wheel_accel_half") {
+            if (!parse_bool(value, &out->wheel_accel_half)) {
+                bad_value();
+            }
+        } else if (key == "wheel_brake_half") {
+            if (!parse_bool(value, &out->wheel_brake_half)) {
+                bad_value();
+            }
         } else if (key.rfind("pad1_button_", 0) == 0 || key.rfind("pad2_button_", 0) == 0) {
             const usize player = key[3] == '2' ? 1 : 0;
             const std::string role = key.substr(std::strlen("pad1_button_"));
@@ -976,6 +984,10 @@ bool save_config(const std::string& path, const Config& config)
         << "wheel_brake_axis = " << config.wheel_brake_axis << "\n"
         << "wheel_accel_invert = " << bool_text(config.wheel_accel_invert) << "\n"
         << "wheel_brake_invert = " << bool_text(config.wheel_brake_invert) << "\n"
+        << "# A pedal on half of its axis, released at the centre: pressed towards\n"
+        << "# the high end, or the low end when inverted (Y-).\n"
+        << "wheel_accel_half = " << bool_text(config.wheel_accel_half) << "\n"
+        << "wheel_brake_half = " << bool_text(config.wheel_brake_half) << "\n"
         << "\n"
         << "# Gamepad buttons, per player, as SDL_GamepadButton values (-1\n"
         << "# unbinds). button1..4 are the arcade buttons, up/down/left/right the\n"

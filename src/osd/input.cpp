@@ -520,15 +520,62 @@ void Input::add_wheel(SDL_JoystickID id)
     m_wheel.can_rumble = SDL_GetBooleanProperty(SDL_GetJoystickProperties(handle),
                                                 SDL_PROP_JOYSTICK_CAP_RUMBLE_BOOLEAN, false);
 
-    // Axis roles: use the calibrated values when set, else auto-detect. Steering
-    // self-centres (rests mid-travel) while a pedal rests hard at one end; axis 0
-    // is steering on every wheel that exists, so it anchors the search and the
-    // other axes resting at an extreme are pedals, taken in order accel then
-    // brake. A wheel whose layout defeats this is corrected in the GUI.
     const int axes = SDL_GetNumJoystickAxes(handle);
     for (int axis = 0; axis < axes && axis < Wheel::kMaxAxes; ++axis) {
         m_wheel.axis_rest[static_cast<usize>(axis)] = SDL_GetJoystickAxis(handle, axis);
     }
+    assign_wheel_axes();
+
+    // Force feedback is a constant force we aim ourselves each frame (see
+    // update_force_feedback): the wheel's driver ignores FF_SPRING but honours
+    // FF_CONSTANT, so the centring pull is computed from the wheel angle rather
+    // than programmed as a spring. Started at zero level and left running.
+    if (m_wheel_settings.ffb) {
+        auto ffb = std::make_unique<WheelForce>();
+        if (ffb->open(handle)) {
+            SM2_INFO("wheel force feedback: %s%s", ffb->backend(),
+                     ffb->has_rumble() ? " (with rumble)" : "");
+            // Centres the wheel until our spring has a position to work from.
+            ffb->set_autocenter(50);
+            m_wheel.autocenter = true;
+            m_wheel.ffb        = std::move(ffb);
+        } else {
+            SM2_INFO("wheel has no constant-force effect; using plain rumble");
+        }
+    }
+}
+
+void Input::set_wheel_settings(const WheelSettings& wheel)
+{
+    const WheelSettings& old = m_wheel_settings;
+    const bool axes_changed =
+        wheel.steer_axis != old.steer_axis || wheel.accel_axis != old.accel_axis
+        || wheel.brake_axis != old.brake_axis || wheel.accel_invert != old.accel_invert
+        || wheel.brake_invert != old.brake_invert || wheel.accel_half != old.accel_half
+        || wheel.brake_half != old.brake_half;
+    m_wheel_settings = wheel;
+    // A calibration takes effect at once, not at the wheel's next connection.
+    if (axes_changed && m_wheel.handle != nullptr) {
+        assign_wheel_axes();
+    }
+}
+
+void Input::assign_wheel_axes()
+{
+    // Axis roles: use the calibrated values when set, else auto-detect. Steering
+    // self-centres (rests mid-travel) while a pedal rests hard at one end; axis 0
+    // is steering on every wheel that exists, so it anchors the search and the
+    // other axes resting at an extreme are pedals, taken in order accel then
+    // brake. A wheel whose layout defeats this is corrected in the GUI; so is a
+    // pedal on half of its axis, which rests at the centre like the steering.
+    const int axes = SDL_GetNumJoystickAxes(m_wheel.handle);
+    m_wheel.steer_axis   = -1;
+    m_wheel.accel_axis   = -1;
+    m_wheel.brake_axis   = -1;
+    m_wheel.accel_invert = false;
+    m_wheel.brake_invert = false;
+    m_wheel.accel_half   = false;
+    m_wheel.brake_half   = false;
     if (m_wheel_settings.steer_axis >= 0 || m_wheel_settings.accel_axis >= 0
         || m_wheel_settings.brake_axis >= 0) {
         m_wheel.steer_axis   = m_wheel_settings.steer_axis;
@@ -536,6 +583,8 @@ void Input::add_wheel(SDL_JoystickID id)
         m_wheel.brake_axis   = m_wheel_settings.brake_axis;
         m_wheel.accel_invert = m_wheel_settings.accel_invert;
         m_wheel.brake_invert = m_wheel_settings.brake_invert;
+        m_wheel.accel_half   = m_wheel_settings.accel_half;
+        m_wheel.brake_half   = m_wheel_settings.brake_half;
     } else {
         m_wheel.steer_axis = axes > 0 ? 0 : -1;
         int assigned_pedals = 0;
@@ -560,29 +609,11 @@ void Input::add_wheel(SDL_JoystickID id)
         }
     }
 
-    const char* name = SDL_GetJoystickName(handle);
-    SM2_INFO("wheel: %s (%d axes; steer %d accel %d(inv %d) brake %d(inv %d))",
+    const char* name = SDL_GetJoystickName(m_wheel.handle);
+    SM2_INFO("wheel: %s (%d axes; steer %d accel %d(inv %d half %d) brake %d(inv %d half %d))",
              name != nullptr ? name : "steering wheel", axes,
-             m_wheel.steer_axis, m_wheel.accel_axis, m_wheel.accel_invert,
-             m_wheel.brake_axis, m_wheel.brake_invert);
-
-    // Force feedback is a constant force we aim ourselves each frame (see
-    // update_force_feedback): the wheel's driver ignores FF_SPRING but honours
-    // FF_CONSTANT, so the centring pull is computed from the wheel angle rather
-    // than programmed as a spring. Started at zero level and left running.
-    if (m_wheel_settings.ffb) {
-        auto ffb = std::make_unique<WheelForce>();
-        if (ffb->open(handle)) {
-            SM2_INFO("wheel force feedback: %s%s", ffb->backend(),
-                     ffb->has_rumble() ? " (with rumble)" : "");
-            // Centres the wheel until our spring has a position to work from.
-            ffb->set_autocenter(50);
-            m_wheel.autocenter = true;
-            m_wheel.ffb        = std::move(ffb);
-        } else {
-            SM2_INFO("wheel has no constant-force effect; using plain rumble");
-        }
-    }
+             m_wheel.steer_axis, m_wheel.accel_axis, m_wheel.accel_invert, m_wheel.accel_half,
+             m_wheel.brake_axis, m_wheel.brake_invert, m_wheel.brake_half);
 }
 
 void Input::remove_wheel(SDL_JoystickID id)
@@ -604,6 +635,24 @@ s16 Input::wheel_axis(int axis) const
         return m_wheel.axis_rest[static_cast<usize>(axis)];
     }
     return SDL_GetJoystickAxis(m_wheel.handle, axis);
+}
+
+float Input::pedal_travel(int axis, bool invert, bool half) const
+{
+    const float raw = static_cast<float>(wheel_axis(axis));
+    float travel;
+    if (half) {
+        // Released at the centre, pressed towards one end.
+        travel = invert ? -raw / 32768.0f : raw / 32767.0f;
+    } else {
+        // SDL normalises every axis to -32768..32767: a pedal over the whole
+        // axis rests at one end and is pressed at the other.
+        travel = (raw + 32768.0f) / 65535.0f;
+        if (invert) {
+            travel = 1.0f - travel;
+        }
+    }
+    return std::clamp(travel, 0.0f, 1.0f);
 }
 
 bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) const
@@ -673,14 +722,11 @@ bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) con
     }
 
     // A pedal. The physical pedal gives fraction 0 released, 1 pressed. A wheel
-    // whose pedal reads the other way is corrected by the user's invert flag.
-    const bool invert =
-        (channel.control == rom::AnalogControl::Brake) ? m_wheel.brake_invert
-                                                       : m_wheel.accel_invert;
-    if (invert) {
-        fraction = 1.0f - fraction;
-    }
-    fraction = std::clamp(fraction, 0.0f, 1.0f);
+    // whose pedal reads the other way is corrected by the user's invert flag;
+    // one on half of its axis, by the half flag.
+    const bool brake = channel.control == rom::AnalogControl::Brake;
+    fraction = pedal_travel(axis, brake ? m_wheel.brake_invert : m_wheel.accel_invert,
+                            brake ? m_wheel.brake_half : m_wheel.accel_half);
 
     // Map the pedal the way MAME's PORT_BIT does. A PORT_REVERSE pedal (Over
     // Rev, Super GT) reads inverted -- released at the maximum, pressed at the
@@ -1227,14 +1273,10 @@ void Input::update_force_feedback(const rom::GameSpec& game)
         // G923's motor is strong, so even a small sine magnitude is plenty.
         const int rmax = static_cast<int>(
             std::clamp(m_wheel_settings.rumble_strength, 0u, 100u) * 4000 / 100);
-        const int accel_raw = static_cast<int>(
-            wheel_axis(m_wheel.accel_axis));  // -32768..32767
-        int throttle = accel_raw + 32768;  // 0..65535, pedal released..pressed
-        if (m_wheel.accel_invert) {
-            throttle = 65535 - throttle;
-        }
+        const float throttle =
+            pedal_travel(m_wheel.accel_axis, m_wheel.accel_invert, m_wheel.accel_half);
         // A faint idle hum (a fifth of the range) rising to the full engine level.
-        const int engine = rmax / 5 + (rmax * 4 / 5) * throttle / 65535;
+        const int engine = rmax / 5 + static_cast<int>(static_cast<float>(rmax * 4 / 5) * throttle);
         rumble = std::max(rumble, engine);
     }
 

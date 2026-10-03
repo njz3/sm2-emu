@@ -119,12 +119,16 @@ public:
             Config{}.wheel_buttons;
 
         /// Wheel axis per analogue control, or -1 to auto-detect. Invert flags
-        /// apply to a pedal that reads high released, low pressed.
+        /// apply to a pedal that reads high released, low pressed. Half flags,
+        /// to a pedal on half of its axis, released at the centre and pressed
+        /// towards the high end, the low one when inverted.
         s32  steer_axis   = -1;
         s32  accel_axis   = -1;
         s32  brake_axis   = -1;
         bool accel_invert = false;
         bool brake_invert = false;
+        bool accel_half   = false;
+        bool brake_half   = false;
     };
 
     /// Start the gamepad subsystem and open whatever is already plugged in.
@@ -151,8 +155,9 @@ public:
     void poll(hw::Inputs* inputs) const;
 
     /// Replace the wheel feel settings live, e.g. from a GUI slider. Cheap; the
-    /// steering range and FFB strength take effect on the next frame.
-    void set_wheel_settings(const WheelSettings& wheel) { m_wheel_settings = wheel; }
+    /// steering range and FFB strength take effect on the next frame, a new
+    /// axis calibration at once.
+    void set_wheel_settings(const WheelSettings& wheel);
 
     /// True when a wheel is connected, for the settings UI to show its controls.
     [[nodiscard]] bool wheel_connected() const { return m_wheel.handle != nullptr; }
@@ -389,6 +394,8 @@ private:
         int  brake_axis   = -1;
         bool accel_invert = false;
         bool brake_invert = false;
+        bool accel_half   = false;  ///< pedal on half its axis, see WheelSettings.
+        bool brake_half   = false;
 
         /// SDL reports 0 for an axis that has not sent an event yet, which on a
         /// pedal is half pressed. Until one moves, use its value read at open.
@@ -399,6 +406,11 @@ private:
 
     [[nodiscard]] s16 wheel_axis(int axis) const;
 
+    /// How far a pedal on `axis` is pressed, 0 released to 1 fully: over the
+    /// whole axis, or over half of it from the centre when `half`; `invert`
+    /// for a pedal pressed towards the low end.
+    [[nodiscard]] float pedal_travel(int axis, bool invert, bool half) const;
+
 
     void add_gamepad(SDL_JoystickID id);
     void remove_gamepad(SDL_JoystickID id);
@@ -406,6 +418,9 @@ private:
     /// Open `id` as a wheel if it looks like one and no wheel is open yet.
     void add_wheel(SDL_JoystickID id);
     void remove_wheel(SDL_JoystickID id);
+
+    /// Give the open wheel's axes their roles: calibrated, or auto-detected.
+    void assign_wheel_axes();
 
 
     /// Read one driving control straight off the wheel, or a sentinel byte when
