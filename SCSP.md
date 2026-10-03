@@ -85,6 +85,9 @@ which lists the original documents.
 - Dynamite Cop / Dynamite Deka 2, attract mode recorded on **real hardware** (Game Nexus,
   [YouTube](https://www.youtube.com/watch?v=FfdDF_Bu85Y)), supplied as the video's AAC audio
   (118 s, about 128 kbit/s).
+- The House of the Dead, attract mode recorded on **real hardware** ("Model 2 Hardware
+  Capture", [YouTube](https://www.youtube.com/watch?v=5O9s1V9RoPs)), supplied as the video's
+  AAC audio (62 s, 128 kbit/s, 44.1 kHz), decoded to WAV with Windows' own AAC decoder.
 
 ## Goal
 
@@ -767,35 +770,47 @@ Upstream's 88d5557 (2026-10-01, "improve hotd sound fidelity") dropped the fixed
 cycles of `Model2Sound::bus_wait`, keeping only the contention term. Measured on
 2026-10-03 after merging it (013bfff): 3 minutes of attract on each core from a fresh
 NVRAM, with the fixed part set from 0 to 4 cycles per access by a temporary environment
-variable (removed since).
+variable (removed since). House of the Dead was added the same day (at 8e94b36), against
+a cabinet recording of its attract mode (see "Audio references"), the same way.
 
-| Fixed wait cycles | Sega Rally against the OST | Dynamite Cop against the cabinet |
-|---|---|---|
-| 0 (upstream) | +1.45% (17 ms) | +0.66% (56 ms) |
-| 1 | +0.78% (10 ms) | — |
-| 2 (before 88d5557; restored) | +0.48% (6 ms) | +0.65% (44 ms) |
-| 3 | +0.45% (6 ms) | — |
-| 4 | +0.37% (6 ms) | +0.63% (42 ms) |
+| Fixed wait cycles | Sega Rally against the OST | Dynamite Cop against the cabinet | House of the Dead against the cabinet |
+|---|---|---|---|
+| 0 (upstream) | +1.45% (17 ms) | +0.66% (56 ms) | +1.34% / +1.33% (35 ms) |
+| 1 | +0.78% (10 ms) | — | +0.91% / +0.97% (30 / 25 ms) |
+| 2 (before 88d5557; restored) | +0.48% (6 ms) | +0.65% (44 ms) | +0.48% / +0.57% (28 / 19 ms) |
+| 3 | +0.45% (6 ms) | — | +0.07% / +0.21% (26 / 20 ms) |
+| 4 | +0.37% (6 ms) | +0.63% (42 ms) | −0.28% / −0.22% (17 / 14 ms) |
 
 Tempo against the reference, with the fit's residual rms in brackets, on the mame core;
 the mednafen core gives the same figures within 0.01% (checked at 0 and 2 cycles on Sega
 Rally, at 0 on Dynamite Cop). Sega Rally was fitted on two passes of its attract loop,
-which agree within 0.01%.
+which agree within 0.01%. House of the Dead's attract music passes twice in the capture,
+at 27.8 and 135.1 s; the two figures are those passes, which agree within 0.15%.
 
 - **Sega Rally depends on the sound 68000's speed**: steeply up to two fixed cycles, then
   hardly. Without them its music is three times further from the soundtrack. Its tempo
   stays steady at every setting.
 - **Dynamite Cop does not**: 0.03% across the whole range. Its 0.65% is therefore not the
   68000's speed, which disproves the conclusion first drawn from the cabinet recording.
+- **House of the Dead depends on it all the way**: about 0.4% per cycle from 0 to 4, with
+  no knee. Its pitch matches the cabinet's at every setting (+1.0 cent, with
+  `fine_pitch.py`), so the recording's clock is right and the gap in tempo is the
+  emulation's. Without the fixed cycles its music is 1.3% fast against the cabinet, with
+  two 0.5%, with three 0.1–0.2%.
 - **The fixed two cycles are restored on this branch** (`kBusWaitCycles = 2` in
   [model2_sound.cpp](src/hw/model2_sound.cpp)). Captures with it are bit-identical to the
-  sweep's two-cycle ones. Upstream made the change for House of the Dead, against a board
-  capture not available here; these figures are to go upstream so the two can be
-  reconciled.
+  sweep's two-cycle ones. Upstream made the change for House of the Dead, yet House of the
+  Dead's own cabinet recording is for the fixed cycles: without them its music goes from
+  +0.5% to +1.3%. These figures are to go upstream.
 - **What remains** (+0.4% on Sega Rally, +0.65% on Dynamite Cop, pitch exact on both) is
   not the 68000's speed. Next candidates: the period of the SCSP timers the sound programs
   run on (their settings can be traced, on dynamcop first), the interrupt latency, or for
   Sega Rally the Saturn soundtrack itself.
+- **Three cycles rather than two?** At two, the three games are all 0.5–0.65% fast. Three
+  would bring House of the Dead within 0.2% and move the other two by 0.03% or less. But
+  Sega Rally and Dynamite Cop no longer follow the 68000 there, so their common 0.5% has
+  another cause, which three cycles might only be masking on House of the Dead. Two stays,
+  the value upstream fitted the contention with (def088c), until that cause is looked at.
 
 **Method note.** `tools/tempo_fit.py` finds each pass of the reference from its first piece
 alone, and "Power Games" repeats sections. At 0 and 1 fixed cycle it latched onto a repeat
@@ -805,6 +820,9 @@ The figures above come from `tools/hw_fit.py`, with the start imposed:
 `python tools/hw_fit.py tools <OST> 4 48 24.3 name=capture.wav` (the pass at 28.3 s; 77.6
 for the next one). Before trusting `tempo_fit.py` on Sega Rally, check that it reports the
 passes at about 28.3, 81.6 and 134.7 s.
+House of the Dead: `python tools/hw_fit.py tools <recording> 0 62 27.8 name=capture.wav`
+(135.07 for the second pass), and for its pitch
+`python tools/fine_pitch.py <recording> 2 58 name=capture.wav@29.83`.
 
 ## Check against the official manual
 
@@ -1080,3 +1098,8 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
   either way. The fixed two cycles are restored (`kBusWaitCycles`), the conclusion drawn
   from the Dynamite Cop recording is corrected, and a method note warns about
   `tempo_fit.py` on repeated sections. See "Tempo and the fixed wait states".
+- **2026-10-03**: House of the Dead checked against a cabinet recording of its attract
+  mode ([YouTube](https://www.youtube.com/watch?v=5O9s1V9RoPs)): +1.33% without the fixed
+  wait states, +0.5% with two, +0.1–0.2% with three, pitch within a cent. Its tempo follows
+  the 68000's speed all the way, unlike Sega Rally's beyond two cycles. Two cycles kept. See
+  "Tempo and the fixed wait states".
