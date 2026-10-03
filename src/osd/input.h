@@ -363,6 +363,7 @@ private:
         std::unique_ptr<WheelForce> ffb;
         int            force_level  = 0;   ///< Last level commanded, to skip no-ops.
         int            rumble_mag   = -1;  ///< last rumble magnitude, to skip no-ops.
+        u16            rumble_period = 0;  ///< ms, of the last rumble sent; 0 before any.
 
         bool           autocenter = false;  ///< device autocentre still holding it.
         bool           can_rumble = false;  ///< has rumble motors of its own.
@@ -488,10 +489,14 @@ private:
     u32                              m_recoil_strength = 60;
 
     /// The drive board's current force command, and Sega Rally's chop setting:
-    /// 0 is off, n chops the torque with a period of 2^(n+2) board ticks.
+    /// 0 is off, n chops the torque with a period of 2^(n+2) board ticks. It
+    /// outlives the torque commands until a $10 ends it, as on the board.
     DriveCommand                     m_drive_command;
     int                              m_drive_pulse = 0;
-    u32                              m_drive_ticks = 0;  ///< the board's ~1 kHz tick count, advanced once per frame
+
+    /// The Sega Rally board's interrupts counted since start, simulated: its
+    /// chopping flips on bits of this count.
+    double                           m_drive_ticks = 0.0;
 
     /// The burst currently playing, shared by every pad: one drive board, one car.
     int                              m_pad_rumble_level    = 0;

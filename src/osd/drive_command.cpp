@@ -116,12 +116,14 @@ DriveCommand decode_stcc(u8 value)
 }
 
 // Sega Rally streams a torque every frame, strength in the low five bits,
-// decoded the way its board's program (epr-17891) does:
+// decoded the way its board's program (EPR-17891) does:
 //   0x80..0x9f  push right  1..32
 //   0xc0..0xdf  push left   1..32
-//   0x40..0x5f  brake       1..32
-//   0x10..0x17  chop the torque on and off, 0x10 stops
+//   0x40..0x5f  brake       1..32 (a power with no direction; not sent by the game)
+//   0x10..0x17  chop the torque on and off, 0x10 stops; the game sends 0x15
+//               on shocks and rough ground
 // Holding the wheel off-centre makes the game push it back. 0x00 releases.
+// Every other byte leaves the torque as it is: the board replays its last one.
 DriveCommand decode_rally(u8 value)
 {
     const int low = value & 0x1f;
