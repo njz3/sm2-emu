@@ -4175,14 +4175,10 @@
       <input type="buttons3"/>
     </inputs>
 
-    <!--
-      Analogue mux wiring, from MAME's model2c_state::skisuprg (ch0 swing,
-      ch1 inclining). Both reversed so the left stick reads the natural way on a
-      gamepad.
-    -->
+    <!-- Analogue mux wiring, as the game's own input test labels it. -->
     <analog>
-      <channel index="0" control="swing" rest="0x80" reverse="true"/>
-      <channel index="1" control="inclining" rest="0x80" reverse="true"/>
+      <channel index="0" control="inclining" rest="0x80"/>
+      <channel index="1" control="swing" rest="0x80" reverse="true"/>
     </analog>
 
     <roms>
@@ -4966,7 +4962,7 @@
 
     <!-- Analogue mux wiring, from MAME's model2c_state::topskatr. -->
     <analog>
-      <channel index="0" control="curving" rest="0x80"/>
+      <channel index="0" control="curving" rest="0x80" reverse="true"/>
       <channel index="1" control="slide" rest="0x80"/>
     </analog>
 
@@ -5026,7 +5022,7 @@
 
     <!-- Analogue mux wiring, from MAME's model2c_state::topskatr. -->
     <analog>
-      <channel index="0" control="curving" rest="0x80"/>
+      <channel index="0" control="curving" rest="0x80" reverse="true"/>
       <channel index="1" control="slide" rest="0x80"/>
     </analog>
 
@@ -5086,7 +5082,7 @@
 
     <!-- Analogue mux wiring, from MAME's model2c_state::topskatr. -->
     <analog>
-      <channel index="0" control="curving" rest="0x80"/>
+      <channel index="0" control="curving" rest="0x80" reverse="true"/>
       <channel index="1" control="slide" rest="0x80"/>
     </analog>
 
@@ -5146,7 +5142,7 @@
 
     <!-- Analogue mux wiring, from MAME's model2c_state::topskatr. -->
     <analog>
-      <channel index="0" control="curving" rest="0x80"/>
+      <channel index="0" control="curving" rest="0x80" reverse="true"/>
       <channel index="1" control="slide" rest="0x80"/>
     </analog>
 

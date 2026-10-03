@@ -384,8 +384,9 @@ private:
     [[nodiscard]] SDL_Gamepad* pad_for(u32 player) const;
 
     /// Sample one logical control and scale it into an analogue channel's own
-    /// calibrated range.
-    [[nodiscard]] u8 sample_channel(const rom::AnalogChannel& channel) const;
+    /// calibrated range, with centre_dead and curve shaping a stick axis.
+    [[nodiscard]] u8 sample_channel(const rom::AnalogChannel& channel,
+                                    float centre_dead, float curve) const;
 
     void gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) const;
 

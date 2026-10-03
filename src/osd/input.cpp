@@ -97,6 +97,19 @@ constexpr ControlBinding kControlBindings[] = {
     {rom::AnalogControl::Bat2,      HostAxis::LeftTrigger},
 };
 
+// A released stick can settle off centre, so read the deadzone as centre and
+// rescale beyond it. curve 1 is linear.
+[[nodiscard]] float centred_fraction(s16 raw, float centre_dead, float curve)
+{
+    const float value = std::max(static_cast<float>(raw), -32767.0f);
+    const float past  = std::abs(value) - centre_dead;
+    if (past <= 0.0f) {
+        return 0.5f;
+    }
+    const float travel = std::pow(past / (32767.0f - centre_dead), curve);
+    return 0.5f + std::copysign(travel, value) * 0.5f;
+}
+
 [[nodiscard]] HostAxis host_axis_for(rom::AnalogControl control)
 {
     for (const ControlBinding& binding : kControlBindings) {
@@ -780,7 +793,8 @@ bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) con
     return true;
 }
 
-u8 Input::sample_channel(const rom::AnalogChannel& channel) const
+u8 Input::sample_channel(const rom::AnalogChannel& channel, float centre_dead,
+                         float curve) const
 {
     // A wheel, when present, owns the driving controls; everything else, and any
     // control the wheel has no axis for, falls through to the gamepad.
@@ -814,28 +828,19 @@ u8 Input::sample_channel(const rom::AnalogChannel& channel) const
         return static_cast<u8>(value + 0.5f);
     };
 
-    // A released stick does not always spring back to zero; a worn one can settle
-    // a fifth of the way out. Read that as exact centre, and rescale beyond it so
-    // the output rises from centre instead of jumping to a few percent of lock.
-    const auto centred_fraction = [](s16 raw) {
-        constexpr float kCentreDead = 8000.0f;
-        const float value = std::max(static_cast<float>(raw), -32767.0f);
-        const float past  = std::abs(value) - kCentreDead;
-        if (past <= 0.0f) {
-            return 0.5f;
-        }
-        return 0.5f + std::copysign(past / (32767.0f - kCentreDead), value) * 0.5f;
+    const auto centred = [centre_dead, curve](s16 raw) {
+        return centred_fraction(raw, centre_dead, curve);
     };
 
     float fraction = 0.0f;
     switch (axis) {
         case HostAxis::PadLeftX:
         case HostAxis::Pad2LeftX:
-            fraction = centred_fraction(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX));
+            fraction = centred(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX));
             break;
         case HostAxis::PadLeftY:
         case HostAxis::Pad2LeftY:
-            fraction = centred_fraction(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY));
+            fraction = centred(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY));
             break;
         case HostAxis::RightTrigger:
         case HostAxis::LeftTrigger: {
@@ -1956,11 +1961,16 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
     // Analogue channels follow the title's own machine config: which channel a
     // control sits on, how far it travels and where it rests are all per-title.
     // An unconnected channel reads zero, as an unbound an_port_callback does.
+    // Top Skater wants fine carving; the driving titles need the larger
+    // deadzone to re-centre.
+    const bool  fine_stick  = game.name == "topskatr" || game.parent == "topskatr";
+    const float centre_dead = fine_stick ? 3000.0f : 8000.0f;
+    const float curve       = fine_stick ? 2.0f : 1.0f;
     for (usize channel = 0; channel < inputs->analog.size(); ++channel) {
         const rom::AnalogChannel& wiring = game.analog[channel];
         inputs->analog[channel] = wiring.control == rom::AnalogControl::None
                                       ? 0x00
-                                      : sample_channel(wiring);
+                                      : sample_channel(wiring, centre_dead, curve);
     }
 
     // Keyboard analog driver, so any analog title is playable without a pad:
@@ -2017,9 +2027,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
     }
 
-    // Sega Ski Super G steers off inclining alone; the edge (swing) is held
-    // flat. Coupling the edge to the steer, as the real platform does, was tried
-    // and made turning worse on a pad.
+    // Sega Ski Super G turns hardest with inclining and swing moving together,
+    // as the platform does; their raw values run in opposite directions.
     if (is_ski) {
         usize incline_ch = inputs->analog.size();
         usize swing_ch   = inputs->analog.size();
@@ -2055,7 +2064,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
                     (snap_left == left_is_max) ? inc.maximum : inc.minimum;
             }
 
-            inputs->analog[swing_ch] = 0x80;
+            const rom::AnalogChannel& swing = game.analog[swing_ch];
+            inputs->analog[swing_ch] = static_cast<u8>(
+                swing.maximum - (inputs->analog[incline_ch] - inc.minimum));
         }
     }
 
@@ -2098,6 +2109,39 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         if (right)      inputs->in0 &= static_cast<u8>(~kSelectRight);
         if (jump_front) inputs->in0 &= static_cast<u8>(~kJumpFront);
         if (jump_tail)  inputs->in1 &= static_cast<u8>(~kJumpTailIn1);
+
+        // Past its limit Slide skids the board instead of turning, so it sits on
+        // the triggers rather than the steering axis: left skids left.
+        float slide = 0.0f;
+        for (const Pad& pad : m_pads) {
+            if (pad.handle == nullptr || pad.player != 0) {
+                continue;
+            }
+            const auto pull = [&](SDL_GamepadAxis axis) {
+                const int raw = static_cast<int>(SDL_GetGamepadAxis(pad.handle, axis));
+                return static_cast<float>(std::max(0, raw - kPedalFloor))
+                     / static_cast<float>(32767 - kPedalFloor);
+            };
+            slide = pull(SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) - pull(SDL_GAMEPAD_AXIS_LEFT_TRIGGER);
+            break;
+        }
+        if (keys != nullptr) {
+            const bool skid_left  = SDL_SCANCODE_C < key_count && keys[SDL_SCANCODE_C];
+            const bool skid_right = SDL_SCANCODE_V < key_count && keys[SDL_SCANCODE_V];
+            if (skid_left != skid_right) {
+                slide = skid_right ? 1.0f : -1.0f;
+            }
+        }
+        for (usize channel = 0; channel < inputs->analog.size(); ++channel) {
+            const rom::AnalogChannel& wiring = game.analog[channel];
+            if (wiring.control != rom::AnalogControl::Slide) {
+                continue;
+            }
+            const float fraction = 0.5f + slide * 0.5f;
+            const float span = static_cast<float>(wiring.maximum - wiring.minimum);
+            inputs->analog[channel] = static_cast<u8>(
+                static_cast<float>(wiring.minimum) + fraction * span + 0.5f);
+        }
 
         // Keyboard steer: nudge the Curving channel off its centre rest so the
         // skater turns without a pad stick. The pad left stick already drives
