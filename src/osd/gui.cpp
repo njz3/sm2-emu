@@ -1602,9 +1602,10 @@ void Gui::draw_network_tab(Config& config)
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Announces the game and the outputs port to tools on\n"
-                              "this machine that wait for it, as Supermodel does\n"
-                              "(8001, which BackForceFeeder listens on). 0 turns it off.");
+            ImGui::SetTooltip("When a game starts, announces it and the outputs port\n"
+                              "once to tools on this machine that wait for it, as\n"
+                              "Supermodel does (8001, which BackForceFeeder listens\n"
+                              "on). 0 turns it off.");
         }
     }
     ImGui::EndDisabled();

@@ -20,7 +20,6 @@
 #include "core/log.h"
 #include "core/net.h"
 
-#include <chrono>
 #include <cstring>
 #include <span>
 #include <string_view>
@@ -95,10 +94,6 @@ std::string line(std::string_view name, s32 value)
 // Network
 // ---------------------------------------------------------------------------
 
-/// How often a game is announced over UDP while no client is connected.
-/// BackForceFeeder listens a second at a time between its TCP attempts.
-constexpr std::chrono::seconds kAnnounceInterval{2};
-
 class NetworkBackend final : public Outputs::Backend {
 public:
     NetworkBackend(u16 port, u16 announce_port) : m_port(port), m_announce_port(announce_port)
@@ -138,7 +133,7 @@ public:
                 m_server.broadcast(line(item.name, item.value));
             }
         }
-        m_next_announce = {};  // announce the new game straight away
+        announce(game);
     }
 
     void stop() override { m_server.broadcast("mame_stop = 1\r"); }
@@ -167,7 +162,6 @@ public:
                 m_server.send(client, "pause = 1\r");
             }
         });
-        announce(game);
     }
 
     [[nodiscard]] Outputs::NetworkStatus status() const override
@@ -176,19 +170,13 @@ public:
     }
 
 private:
-    /// Supermodel's datagram, "mame_start = <set>\rtcp = <port>\r", sent while a
-    /// game runs, the server listens and nobody has connected yet.
+    /// Supermodel's datagram, "mame_start = <set>\rtcp = <port>\r", sent once
+    /// when a game starts, provided the server listens.
     void announce(const std::string& game)
     {
-        if (game.empty() || !m_announce.valid() || !m_server.valid()
-            || m_server.client_count() != 0) {
+        if (game.empty() || !m_announce.valid() || !m_server.valid()) {
             return;
         }
-        const auto now = std::chrono::steady_clock::now();
-        if (now < m_next_announce) {
-            return;
-        }
-        m_next_announce = now + kAnnounceInterval;
         const std::string text =
             "mame_start = " + game + "\rtcp = " + std::to_string(m_port) + "\r";
         const auto* bytes = reinterpret_cast<const u8*>(text.data());
@@ -202,8 +190,6 @@ private:
     u16            m_announce_port = 0;
     std::string    m_error;
     bool           m_started = false;
-
-    std::chrono::steady_clock::time_point m_next_announce{};
 };
 
 // ---------------------------------------------------------------------------

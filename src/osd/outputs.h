@@ -17,10 +17,10 @@
 // DOFLinx and similar tools in MAME's two formats.
 //
 // Network: a TCP server (port 8000 by default) sending "name = value\r" lines,
-// with "mame_start = <set>", "mame_stop = 1" and "pause = 0/1". While a game
-// runs and no client is connected, it is also announced the way Supermodel
-// does, "mame_start = <set>\rtcp = <port>\r" over UDP to 127.0.0.1:8001 every
-// two seconds: BackForceFeeder waits for that before it connects.
+// with "mame_start = <set>", "mame_stop = 1" and "pause = 0/1". When a game
+// starts, it is also announced once the way Supermodel does,
+// "mame_start = <set>\rtcp = <port>\r" over UDP to 127.0.0.1:8001:
+// BackForceFeeder waits for that before it connects.
 //
 // Windows: a hidden "MAMEOutput" window answering MAME's registered window
 // messages, so clients that speak the Windows protocol work unchanged.
