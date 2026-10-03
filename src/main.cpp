@@ -902,12 +902,13 @@ int main(int argc, char** argv)
     options.config.wheel_accel_invert  = from_file.wheel_accel_invert;
     options.config.wheel_brake_invert  = from_file.wheel_brake_invert;
 
-    options.config.pad_rumble           = from_file.pad_rumble;
-    options.config.pad_rumble_strength  = from_file.pad_rumble_strength;
-    options.config.pad_rumble_cornering = from_file.pad_rumble_cornering;
-    options.config.outputs_network      = from_file.outputs_network;
-    options.config.outputs_network_port = from_file.outputs_network_port;
-    options.config.outputs_windows      = from_file.outputs_windows;
+    options.config.pad_rumble               = from_file.pad_rumble;
+    options.config.pad_rumble_strength      = from_file.pad_rumble_strength;
+    options.config.pad_rumble_cornering     = from_file.pad_rumble_cornering;
+    options.config.outputs_network          = from_file.outputs_network;
+    options.config.outputs_network_port     = from_file.outputs_network_port;
+    options.config.outputs_network_udp_port = from_file.outputs_network_udp_port;
+    options.config.outputs_windows          = from_file.outputs_windows;
 
     options.config.link_enabled        = from_file.link_enabled;
     options.config.link_local_ip       = from_file.link_local_ip;
@@ -2257,6 +2258,7 @@ int main(int argc, char** argv)
 
             outputs.configure(options.config.outputs_network,
                               static_cast<u16>(options.config.outputs_network_port),
+                              static_cast<u16>(options.config.outputs_network_udp_port),
                               options.config.outputs_windows);
             if (machine_iface != nullptr && loaded.has_value()) {
                 outputs.set_game(loaded->game.name, loaded->game.parent);
