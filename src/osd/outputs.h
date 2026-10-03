@@ -60,6 +60,15 @@ public:
     /// Accept clients and flush queued messages. Call once per frame.
     void poll();
 
+    /// Where the network outputs stand, for the settings.
+    struct NetworkStatus {
+        bool        enabled   = false;
+        bool        listening = false;
+        usize       clients   = 0;
+        std::string error;  ///< Why it is not listening; empty when it is.
+    };
+    [[nodiscard]] NetworkStatus network_status() const;
+
     /// One published output, exposed for the backends.
     struct Item {
         std::string name;
