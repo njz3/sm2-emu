@@ -69,16 +69,27 @@ DriveCommand decode_stcc(u8 value)
 // Sega Rally streams a torque every frame, strength in the low five bits:
 //   0x80..0x9f  push right  1..32
 //   0xc0..0xdf  push left   1..32
-// Holding the wheel over sends a push back towards centre. 0x00 releases;
-// 0x10 and 0x15 are not forces.
+// Holding the wheel over sends a push back towards centre. 0x00 releases.
+// 0x10..0x17 set the board's torque chopping (0x10 ends it) without touching
+// the torque, which the game uses as 0x15 on shocks and rough ground. Every
+// other byte leaves the torque as it is: the board replays its last torque
+// command (0x40..0x5f, a power with no direction, is not sent by the game).
+// Read in the board's EPROM, EPR-17891.
 DriveCommand decode_rally(u8 value)
 {
     const int low = value & 0x1f;
     switch (value & 0xe0) {
         case 0x80: return make(Effect::PushRight, low + 1, 32, true);
         case 0xc0: return make(Effect::PushLeft, low + 1, 32, true);
-        default:   return value == 0x00 ? DriveCommand{} : DriveCommand{Effect::Other};
+        default:   break;
     }
+    if (value == 0x00) {
+        return DriveCommand{};
+    }
+    if ((value & 0xf8) == 0x10) {
+        return {Effect::Chop, 0, false, static_cast<u8>(value & 0x07)};
+    }
+    return DriveCommand{Effect::Other};
 }
 
 }  // namespace
