@@ -40,6 +40,7 @@ public:
     virtual void paused(bool paused) = 0;
     virtual void poll(const std::string& game, const std::vector<Item>& items,
                       bool paused) = 0;
+    [[nodiscard]] virtual NetworkStatus status() const { return {}; }
 };
 
 namespace {
@@ -99,7 +100,13 @@ public:
         m_started = net::startup();
         if (m_started && m_server.open(port)) {
             SM2_INFO("outputs: network outputs on port %u", port);
+        } else if (m_server.address_in_use()) {
+            m_error = "port " + std::to_string(port) + " is already in use";
+            SM2_WARN("outputs: TCP port %u is already in use, probably by another emulator "
+                     "or output tool; close it, or set outputs_network_port to a free port",
+                     port);
         } else {
+            m_error = m_server.last_error();
             SM2_WARN("outputs: %s", m_server.last_error().c_str());
         }
     }
@@ -150,8 +157,14 @@ public:
         });
     }
 
+    [[nodiscard]] Outputs::NetworkStatus status() const override
+    {
+        return {true, m_server.valid(), m_server.client_count(), m_error};
+    }
+
 private:
     net::TcpServer m_server;
+    std::string    m_error;
     bool           m_started = false;
 };
 
@@ -481,6 +494,11 @@ void Outputs::poll()
     if (m_network != nullptr) {
         m_network->poll(m_game, m_items, m_paused);
     }
+}
+
+Outputs::NetworkStatus Outputs::network_status() const
+{
+    return m_network != nullptr ? m_network->status() : NetworkStatus{};
 }
 
 }  // namespace sm2::osd
