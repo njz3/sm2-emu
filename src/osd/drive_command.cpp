@@ -62,17 +62,20 @@ DriveCommand decode_daytona(u8 value)
     }
 }
 
-// Indy 500, Touring Car, OverRev and Super GT 24h share a later board program
-// (epr-18261) that keeps Daytona's layout but reads the low nibble differently:
+// Indy 500, Touring Car, Over Rev and Super GT 24h share a later board program
+// (EPR-18261) that keeps Daytona's layout but reads the low nibble differently.
+// A force-feedback wheel gets that board itself (IndyBoard); this reading is
+// what pads and plain rumble get of it:
 //   0x1x  motor off
 //   0x2x  friction     0..7
 //   0x3x  centring     0..7; 8..15 repeat them
 //   0x5x  push left    0..7, where 0 is no push
 //   0x6x  push right   0..7, where 0 is no push
 // A push fades to nothing at step 0 (Indy 500 streams 0x54, 0x53 .. 0x50 as a
-// jolt dies away), so strengths run from zero. 0x4x is not a command here.
-// 0x0x is game state, 0x7x the motor strength, and 0xax/0xbx follow each
-// effect in Indy 500 as parameters not yet understood.
+// jolt dies away), so strengths run from zero. 0x0x is game state and 0x7x the
+// motor strength. 0x4x (a push away from the centre), 0x9x/0xcx (the wheel's
+// centre) and 0xax/0xbx (a vibration's period and amplitude) only IndyBoard
+// plays.
 DriveCommand decode_indy(u8 value)
 {
     constexpr DriveCommand kOther{Effect::Other};
@@ -95,24 +98,6 @@ DriveCommand decode_indy(u8 value)
         case 0x60: return push(Effect::PushRight);
         default:   return kOther;
     }
-}
-
-// Touring Car streams its pushes every frame as a centring torque worked out
-// from the car, which lags the wheel: swinging from one turn into the next, it
-// still pushes the old way and throws the wheel. So only its strength is used,
-// as a spring about the wheel's own position. It idles at 1, so strength runs
-// from 1 (none) to 7 (full).
-DriveCommand decode_stcc(u8 value)
-{
-    DriveCommand command = decode_indy(value);
-    const int high = value & 0xf0;
-    if (high == 0x50 || high == 0x60) {
-        const int low    = value & 0x0f;
-        command.effect   = Effect::Spring;
-        command.strength = low <= 1 ? 0 : (low - 1) * kDriveFull / 6;
-        command.held     = true;
-    }
-    return command;
 }
 
 // Sega Rally streams a torque every frame, strength in the low five bits,
@@ -151,7 +136,6 @@ DriveCommand decode_drive_command(rom::DriveProtocol protocol, u8 value)
 {
     switch (protocol) {
         case rom::DriveProtocol::Indy:  return decode_indy(value);
-        case rom::DriveProtocol::Stcc:  return decode_stcc(value);
         case rom::DriveProtocol::Rally: return decode_rally(value);
         case rom::DriveProtocol::Daytona:
         default: return decode_daytona(value);

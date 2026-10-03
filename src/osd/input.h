@@ -17,6 +17,7 @@
 #include "core/config.h"
 #include "core/types.h"
 #include "osd/drive_command.h"
+#include "osd/indy_board.h"
 #include "rom/game.h"
 
 #include <SDL3/SDL.h>
@@ -493,6 +494,11 @@ private:
     /// outlives the torque commands until a $10 ends it, as on the board.
     DriveCommand                     m_drive_command;
     int                              m_drive_pulse = 0;
+
+    /// Indy 500's drive board (Touring Car, Over Rev, Super GT), which works
+    /// out its forces from the wheel: fed the game's bytes, it drives a
+    /// force-feedback wheel.
+    IndyBoard                        m_indy;
 
     /// The Sega Rally board's interrupts counted since start, simulated: its
     /// chopping flips on bits of this count.
