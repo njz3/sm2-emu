@@ -2349,6 +2349,9 @@ int main(int argc, char** argv)
                 audio_paused_state = effective_pause;
                 audio.set_paused(effective_pause);
                 pacer.resync();
+                if (effective_pause) {
+                    input.release_force_feedback();
+                }
             }
 
             outputs.configure(options.config.outputs_network,
@@ -2833,6 +2836,7 @@ int main(int argc, char** argv)
 
                 audio.set_paused(true);
                 audio_paused_state = true;
+                input.release_force_feedback();
                 show_picker();
                 window.set_title(build_title());
                 pacer.resync();

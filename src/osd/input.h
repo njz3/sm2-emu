@@ -206,6 +206,10 @@ public:
     /// wheel, without force feedback, or for a title with no steering.
     void update_force_feedback(const rom::GameSpec& game);
 
+    /// Take the force and rumble off the wheel, for a pause: without this the
+    /// last frame's force stays on. The next update_force_feedback() resends.
+    void release_force_feedback();
+
     /// True while a wheel delivers force feedback to a game with a drive board;
     /// then nothing rumbles, the wheel's own rumble and gamepads included.
     [[nodiscard]] bool wheel_ffb_active(const rom::GameSpec& game) const;

@@ -1458,6 +1458,21 @@ void Input::update_force_feedback(const rom::GameSpec& game)
               level, rumble_now);
 }
 
+void Input::release_force_feedback()
+{
+    if (!m_wheel.ffb) {
+        return;
+    }
+    if (m_wheel.force_level != 0) {
+        m_wheel.force_level = 0;
+        m_wheel.ffb->set_force(0);
+    }
+    if (m_wheel.rumble_mag > 0) {
+        m_wheel.rumble_mag = 0;
+        m_wheel.ffb->set_rumble(0);
+    }
+}
+
 void Input::update_pad_rumble(const rom::GameSpec& game)
 {
     if (m_pads.empty()) {
