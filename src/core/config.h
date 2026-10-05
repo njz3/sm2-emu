@@ -278,6 +278,60 @@ struct Config {
     /// Rumble strength, 0..100 percent of the pad's motor range.
     u32 pad_rumble_strength = 60;
 
+    /// Gain on a stick's travel past its deadzone, in percent. Under 100 the
+    /// stick never reaches full lock; over 100 it reaches it early.
+    u32 pad_stick_sensitivity = 100;
+
+    /// The cabinet controls a gamepad button can be bound to. Test and Service
+    /// stay on the Guide chord, so they are not here. Keep kCount last.
+    enum class PadRole : u32 {
+        Button1, Button2, Button3, Button4, Up, Down, Left, Right,
+        Start, Coin, GearUp, GearDown, kCount
+    };
+    static constexpr u32 kPadRoleCount = static_cast<u32>(PadRole::kCount);
+
+    /// A binding of kPadAxisPlus + axis is that axis pushed past half travel in
+    /// its positive direction (a trigger pulled, a stick right or down);
+    /// kPadAxisMinus + axis is the negative direction.
+    static constexpr s32 kPadAxisPlus  = 100;
+    static constexpr s32 kPadAxisMinus = 200;
+
+    /// The SDL_GamepadButton bound to each role, per player, or -1. The defaults
+    /// are SDL's positional layout: South 0, East 1, West 2, North 3, Back 4,
+    /// Start 6, LeftShoulder 9, RightShoulder 10, DpadUp 11, DpadDown 12,
+    /// DpadLeft 13, DpadRight 14. The shoulders doubling as Button 3/4 lives in
+    /// the input layer, outside these bindings.
+    std::array<std::array<s32, kPadRoleCount>, 2> pad_bindings = {{
+        // B1  B2  B3  B4  Up  Dn  Lf  Rt  Start Coin GearUp GearDown
+        {  0,  1,  2,  3, 11, 12, 13, 14,  6,   4,   10,    9 },
+        {  0,  1,  2,  3, 11, 12, 13, 14,  6,   4,   10,    9 },
+    }};
+
+    /// The pad's analogue controls: the aim stick (steering, bank, flight
+    /// stick), the two pedals and Virtual On's right lever, in X/Y pairs for
+    /// the sticks. Which game channel each feeds is the ROM's business. Keep
+    /// kCount last.
+    enum class PadAxisRole : u32 { AimX, AimY, Accel, Brake, LeverX, LeverY, kCount };
+    static constexpr u32 kPadAxisCount = static_cast<u32>(PadAxisRole::kCount);
+
+    /// The SDL_GamepadAxis bound to each analogue role, per player, and whether
+    /// it reads inverted. -1 keeps the default: aim on the left stick, accel on
+    /// the right trigger, brake on the left trigger, the lever on the right
+    /// stick. LeftX 0, LeftY 1, RightX 2, RightY 3, LeftTrigger 4, RightTrigger 5.
+    std::array<std::array<s32, kPadAxisCount>, 2> pad_axes = {{
+        { -1, -1, -1, -1, -1, -1 },
+        { -1, -1, -1, -1, -1, -1 },
+    }};
+    std::array<std::array<bool, kPadAxisCount>, 2> pad_axis_invert = {{
+        { false, false, false, false, false, false },
+        { false, false, false, false, false, false },
+    }};
+    /// A binding that floors the pedal while held, or -1.
+    std::array<std::array<s32, kPadAxisCount>, 2> pad_axis_buttons = {{
+        { -1, -1, -1, -1, -1, -1 },
+        { -1, -1, -1, -1, -1, -1 },
+    }};
+
     // -- cabinet outputs ---------------------------------------------------
 
     /// Publish lamps and drive-board bytes over MAME's network output protocol.

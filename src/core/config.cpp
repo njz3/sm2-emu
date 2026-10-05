@@ -189,6 +189,17 @@ constexpr std::array<const char*, Config::kGunRoleCount> kGunRoleNames = {
     "hat_up", "hat_down", "hat_left", "hat_right",
 };
 
+/// Pad-role names as they appear in the ini, in Config::PadRole order.
+constexpr std::array<const char*, Config::kPadRoleCount> kPadRoleNames = {
+    "button1", "button2", "button3", "button4",
+    "up", "down", "left", "right", "start", "coin", "gear_up", "gear_down",
+};
+
+/// Pad analogue-axis role names in the ini, in Config::PadAxisRole order.
+constexpr std::array<const char*, Config::kPadAxisCount> kPadAxisNames = {
+    "aim_x", "aim_y", "accel", "brake", "lever_x", "lever_y",
+};
+
 [[nodiscard]] bool parse_s32(const std::string& value, s32* out)
 {
     std::istringstream stream(value);
@@ -594,6 +605,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->pad_rumble_strength)) {
                 bad_value();
             }
+        } else if (key == "pad_stick_sensitivity") {
+            if (!parse_u32(value, &out->pad_stick_sensitivity)) {
+                bad_value();
+            }
         } else if (key == "wheel_lock_degrees") {
             if (!parse_u32(value, &out->wheel_lock_degrees)) {
                 bad_value();
@@ -702,6 +717,48 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_bool(value, &out->wheel_brake_half)) {
                 bad_value();
             }
+        } else if (key.rfind("pad1_button_", 0) == 0 || key.rfind("pad2_button_", 0) == 0) {
+            const usize player = key[3] == '2' ? 1 : 0;
+            const std::string role = key.substr(std::strlen("pad1_button_"));
+            bool matched = false;
+            for (u32 r = 0; r < Config::kPadRoleCount; ++r) {
+                if (role == kPadRoleNames[r]) {
+                    if (!parse_s32(value, &out->pad_bindings[player][r])) bad_value();
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                problems->push_back(path + ":" + std::to_string(number)
+                                    + ": unknown setting '" + key + "'");
+            }
+        } else if (key.rfind("pad1_axis_", 0) == 0 || key.rfind("pad2_axis_", 0) == 0) {
+            const usize player = key[3] == '2' ? 1 : 0;
+            const std::string role = key.substr(std::strlen("pad1_axis_"));
+            bool matched = false;
+            for (u32 r = 0; r < Config::kPadAxisCount; ++r) {
+                if (role == kPadAxisNames[r]) {
+                    if (!parse_s32(value, &out->pad_axes[player][r])) bad_value();
+                    matched = true;
+                    break;
+                }
+                const std::string inv = std::string(kPadAxisNames[r]) + "_invert";
+                if (role == inv) {
+                    if (!parse_bool(value, &out->pad_axis_invert[player][r])) bad_value();
+                    matched = true;
+                    break;
+                }
+                const std::string button = std::string(kPadAxisNames[r]) + "_button";
+                if (role == button) {
+                    if (!parse_s32(value, &out->pad_axis_buttons[player][r])) bad_value();
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                problems->push_back(path + ":" + std::to_string(number)
+                                    + ": unknown setting '" + key + "'");
+            }
         } else if (key.rfind("gun1_button_", 0) == 0 || key.rfind("gun2_button_", 0) == 0) {
             const usize player = key[3] == '2' ? 1 : 0;
             const std::string role = key.substr(std::strlen("gun1_button_"));
@@ -769,6 +826,7 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     out->wheel_shift_neutral_ms = std::min(out->wheel_shift_neutral_ms, 500u);
     out->wheel_rumble_strength = std::min(out->wheel_rumble_strength, 100u);
     out->pad_rumble_strength = std::min(out->pad_rumble_strength, 100u);
+    out->pad_stick_sensitivity = std::clamp(out->pad_stick_sensitivity, 25u, 300u);
     if (out->outputs_network_port == 0 || out->outputs_network_port > 65535) {
         out->outputs_network_port = 8000;
     }
@@ -930,6 +988,9 @@ bool save_config(const std::string& path, const Config& config)
         << "# buzz that rises with steering angle. 0..100 percent.\n"
         << "pad_rumble = " << bool_text(config.pad_rumble) << "\n"
         << "pad_rumble_strength = " << config.pad_rumble_strength << "\n"
+        << "# Stick sensitivity, percent gain past the deadzone (25..300). Under\n"
+        << "# 100 the stick never reaches full lock; over, it gets there early.\n"
+        << "pad_stick_sensitivity = " << config.pad_stick_sensitivity << "\n"
         << "# Cabinet lamps and drive-board bytes for MAMEHooker, DOFLinx and\n"
         << "# similar tools, in MAME's formats: over TCP (network) and, on\n"
         << "# Windows, as window messages. With the network outputs on, a starting\n"
@@ -987,6 +1048,45 @@ bool save_config(const std::string& path, const Config& config)
         << "wheel_accel_half = " << bool_text(config.wheel_accel_half) << "\n"
         << "wheel_brake_half = " << bool_text(config.wheel_brake_half) << "\n"
         << "\n"
+        << "# Gamepad buttons, per player, as SDL_GamepadButton values (-1\n"
+        << "# unbinds). button1..4 are the arcade buttons, up/down/left/right the\n"
+        << "# joystick gate, start/coin the operator inputs, gear_up/gear_down\n"
+        << "# the shift. Defaults are the positional SDL layout: South 0 East 1\n"
+        << "# West 2 North 3 -> button1..4, DpadUp 11 DpadDown 12 DpadLeft 13\n"
+        << "# DpadRight 14, Start 6, Back 4, RightShoulder 10, LeftShoulder 9.\n"
+        << "# 100 + an axis number is that axis pushed past half travel (a trigger\n"
+        << "# pulled, a stick right or down); 200 + axis is the other direction.\n";
+    for (u32 p = 0; p < 2; ++p) {
+        for (u32 r = 0; r < Config::kPadRoleCount; ++r) {
+            out << "pad" << (p + 1) << "_button_" << kPadRoleNames[r] << " = "
+                << config.pad_bindings[p][r] << "\n";
+        }
+    }
+    out << "\n"
+        << "# Gamepad analogue axes, per player, as SDL_GamepadAxis values (-1\n"
+        << "# keeps the default: aim on the left stick, accel on the right trigger,\n"
+        << "# brake on the left trigger, Virtual On's lever on the right stick).\n"
+        << "# LeftX 0 LeftY 1 RightX 2 RightY 3 LeftTrigger 4 RightTrigger 5. An\n"
+        << "# *_invert flag reverses an axis that reads the wrong way; a pedal's\n"
+        << "# *_button is a binding that floors it while held (-1 none).\n";
+    for (u32 p = 0; p < 2; ++p) {
+        for (u32 r = 0; r < Config::kPadAxisCount; ++r) {
+            const auto role     = static_cast<Config::PadAxisRole>(r);
+            const bool is_pedal = role == Config::PadAxisRole::Accel || role == Config::PadAxisRole::Brake;
+            const bool is_aim   = role == Config::PadAxisRole::AimX || role == Config::PadAxisRole::AimY;
+            out << "pad" << (p + 1) << "_axis_" << kPadAxisNames[r] << " = "
+                << config.pad_axes[p][r] << "\n";
+            if (is_pedal || is_aim) {
+                out << "pad" << (p + 1) << "_axis_" << kPadAxisNames[r] << "_invert = "
+                    << bool_text(config.pad_axis_invert[p][r]) << "\n";
+            }
+            if (is_pedal) {
+                out << "pad" << (p + 1) << "_axis_" << kPadAxisNames[r] << "_button = "
+                    << config.pad_axis_buttons[p][r] << "\n";
+            }
+        }
+    }
+    out << "\n"
         << "# Light-gun buttons, per player, as raw Linux evdev key codes (0\n"
         << "# unbinds). Trigger fires, reload is the off-screen reload / missile,\n"
         << "# coin and start are the operator inputs, hat_* are a gun's D-pad.\n"

@@ -224,6 +224,9 @@ public:
     /// Turn the picker on with the launchable games (sorted for display), the
     /// backend (main-thread texture create/destroy) and the scraper (polled
     /// each frame). A null scraper or empty list still lists/launches by title.
+    /// The backend that uploads textures the settings tabs draw.
+    void set_texture_backend(render::Backend* backend) { m_backend = backend; }
+
     void enable_picker(std::vector<PickerEntry> entries, render::Backend* backend,
                        Scraper* scraper);
 
@@ -311,6 +314,18 @@ private:
     int m_gun_capture_player = -1;
     u32 m_gun_capture_role   = 0;
 
+    // Button capture: the (player, role) awaiting a press, or -1, and the
+    // player being edited.
+    int m_pad_capture_player = -1;
+    u32 m_pad_capture_role   = 0;
+    int m_pad_edit_player    = 0;
+
+    // Axis capture: the (player, role) awaiting a move, or -1, and the rest
+    // position when it began.
+    int                 m_pad_axis_capture_player = -1;
+    u32                 m_pad_axis_capture_role   = 0;
+    std::array<s16, 16> m_pad_axis_baseline{};
+
     // -- cabinet link status -----------------------------------------------
     LinkStatus m_link_status;
     OutputsStatus m_outputs_status;
@@ -339,6 +354,19 @@ private:
     /// BeginTabItem() overrides the ID stack, so OpenPopup() must be issued
     /// from draw_dir_picker_popup() (after EndTabBar()) instead of here.
     bool                      m_dir_picker_request_open = false;
+
+    // -- gamepad diagram ---------------------------------------------------
+    /// The pad picture, decoded and uploaded on first use.
+    struct PadArt {
+        render::Backend::TextureHandle handle = 0;
+        float                          w      = 0.0f;
+        float                          h      = 0.0f;
+        bool                           tried  = false;
+    };
+    PadArt           m_pad_art;
+    render::Backend* m_backend = nullptr;
+    [[nodiscard]] const PadArt* pad_art();
+    void                        release_pad_art();
 
     // -- game picker state -------------------------------------------------
     bool                       m_picker_enabled = false;

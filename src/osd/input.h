@@ -257,6 +257,12 @@ public:
         m_pad_rumble_strength = strength;
     }
 
+    /// Stick gain as a percentage, pushed from the config each frame.
+    void set_pad_stick_sensitivity(u32 percent)
+    {
+        m_pad_stick_gain = static_cast<float>(percent) / 100.0f;
+    }
+
     /// Per-player gun button bindings: the evdev key code for each GunRole,
     /// pushed from the config each frame. Sized [2 players][kGunRoles].
     static constexpr usize kGunRoles = 8;
@@ -264,6 +270,46 @@ public:
     {
         m_gun_buttons = b;
     }
+
+    /// The binding for each Config::PadRole, per player, pushed from the config
+    /// each frame.
+    static constexpr usize kPadRoles = Config::kPadRoleCount;
+    void set_pad_buttons(const std::array<std::array<s32, kPadRoles>, 2>& b)
+    {
+        m_pad_buttons = b;
+    }
+
+    /// Whether the physical SDL `button` is down on `player`'s pad.
+    [[nodiscard]] bool pad_physical_down(u32 player, s32 button) const;
+
+    /// The lowest-numbered button held on `player`'s pad, or -1.
+    [[nodiscard]] s32 pressed_pad_button(u32 player) const;
+
+    /// A binding's name for the settings UI; empty if unbound or unknown.
+    [[nodiscard]] static std::string pad_button_name(s32 button);
+
+    /// The axis for each Config::PadAxisRole, per player, -1 for the default,
+    /// with its invert flag and pedal button; pushed from the config each frame.
+    static constexpr usize kPadAxes = Config::kPadAxisCount;
+    void set_pad_axes(const std::array<std::array<s32, kPadAxes>, 2>&  axes,
+                      const std::array<std::array<bool, kPadAxes>, 2>& invert,
+                      const std::array<std::array<s32, kPadAxes>, 2>&  buttons)
+    {
+        m_pad_axes         = axes;
+        m_pad_axis_invert  = invert;
+        m_pad_axis_buttons = buttons;
+    }
+
+    /// The axis on `player`'s pad that has moved furthest from `baseline`, or
+    /// -1; `positive` is its direction.
+    [[nodiscard]] s32 captured_pad_axis(u32 player, const s16* baseline,
+                                        bool* positive) const;
+
+    /// Every axis on `player`'s pad, SDL_GAMEPAD_AXIS_COUNT of them, into `out`.
+    void pad_axis_baseline(u32 player, s16* out) const;
+
+    /// The name of an SDL gamepad axis, for the settings UI. Empty if unknown.
+    [[nodiscard]] static std::string pad_axis_name(s32 axis);
 
     /// Present-stage placement, pushed from the config each frame, so the gun /
     /// mouse pointer maps onto the same letterbox rectangle the backend draws
@@ -389,6 +435,15 @@ private:
     /// The pad driving a given player, or nullptr if that player has none.
     [[nodiscard]] SDL_Gamepad* pad_for(u32 player) const;
 
+    /// Whether `binding` is held on `pad`: a button, or an axis past half travel.
+    [[nodiscard]] static bool binding_held(SDL_Gamepad* pad, s32 binding);
+
+    /// Whether the pad's `physical` button is held, read through the user's
+    /// bindings: a button that is a role's default reads that role's binding.
+    [[nodiscard]] bool pad_button_held(const Pad& pad, SDL_GamepadButton physical) const;
+    /// Whether the button bound to `role` is held on `player`'s pad.
+    [[nodiscard]] bool pad_role_held(u32 player, Config::PadRole role) const;
+
     /// Sample one logical control and scale it into an analogue channel's own
     /// calibrated range, with centre_dead and curve shaping a stick axis.
     [[nodiscard]] u8 sample_channel(const rom::AnalogChannel& channel,
@@ -484,6 +539,16 @@ private:
         {0x110u, 0x111u, 0x101u, 0x102u, 0x105u, 0x106u, 0x107u, 0x108u},
         {0x110u, 0x111u, 0x101u, 0x102u, 0x105u, 0x106u, 0x107u, 0x108u},
     }};
+
+    /// Bindings per player and role, SDL's layout until the config arrives.
+    std::array<std::array<s32, kPadRoles>, 2> m_pad_buttons =
+        Config{}.pad_bindings;
+    float m_pad_stick_gain = 1.0f;
+
+    /// Axis overrides per player and role, with invert flags and pedal buttons.
+    std::array<std::array<s32, kPadAxes>, 2>  m_pad_axes        = Config{}.pad_axes;
+    std::array<std::array<bool, kPadAxes>, 2> m_pad_axis_invert = Config{}.pad_axis_invert;
+    std::array<std::array<s32, kPadAxes>, 2>  m_pad_axis_buttons = Config{}.pad_axis_buttons;
     enum GunRoleIdx { GrTrigger, GrReload, GrCoin, GrStart,
                       GrHatUp, GrHatDown, GrHatLeft, GrHatRight };
 

@@ -19,6 +19,8 @@
 #include "osd/scraper.h"
 #include "render/geometry.h"
 
+#include "assets/pad_xbox_outline.h"
+
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 
@@ -104,6 +106,7 @@ bool Gui::init(SDL_Window* window)
 
 void Gui::shutdown()
 {
+    release_pad_art();
     if (!m_initialised) return;
 
     ImGui_ImplSDL3_Shutdown();
@@ -777,6 +780,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
             ImGui::BulletText("VulkanMemoryAllocator - GPU memory (AMD / GPUOpen)");
             ImGui::BulletText("shaderc / glslang - shader compilation");
             ImGui::BulletText("stb_image - box-art image decoding (Sean Barrett)");
+            ImGui::BulletText("Gamepad picture - Xelu's Free Controller Prompts (Nicolae Berbece), CC0");
             ImGui::BulletText("libcurl - artwork scraping (optional)");
             ImGui::Spacing();
             ImGui::Text("Game artwork and descriptions from ArcadeDB");
@@ -1117,6 +1121,130 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
 // Gamepad tab
 // ---------------------------------------------------------------------------
 
+namespace {
+
+/// Where each physical control sits on the pad picture, as fractions of its size.
+struct PadArtLayout {
+    ImVec2 south, east, west, north, back, guide, start, lstick, rstick, lb, rb;
+    ImVec2 up, down, left, right, lt, rt;
+};
+
+constexpr PadArtLayout kPadArt = {
+    {0.752f, 0.534f}, {0.818f, 0.438f}, {0.685f, 0.438f}, {0.752f, 0.337f},
+    {0.435f, 0.441f}, {0.503f, 0.286f}, {0.573f, 0.441f},
+    {0.258f, 0.441f}, {0.630f, 0.650f}, {0.260f, 0.155f}, {0.740f, 0.155f},
+    {0.378f, 0.588f}, {0.378f, 0.715f}, {0.335f, 0.650f}, {0.420f, 0.650f},
+    {0.245f, 0.070f}, {0.755f, 0.070f},
+};
+
+constexpr ImVec2 kOffArt{-1.0f, -1.0f};
+
+ImVec2 art_button_point(const PadArtLayout& a, s32 button)
+{
+    switch (static_cast<SDL_GamepadButton>(button)) {
+        case SDL_GAMEPAD_BUTTON_SOUTH:          return a.south;
+        case SDL_GAMEPAD_BUTTON_EAST:           return a.east;
+        case SDL_GAMEPAD_BUTTON_WEST:           return a.west;
+        case SDL_GAMEPAD_BUTTON_NORTH:          return a.north;
+        case SDL_GAMEPAD_BUTTON_BACK:           return a.back;
+        case SDL_GAMEPAD_BUTTON_GUIDE:          return a.guide;
+        case SDL_GAMEPAD_BUTTON_START:          return a.start;
+        case SDL_GAMEPAD_BUTTON_LEFT_STICK:     return a.lstick;
+        case SDL_GAMEPAD_BUTTON_RIGHT_STICK:    return a.rstick;
+        case SDL_GAMEPAD_BUTTON_LEFT_SHOULDER:  return a.lb;
+        case SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER: return a.rb;
+        case SDL_GAMEPAD_BUTTON_DPAD_UP:        return a.up;
+        case SDL_GAMEPAD_BUTTON_DPAD_DOWN:      return a.down;
+        case SDL_GAMEPAD_BUTTON_DPAD_LEFT:      return a.left;
+        case SDL_GAMEPAD_BUTTON_DPAD_RIGHT:     return a.right;
+        default:                                return kOffArt;
+    }
+}
+
+ImVec2 art_axis_point(const PadArtLayout& a, s32 axis);
+
+/// Where a binding sits on the picture.
+ImVec2 art_binding_point(const PadArtLayout& a, s32 binding)
+{
+    if (binding >= Config::kPadAxisMinus) {
+        return art_axis_point(a, binding - Config::kPadAxisMinus);
+    }
+    if (binding >= Config::kPadAxisPlus) {
+        return art_axis_point(a, binding - Config::kPadAxisPlus);
+    }
+    return art_button_point(a, binding);
+}
+
+ImVec2 art_axis_point(const PadArtLayout& a, s32 axis)
+{
+    switch (static_cast<SDL_GamepadAxis>(axis)) {
+        case SDL_GAMEPAD_AXIS_LEFTX:
+        case SDL_GAMEPAD_AXIS_LEFTY:         return a.lstick;
+        case SDL_GAMEPAD_AXIS_RIGHTX:
+        case SDL_GAMEPAD_AXIS_RIGHTY:        return a.rstick;
+        case SDL_GAMEPAD_AXIS_LEFT_TRIGGER:  return a.lt;
+        case SDL_GAMEPAD_AXIS_RIGHT_TRIGGER: return a.rt;
+        default:                             return kOffArt;
+    }
+}
+
+/// Face buttons in their usual colours; everything else one neutral blue.
+ImU32 button_colour(s32 button)
+{
+    switch (static_cast<SDL_GamepadButton>(button)) {
+        case SDL_GAMEPAD_BUTTON_SOUTH: return IM_COL32(96, 200, 96, 255);
+        case SDL_GAMEPAD_BUTTON_EAST:  return IM_COL32(224, 84, 84, 255);
+        case SDL_GAMEPAD_BUTTON_WEST:  return IM_COL32(96, 136, 236, 255);
+        case SDL_GAMEPAD_BUTTON_NORTH: return IM_COL32(232, 200, 64, 255);
+        default:                       return IM_COL32(150, 185, 235, 255);
+    }
+}
+
+s32 default_pad_axis(Config::PadAxisRole role)
+{
+    switch (role) {
+        case Config::PadAxisRole::AimX:  return SDL_GAMEPAD_AXIS_LEFTX;
+        case Config::PadAxisRole::AimY:  return SDL_GAMEPAD_AXIS_LEFTY;
+        case Config::PadAxisRole::Accel:  return SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
+        case Config::PadAxisRole::Brake:  return SDL_GAMEPAD_AXIS_LEFT_TRIGGER;
+        case Config::PadAxisRole::LeverX: return SDL_GAMEPAD_AXIS_RIGHTX;
+        case Config::PadAxisRole::LeverY: return SDL_GAMEPAD_AXIS_RIGHTY;
+        default:                          return -1;
+    }
+}
+
+}  // namespace
+
+const Gui::PadArt* Gui::pad_art()
+{
+    if (m_backend == nullptr) {
+        return nullptr;
+    }
+    PadArt& art = m_pad_art;
+    if (!art.tried) {
+        art.tried = true;
+        int            w = 0, h = 0, channels = 0;
+        unsigned char* rgba = stbi_load_from_memory(
+            assets::pad_xbox_outline, static_cast<int>(assets::pad_xbox_outline_size), &w, &h,
+            &channels, 4);
+        if (rgba != nullptr) {
+            art.handle = m_backend->create_texture(static_cast<u32>(w), static_cast<u32>(h), rgba);
+            art.w      = static_cast<float>(w);
+            art.h      = static_cast<float>(h);
+            stbi_image_free(rgba);
+        }
+    }
+    return art.handle != 0 ? &art : nullptr;
+}
+
+void Gui::release_pad_art()
+{
+    if (m_pad_art.handle != 0 && m_backend != nullptr) {
+        m_backend->destroy_texture(m_pad_art.handle);
+    }
+    m_pad_art = PadArt{};
+}
+
 void Gui::draw_gamepad_tab(Config& config, Input* input)
 {
     const int pads = input != nullptr ? static_cast<int>(input->pad_count()) : 0;
@@ -1125,7 +1253,288 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
     } else {
         ImGui::TextDisabled("No gamepad connected. Settings still apply once one is.");
     }
-    ImGui::Spacing();
+
+    int&       edit = m_pad_edit_player;
+    const auto p    = static_cast<usize>(edit);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Player");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("1", edit == 0)) { edit = 0; m_pad_capture_player = -1; m_pad_axis_capture_player = -1; }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("2", edit == 1)) { edit = 1; m_pad_capture_player = -1; m_pad_axis_capture_player = -1; }
+    ImGui::SameLine(0.0f, 24.0f);
+    if (ImGui::Button("Reset to SDL defaults")) {
+        config.pad_bindings[p]    = Config{}.pad_bindings[p];
+        config.pad_axes[p]         = Config{}.pad_axes[p];
+        config.pad_axis_invert[p]  = Config{}.pad_axis_invert[p];
+        config.pad_axis_buttons[p] = Config{}.pad_axis_buttons[p];
+        m_pad_capture_player       = -1;
+        m_pad_axis_capture_player  = -1;
+    }
+
+    // -- the picture, with a slot for every control around it ---------------
+    // A slot per cabinet control; a stick slot binds both axes of its role.
+    enum class Kind { Button, Pedal, Stick };
+    struct Slot {
+        const char* name;
+        Kind        kind;
+        u32         role;
+        int         column;  // 0 left of the picture, 1 right, 2 under the left stick, 3 under the right
+    };
+    static const Slot kSlots[] = {
+        {"Brake",       Kind::Pedal,  static_cast<u32>(Config::PadAxisRole::Brake), 0},
+        {"Gear Down",   Kind::Button, static_cast<u32>(Config::PadRole::GearDown),  0},
+        {"Move Up",     Kind::Button, static_cast<u32>(Config::PadRole::Up),        0},
+        {"Move Left",   Kind::Button, static_cast<u32>(Config::PadRole::Left),      0},
+        {"Move Right",  Kind::Button, static_cast<u32>(Config::PadRole::Right),     0},
+        {"Move Down",   Kind::Button, static_cast<u32>(Config::PadRole::Down),      0},
+        {"Coin",        Kind::Button, static_cast<u32>(Config::PadRole::Coin),      0},
+        {"Accelerator", Kind::Pedal,  static_cast<u32>(Config::PadAxisRole::Accel), 1},
+        {"Gear Up",     Kind::Button, static_cast<u32>(Config::PadRole::GearUp),    1},
+        {"Button 4",    Kind::Button, static_cast<u32>(Config::PadRole::Button4),   1},
+        {"Button 3",    Kind::Button, static_cast<u32>(Config::PadRole::Button3),   1},
+        {"Button 2",    Kind::Button, static_cast<u32>(Config::PadRole::Button2),   1},
+        {"Button 1",    Kind::Button, static_cast<u32>(Config::PadRole::Button1),   1},
+        {"Start",       Kind::Button, static_cast<u32>(Config::PadRole::Start),     1},
+        {"Steer / Aim", Kind::Stick,  static_cast<u32>(Config::PadAxisRole::AimX),   2},
+        {"Right Lever", Kind::Stick,  static_cast<u32>(Config::PadAxisRole::LeverX), 3},
+    };
+
+    const float         s      = m_ui_scale > 0.0f ? m_ui_scale : 1.0f;
+    const PadArtLayout& layout = kPadArt;
+    const PadArt*       art    = pad_art();
+    ImDrawList*         draw   = ImGui::GetWindowDrawList();
+    const ImVec2        origin = ImGui::GetCursorScreenPos();
+    const float         avail  = ImGui::GetContentRegionAvail().x;
+    const float         slot_w = 196.0f * s;
+    const float         slot_h = 28.0f * s;
+    const float         gap    = 26.0f * s;
+    const float         img_w  = std::clamp(avail - 2.0f * (slot_w + gap), 240.0f * s, 620.0f * s);
+    const float         img_h  = img_w * (art != nullptr ? art->h / art->w : 0.65f);
+    const ImVec2        img0(origin.x + (avail - img_w) * 0.5f, origin.y + 40.0f * s);
+    const ImVec2        img1(img0.x + img_w, img0.y + img_h);
+    if (art != nullptr) {
+        draw->AddImage(reinterpret_cast<ImTextureID>(m_backend->texture_imgui_id(art->handle)),
+                       img0, img1);
+    } else {
+        draw->AddRect(img0, img1, IM_COL32(90, 95, 105, 255), 12.0f * s);
+    }
+    const auto at = [&](ImVec2 f) { return ImVec2(img0.x + f.x * img_w, img0.y + f.y * img_h); };
+
+    // Light every button that is down.
+    if (input != nullptr) {
+        for (int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT; ++b) {
+            const ImVec2 f = art_button_point(layout, b);
+            if (f.x >= 0.0f && input->pad_physical_down(static_cast<u32>(edit), b)) {
+                draw->AddCircle(at(f), 10.0f * s, IM_COL32(255, 255, 255, 230), 0, 2.5f * s);
+            }
+        }
+    }
+
+    const float  font      = ImGui::GetFontSize();
+    const float  pitch     = img_h / 6.0f;
+    const float  left_x    = img0.x - gap - slot_w;
+    const float  right_x   = img1.x + gap;
+    const float  below_y   = img1.y + 20.0f * s;
+    int          rows[4]   = {0, 0, 0, 0};
+    for (const Slot& slot : kSlots) {
+        const int row = rows[slot.column]++;
+        ImVec2    pos;
+        ImVec2    anchor;  // where the connector leaves the slot
+        if (slot.column == 0) {
+            pos    = ImVec2(left_x, img0.y + row * pitch - slot_h * 0.5f);
+            anchor = ImVec2(pos.x + slot_w, pos.y + slot_h * 0.5f);
+        } else if (slot.column == 1) {
+            pos    = ImVec2(right_x, img0.y + row * pitch - slot_h * 0.5f);
+            anchor = ImVec2(pos.x, pos.y + slot_h * 0.5f);
+        } else {
+            // Under its stick, so the connector is vertical.
+            const float stick_x = at(slot.column == 2 ? layout.lstick : layout.rstick).x;
+            const float inset   = 30.0f * s;
+            pos    = ImVec2(slot.column == 2 ? stick_x + inset - slot_w : stick_x - inset, below_y);
+            anchor = ImVec2(stick_x, pos.y);
+        }
+
+        const bool  is_axis = slot.kind != Kind::Button;
+        std::string value;
+        ImVec2      target = kOffArt;
+        ImU32       colour = IM_COL32(150, 185, 235, 255);
+        bool        capturing;
+        if (!is_axis) {
+            const s32 bound = config.pad_bindings[p][slot.role];
+            value           = bound < 0 ? "unbound" : Input::pad_button_name(bound);
+            target          = art_binding_point(layout, bound);
+            colour          = button_colour(bound);
+            capturing       = m_pad_capture_player == edit && m_pad_capture_role == slot.role;
+        } else {
+            const auto role  = static_cast<Config::PadAxisRole>(slot.role);
+            const s32  bound = config.pad_axes[p][slot.role];
+            const s32  shown = bound >= 0 ? bound : default_pad_axis(role);
+            if (slot.kind == Kind::Stick) {
+                value = shown == SDL_GAMEPAD_AXIS_RIGHTX || shown == SDL_GAMEPAD_AXIS_RIGHTY
+                            ? "Right Stick"
+                        : shown == SDL_GAMEPAD_AXIS_LEFTX || shown == SDL_GAMEPAD_AXIS_LEFTY
+                            ? "Left Stick"
+                                    : Input::pad_axis_name(shown);
+            } else {
+                value = Input::pad_axis_name(shown);
+                if (config.pad_axis_invert[p][slot.role]) {
+                    value += " (inverted)";
+                }
+            }
+            target = art_axis_point(layout, shown);
+            if (const s32 button = config.pad_axis_buttons[p][slot.role];
+                slot.kind == Kind::Pedal && button >= 0) {
+                value  = Input::pad_button_name(button);
+                target = art_binding_point(layout, button);
+                colour = button_colour(button);
+            }
+            capturing = m_pad_axis_capture_player == edit && m_pad_axis_capture_role == slot.role;
+        }
+
+        ImGui::PushID(slot.name);
+        ImGui::SetCursorScreenPos(pos);
+        ImGui::InvisibleButton("slot", ImVec2(slot_w, slot_h));
+        const bool hovered = ImGui::IsItemHovered();
+        if (hovered) {
+            ImGui::SetTooltip(slot.kind == Kind::Stick ? "Click, then push a stick.\n"
+                                                         "Right-click to go back to the default."
+                              : slot.kind == Kind::Pedal ? "Click, then pull the trigger, push a stick\n"
+                                                           "or press a button. Right-click for the default."
+                                                         : "Click, then press a button or pull a trigger.\n"
+                                                           "Right-click to unbind.");
+        }
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+            if (capturing) {
+                m_pad_capture_player      = -1;
+                m_pad_axis_capture_player = -1;
+            } else if (is_axis) {
+                m_pad_capture_player      = -1;
+                m_pad_axis_capture_player = edit;
+                m_pad_axis_capture_role   = slot.role;
+                if (input != nullptr) {
+                    input->pad_axis_baseline(static_cast<u32>(edit), m_pad_axis_baseline.data());
+                }
+            } else {
+                m_pad_axis_capture_player = -1;
+                m_pad_capture_player      = edit;
+                m_pad_capture_role        = slot.role;
+                if (input != nullptr) {
+                    input->pad_axis_baseline(static_cast<u32>(edit), m_pad_axis_baseline.data());
+                }
+            }
+            capturing = !capturing;
+        }
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+            if (slot.kind == Kind::Stick) {
+                for (const u32 axis : {slot.role, slot.role + 1}) {
+                    config.pad_axes[p][axis]        = -1;
+                    config.pad_axis_invert[p][axis] = false;
+                }
+            } else if (is_axis) {
+                config.pad_axes[p][slot.role]         = -1;
+                config.pad_axis_invert[p][slot.role]  = false;
+                config.pad_axis_buttons[p][slot.role] = -1;
+            } else {
+                config.pad_bindings[p][slot.role] = -1;
+            }
+        }
+
+        const ImVec2 end(pos.x + slot_w, pos.y + slot_h);
+        const ImU32  bg = capturing ? IM_COL32(44, 68, 108, 255)
+                        : hovered   ? IM_COL32(54, 58, 68, 255)
+                                    : IM_COL32(38, 41, 48, 255);
+        const ImU32  border = capturing ? IM_COL32(110, 160, 240, 255) : IM_COL32(72, 77, 88, 255);
+        draw->AddRectFilled(pos, end, bg, 6.0f * s);
+        draw->AddRect(pos, end, border, 6.0f * s, 0, 1.5f);
+        const float text_y = pos.y + (slot_h - font) * 0.5f;
+        draw->AddText(ImVec2(pos.x + 10.0f * s, text_y), IM_COL32(230, 232, 236, 255), slot.name);
+        if (capturing) {
+            value = is_axis ? "operate it..." : "press a button...";
+        }
+        const ImU32 value_col = capturing ? IM_COL32(140, 190, 255, 255) : IM_COL32(170, 176, 186, 255);
+        const float value_w   = ImGui::CalcTextSize(value.c_str()).x;
+        draw->AddText(ImVec2(end.x - 10.0f * s - value_w, text_y), value_col, value.c_str());
+
+        if (target.x >= 0.0f) {
+            const ImVec2 dot  = at(target);
+            const ImU32  line = (colour & 0x00ffffffu) | 0x80000000u;
+            if (slot.column < 2) {
+                const ImVec2 edge(slot.column == 0 ? img0.x - 8.0f * s : img1.x + 8.0f * s, anchor.y);
+                draw->AddLine(anchor, edge, line, 1.5f * s);
+                draw->AddLine(edge, dot, line, 1.5f * s);
+            } else {
+                draw->AddLine(anchor, dot, line, 1.5f * s);
+            }
+            draw->AddCircleFilled(dot, 4.5f * s, colour);
+        }
+
+        if (capturing && input != nullptr) {
+            if (slot.kind == Kind::Stick) {
+                // Either axis of a stick binds the whole stick.
+                bool      positive = true;
+                const s32 got      = input->captured_pad_axis(
+                    static_cast<u32>(edit), m_pad_axis_baseline.data(), &positive);
+                const bool right = got == SDL_GAMEPAD_AXIS_RIGHTX || got == SDL_GAMEPAD_AXIS_RIGHTY;
+                const bool left  = got == SDL_GAMEPAD_AXIS_LEFTX || got == SDL_GAMEPAD_AXIS_LEFTY;
+                if (left || right) {
+                    const u32 x = slot.role;
+                    const u32 y = slot.role + 1;
+                    config.pad_axes[p][x]        = right ? SDL_GAMEPAD_AXIS_RIGHTX : SDL_GAMEPAD_AXIS_LEFTX;
+                    config.pad_axes[p][y]        = right ? SDL_GAMEPAD_AXIS_RIGHTY : SDL_GAMEPAD_AXIS_LEFTY;
+                    config.pad_axis_invert[p][x] = false;
+                    config.pad_axis_invert[p][y] = false;
+                    m_pad_axis_capture_player    = -1;
+                }
+            } else if (is_axis) {
+                bool      positive = true;
+                const s32 got      = input->captured_pad_axis(
+                    static_cast<u32>(edit), m_pad_axis_baseline.data(), &positive);
+                const s32 button = input->pressed_pad_button(static_cast<u32>(edit));
+                if (got >= 0) {
+                    config.pad_axes[p][slot.role]         = got;
+                    config.pad_axis_invert[p][slot.role]  = !positive;
+                    config.pad_axis_buttons[p][slot.role] = -1;
+                    m_pad_axis_capture_player             = -1;
+                } else if (button >= 0) {
+                    config.pad_axis_buttons[p][slot.role] = button;
+                    m_pad_axis_capture_player             = -1;
+                }
+            } else {
+                s32 got = input->pressed_pad_button(static_cast<u32>(edit));
+                if (got < 0) {
+                    bool      positive = true;
+                    const s32 axis     = input->captured_pad_axis(
+                        static_cast<u32>(edit), m_pad_axis_baseline.data(), &positive);
+                    if (axis >= 0) {
+                        got = (positive ? Config::kPadAxisPlus : Config::kPadAxisMinus) + axis;
+                    }
+                }
+                if (got >= 0) {
+                    config.pad_bindings[p][slot.role] = got;
+                    m_pad_capture_player              = -1;
+                }
+            }
+        }
+        ImGui::PopID();
+    }
+    ImGui::SetCursorScreenPos(ImVec2(origin.x, below_y + slot_h + 10.0f * s));
+    ImGui::TextDisabled("The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
+                        "is Virtual On's. Test and Service are Guide+Start and Guide+Back.");
+
+    // -- sticks and rumble ---------------------------------------------------
+    ImGui::Separator();
+    int sensitivity = static_cast<int>(config.pad_stick_sensitivity);
+    if (ImGui::SliderInt("Stick sensitivity", &sensitivity, 25, 300, "%d%%")) {
+        sensitivity = ((sensitivity + 2) / 5) * 5;
+        config.pad_stick_sensitivity = static_cast<u32>(std::clamp(sensitivity, 25, 300));
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Gain on a stick's travel past its deadzone. Under 100%% the\n"
+                          "stick never reaches full lock; over, it gets there early.");
+    }
 
     ImGui::Checkbox("Rumble", &config.pad_rumble);
     ImGui::SameLine();

@@ -1903,6 +1903,7 @@ int main(int argc, char** argv)
         // above owns whichever GPU API actually draws what it builds.
         osd::Gui gui;
         gui.set_config_path(config_path);
+        gui.set_texture_backend(backend.get());
         // The renderers this build offers, most-preferred first. Software only
         // presents through a GPU backend, so it needs one present.
         {
@@ -2390,6 +2391,10 @@ int main(int argc, char** argv)
                 input.set_recoil(options.config.lightgun_recoil,
                                  options.config.lightgun_recoil_strength);
                 input.set_gun_buttons(options.config.gun_buttons);
+                input.set_pad_buttons(options.config.pad_bindings);
+                input.set_pad_axes(options.config.pad_axes, options.config.pad_axis_invert,
+                                   options.config.pad_axis_buttons);
+                input.set_pad_stick_sensitivity(options.config.pad_stick_sensitivity);
                 input.set_pad_rumble(options.config.pad_rumble,
                                      options.config.pad_rumble_strength);
                 input.set_present_placement(options.config.aspect_mode,

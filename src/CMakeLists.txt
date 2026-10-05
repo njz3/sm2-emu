@@ -295,6 +295,20 @@ add_library(sm2_osd STATIC
     osd/wheel_ffb.cpp
     osd/window.cpp
 )
+# The Gamepad tab's pad picture, embedded as a byte array.
+set(SM2_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
+foreach(asset pad_xbox_outline)
+    set(asset_in  "${CMAKE_CURRENT_SOURCE_DIR}/osd/assets/${asset}.png")
+    set(asset_out "${SM2_GENERATED_DIR}/assets/${asset}.h")
+    add_custom_command(
+        OUTPUT  "${asset_out}"
+        COMMAND ${CMAKE_COMMAND} -DSM2_IN=${asset_in} -DSM2_OUT=${asset_out}
+                -DSM2_SYMBOL=${asset} -P "${CMAKE_SOURCE_DIR}/cmake/EmbedBinary.cmake"
+        DEPENDS "${asset_in}" "${CMAKE_SOURCE_DIR}/cmake/EmbedBinary.cmake"
+        COMMENT "Embedding ${asset}.png")
+    target_sources(sm2_osd PRIVATE "${asset_out}")
+endforeach()
+target_include_directories(sm2_osd PRIVATE "${SM2_GENERATED_DIR}")
 if(SM2_HAVE_EVDEV)
     target_sources(sm2_osd PRIVATE osd/evdev_gun.cpp)
     target_compile_definitions(sm2_osd PUBLIC SM2_HAVE_EVDEV=1 SM2_HAVE_LIGHTGUNS=1)
