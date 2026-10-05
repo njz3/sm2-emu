@@ -577,6 +577,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->wheel_rumble_strength)) {
                 bad_value();
             }
+        } else if (key == "wheel_rumble_engine") {
+            if (!parse_bool(value, &out->wheel_rumble_engine)) {
+                bad_value();
+            }
         } else if (key == "pad_rumble") {
             if (!parse_bool(value, &out->pad_rumble)) {
                 bad_value();
@@ -603,6 +607,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             }
         } else if (key == "pad_rumble_strength") {
             if (!parse_u32(value, &out->pad_rumble_strength)) {
+                bad_value();
+            }
+        } else if (key == "pad_rumble_cornering") {
+            if (!parse_bool(value, &out->pad_rumble_cornering)) {
                 bad_value();
             }
         } else if (key == "pad_stick_sensitivity") {
@@ -979,17 +987,22 @@ bool save_config(const std::string& path, const Config& config)
         << "# Reverses the force, for a wheel whose driver pushes the wrong way:\n"
         << "# one that pulls away from the centre instead of bringing it back.\n"
         << "wheel_ffb_invert = " << bool_text(config.wheel_ffb_invert) << "\n"
-        << "# A synthesised engine/road rumble. Games with force feedback use that\n"
-        << "# instead, and then nothing rumbles, pads included.\n"
+        << "# Wheel rumble, for wheels without force feedback: vibrates on the\n"
+        << "# game's impacts. wheel_rumble_engine adds a vibration that grows with\n"
+        << "# the throttle; it is not from the game.\n"
         << "wheel_rumble = " << bool_text(config.wheel_rumble) << "\n"
         << "wheel_rumble_strength = " << config.wheel_rumble_strength << "\n"
+        << "wheel_rumble_engine = " << bool_text(config.wheel_rumble_engine) << "\n"
         << "\n"
-        << "# Gamepad rumble on driving games: the game's own impacts, plus a\n"
-        << "# buzz that rises with steering angle. 0..100 percent.\n"
+        << "# Gamepad rumble in driving games: vibrates on the game's impacts.\n"
+        << "# pad_rumble_cornering adds a vibration that grows as you steer; it is\n"
+        << "# not from the game.\n"
         << "pad_rumble = " << bool_text(config.pad_rumble) << "\n"
         << "pad_rumble_strength = " << config.pad_rumble_strength << "\n"
-        << "# Stick sensitivity, percent gain past the deadzone (25..300). Under\n"
-        << "# 100 the stick never reaches full lock; over, it gets there early.\n"
+        << "pad_rumble_cornering = " << bool_text(config.pad_rumble_cornering) << "\n"
+        << "# Stick sensitivity past the deadzone, percent (25..300). Full\n"
+        << "# deflection is always full lock; under 100 the middle of the travel\n"
+        << "# does less, over 100 it does more.\n"
         << "pad_stick_sensitivity = " << config.pad_stick_sensitivity << "\n"
         << "# Cabinet lamps and drive-board bytes for MAMEHooker, DOFLinx and\n"
         << "# similar tools, in MAME's formats: over TCP (network) and, on\n"

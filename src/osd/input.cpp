@@ -112,15 +112,16 @@ constexpr ControlBinding kControlBindings[] = {
 };
 
 // A released stick can settle off centre, so read the deadzone as centre and
-// rescale beyond it. curve 1 is linear; gain scales the travel.
-[[nodiscard]] float centred_fraction(s16 raw, float centre_dead, float curve, float gain)
+// rescale beyond it. curve 1 is linear; response bends the middle of the
+// travel without moving its ends, so full deflection is always full lock.
+[[nodiscard]] float centred_fraction(s16 raw, float centre_dead, float curve, float response)
 {
     const float value = std::max(static_cast<float>(raw), -32767.0f);
     const float past  = std::abs(value) - centre_dead;
     if (past <= 0.0f) {
         return 0.5f;
     }
-    const float travel = std::min(1.0f, std::pow(past / (32767.0f - centre_dead), curve) * gain);
+    const float travel = std::pow(past / (32767.0f - centre_dead), curve / response);
     return 0.5f + std::copysign(travel, value) * 0.5f;
 }
 
@@ -831,8 +832,8 @@ u8 Input::sample_channel(const rom::AnalogChannel& channel, float centre_dead,
         return static_cast<u8>(value + 0.5f);
     };
 
-    const auto centred = [centre_dead, curve, gain = m_pad_stick_gain](s16 raw) {
-        return centred_fraction(raw, centre_dead, curve, gain);
+    const auto centred = [centre_dead, curve, response = m_pad_stick_response](s16 raw) {
+        return centred_fraction(raw, centre_dead, curve, response);
     };
 
     // The axis a role reads: the user's override, else the default. Player
@@ -1396,7 +1397,7 @@ void Input::update_force_feedback(const rom::GameSpec& game)
     // Kept deliberately subtle: even at full strength it is a fraction of the
     // device maximum, so it reads as an engine hum rather than a jackhammer.
     if (!ffb_active && game.has_steering() && m_wheel_settings.rumble
-        && m_wheel.accel_axis >= 0) {
+        && m_wheel_settings.rumble_engine && m_wheel.accel_axis >= 0) {
         // Full strength maps to ~12% of the device max at full throttle; the
         // G923's motor is strong, so even a small sine magnitude is plenty.
         const int rmax = static_cast<int>(
@@ -1501,7 +1502,7 @@ void Input::update_pad_rumble(const rom::GameSpec& game)
 
     // Cornering load: the board's answer is a centring spring, so synthesise a buzz instead.
     int cornering = 0;
-    if (active) {
+    if (active && m_pad_rumble_cornering) {
         const int deflection = std::abs(steer);
         constexpr int kDeadzone = 7000;
         if (deflection > kDeadzone) {

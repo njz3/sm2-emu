@@ -111,10 +111,12 @@ public:
         u32  steer_degrees = 270;
         u32  lock_degrees  = 240;  ///< physical rotation for full game lock.
 
-        /// Synthetic engine/road rumble (Daytona streams no continuous buzz, so
-        /// this is derived from the throttle) and its 0..100 strength.
+        /// Rumble in place of force feedback: the game's impacts, and with
+        /// `rumble_engine` an engine hum from the throttle (Daytona streams no
+        /// continuous buzz). 0..100 strength.
         bool rumble          = true;
         u32  rumble_strength = 40;
+        bool rumble_engine   = true;
 
         /// Wheel button index per cabinet role, indexed by Config::WheelRole;
         /// -1 unbinds. Set by the GUI, since numbering differs between wheels.
@@ -251,16 +253,17 @@ public:
     }
 
     /// Gamepad rumble settings, pushed from the GUI/config each frame.
-    void set_pad_rumble(bool enabled, u32 strength)
+    void set_pad_rumble(bool enabled, u32 strength, bool cornering)
     {
-        m_pad_rumble_enabled  = enabled;
-        m_pad_rumble_strength = strength;
+        m_pad_rumble_enabled   = enabled;
+        m_pad_rumble_strength  = strength;
+        m_pad_rumble_cornering = cornering;
     }
 
     /// Stick gain as a percentage, pushed from the config each frame.
     void set_pad_stick_sensitivity(u32 percent)
     {
-        m_pad_stick_gain = static_cast<float>(percent) / 100.0f;
+        m_pad_stick_response = static_cast<float>(percent) / 100.0f;
     }
 
     /// Per-player gun button bindings: the evdev key code for each GunRole,
@@ -531,6 +534,7 @@ private:
     int                              m_pad_rumble_hold     = 0;  ///< frames left in the burst
     bool                             m_pad_rumble_enabled  = true;
     u32                              m_pad_rumble_strength = 60;
+    bool                             m_pad_rumble_cornering = true;
     mutable std::array<bool, kMaxGuns> m_trigger_was_down{};
 
     /// Gun role -> evdev key code, per player; Sinden defaults until the config
@@ -543,7 +547,7 @@ private:
     /// Bindings per player and role, SDL's layout until the config arrives.
     std::array<std::array<s32, kPadRoles>, 2> m_pad_buttons =
         Config{}.pad_bindings;
-    float m_pad_stick_gain = 1.0f;
+    float m_pad_stick_response = 1.0f;
 
     /// Axis overrides per player and role, with invert flags and pedal buttons.
     std::array<std::array<s32, kPadAxes>, 2>  m_pad_axes        = Config{}.pad_axes;

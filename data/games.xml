@@ -80,7 +80,8 @@
   `gearbox="true"` marks a title whose IN1 bits 0x70 read a gear selector
   rather than buttons (MAME's daytona_gearbox_r). `drive_board="true"` marks
   one that latches force-feedback commands on port E. `drive_protocol` says how
-  to read them: "daytona" (the default), "indy" or "rally".
+  to read them: "daytona" (the default), "indy" or "rally"; "stcc" reads as
+  "indy", Touring Car's board being Indy 500's.
 
   `shift_buttons="true"` marks a title that shifts with two momentary buttons,
   Shift Up on IN1 0x10 and Shift Down on IN1 0x20, rather than the 0x70 gate
@@ -3338,6 +3339,9 @@
       <input type="vehicle"/>
     </inputs>
 
+    <!-- The drive board only hears from the game once HARDWARE TYPE in the
+         test menu's Foundational Setting is SEGA STCC; the default NORMAL (2in1)
+         cabinet has no force feedback. -->
     <!-- Analogue mux wiring, from MAME's model2c_state::overrev2c. -->
     <analog>
       <channel index="0" control="steer" rest="0x80"/>

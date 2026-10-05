@@ -890,20 +890,25 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
     }
     ImGui::EndDisabled();
 
-    // Synthetic engine/road rumble, since the game streams no continuous buzz.
     ImGui::Checkbox("Rumble", &config.wheel_rumble);
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("A synthesised engine/road vibration that rises with\n"
-                          "the throttle, plus the game's impacts. Used on games\n"
-                          "without force feedback; never at the same time as it.");
+        ImGui::SetTooltip("Vibrates on the game's impacts, for wheels without force\n"
+                          "feedback. It never runs alongside force feedback.");
     }
     ImGui::BeginDisabled(!config.wheel_rumble);
     int rumble = static_cast<int>(config.wheel_rumble_strength);
     if (ImGui::SliderInt("Rumble strength", &rumble, 0, 100, "%d%%")) {
         rumble = ((rumble + 5) / 10) * 10;
         config.wheel_rumble_strength = static_cast<u32>(std::clamp(rumble, 0, 100));
+    }
+    ImGui::Checkbox("Engine vibration", &config.wheel_rumble_engine);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("An added vibration that grows with the throttle. It is not\n"
+                          "from the game. Turn it off to feel only the game's force feedback.");
     }
     ImGui::EndDisabled();
 
@@ -1532,16 +1537,17 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Gain on a stick's travel past its deadzone. Under 100%% the\n"
-                          "stick never reaches full lock; over, it gets there early.");
+        ImGui::SetTooltip("Response of a stick's travel past its deadzone. Full deflection\n"
+                          "is always full lock; under 100%% the middle of the travel does\n"
+                          "less, over 100%% it does more.");
     }
 
     ImGui::Checkbox("Rumble", &config.pad_rumble);
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Vibration on driving games: the jolt of an impact, and a\n"
-                          "buzz that rises with steering angle. Other games stay quiet.");
+        ImGui::SetTooltip("Vibrates on the game's impacts in driving games.\n"
+                          "Other games stay quiet.");
     }
 
     ImGui::BeginDisabled(!config.pad_rumble);
@@ -1549,6 +1555,13 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
     if (ImGui::SliderInt("Rumble strength", &strength, 0, 100, "%d%%")) {
         strength = ((strength + 5) / 10) * 10;  // snap to 10 % steps
         config.pad_rumble_strength = static_cast<u32>(std::clamp(strength, 0, 100));
+    }
+    ImGui::Checkbox("Steering vibration", &config.pad_rumble_cornering);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("An added vibration that grows as you steer. It is not\n"
+                          "from the game. Turn it off to feel only the game's force feedback.");
     }
     ImGui::EndDisabled();
 }

@@ -141,6 +141,7 @@ namespace {
 {
     if (text == "daytona") { *out = DriveProtocol::Daytona; return true; }
     if (text == "indy")    { *out = DriveProtocol::Indy;    return true; }
+    if (text == "stcc")    { *out = DriveProtocol::Indy;    return true; }  // Indy 500's board
     if (text == "rally")   { *out = DriveProtocol::Rally;   return true; }
     return false;
 }

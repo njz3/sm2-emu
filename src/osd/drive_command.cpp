@@ -27,8 +27,7 @@ DriveCommand make(Effect effect, int steps, int full_steps, bool held = false)
 // Daytona's bytes: effect in the high nibble, strength in the low one, decoded
 // the way its drive board's program (EPR-16488A) does. A force-feedback wheel
 // gets Daytona's board itself (DaytonaBoard); this reading is what pads and
-// plain rumble get of it, and of Indy 500's family, whose board (EPR-18261,
-// IndyBoard) lays its bytes out the same way.
+// plain rumble get of it.
 //   0x1x  motor off
 //   0x2x  friction     0..7
 //   0x3x  centring     0..7; 8..15 are the same strengths with a wider deadzone
@@ -40,8 +39,7 @@ DriveCommand make(Effect effect, int steps, int full_steps, bool held = false)
 // releases the wheel. A spring is 2n + 2, reached by a ramp of two a pot step
 // from just inside its deadzone. Steps 8..15 of the other families match
 // nothing on the board and also stop the motor. 0x0x and 0x7x are the boot
-// handshake and the gain setting. Indy 500 also sends its wheel's centre
-// (0x9x, 0xcx) and a vibration (0xax, 0xbx), which only IndyBoard plays.
+// handshake and the gain setting.
 DriveCommand decode_daytona(u8 value)
 {
     constexpr DriveCommand kOther{Effect::Other};
@@ -62,6 +60,44 @@ DriveCommand decode_daytona(u8 value)
         case 0x40: return low <= 7 ? push(Effect::Kick) : kOff;
         case 0x50: return low <= 7 ? push(Effect::PushLeft) : kOff;
         case 0x60: return low <= 7 ? push(Effect::PushRight) : kOff;
+        default:   return kOther;
+    }
+}
+
+// Indy 500, Touring Car, Over Rev and Super GT 24h share a later board program
+// (EPR-18261) that keeps Daytona's layout but reads the low nibble differently.
+// A force-feedback wheel gets that board itself (IndyBoard); this reading is
+// what pads and plain rumble get of it:
+//   0x1x  motor off
+//   0x2x  friction     0..7
+//   0x3x  centring     0..7; 8..15 repeat them
+//   0x5x  push left    0..7, where 0 is no push
+//   0x6x  push right   0..7, where 0 is no push
+// A push fades to nothing at step 0 (Indy 500 streams 0x54, 0x53 .. 0x50 as a
+// jolt dies away), so strengths run from zero. 0x0x is game state and 0x7x the
+// motor strength. 0x4x (a push away from the centre), 0x9x/0xcx (the wheel's
+// centre) and 0xax/0xbx (a vibration's period and amplitude) only IndyBoard
+// plays.
+DriveCommand decode_indy(u8 value)
+{
+    constexpr DriveCommand kOther{Effect::Other};
+    constexpr int kPotStep = 256;
+    const int low = value & 0x0f;
+    const auto push = [low](Effect effect) {
+        return low == 0 ? DriveCommand{} : make(effect, low, 7);
+    };
+    switch (value & 0xf0) {
+        case 0x10: return DriveCommand{};
+        case 0x20: return make(Effect::Friction, (low & 7) + 1, 8);
+        case 0x30: {
+            DriveCommand spring = make(Effect::Spring, (low & 7) + 1, 13);
+            spring.deadzone     = 3 * kPotStep;
+            spring.ramp_from    = 2 * kPotStep;
+            spring.full_at      = 21 * kPotStep;
+            return spring;
+        }
+        case 0x50: return push(Effect::PushLeft);
+        case 0x60: return push(Effect::PushRight);
         default:   return kOther;
     }
 }
@@ -101,8 +137,8 @@ DriveCommand decode_rally(u8 value)
 DriveCommand decode_drive_command(rom::DriveProtocol protocol, u8 value)
 {
     switch (protocol) {
+        case rom::DriveProtocol::Indy:  return decode_indy(value);
         case rom::DriveProtocol::Rally: return decode_rally(value);
-        case rom::DriveProtocol::Indy:  // Daytona's layout, see above
         case rom::DriveProtocol::Daytona:
         default: return decode_daytona(value);
     }

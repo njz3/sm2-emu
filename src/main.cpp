@@ -129,6 +129,7 @@ enum class GraphicsBackendChoice {
     w.lock_degrees    = c.wheel_lock_degrees;
     w.rumble          = c.wheel_rumble;
     w.rumble_strength = c.wheel_rumble_strength;
+    w.rumble_engine   = c.wheel_rumble_engine;
     w.buttons       = c.wheel_buttons;
     w.shifter_neutral  = c.wheel_shifter_neutral;
     w.shift_neutral_ms = c.wheel_shift_neutral_ms;
@@ -933,6 +934,7 @@ int main(int argc, char** argv)
     options.config.wheel_lock_degrees  = from_file.wheel_lock_degrees;
     options.config.wheel_rumble          = from_file.wheel_rumble;
     options.config.wheel_rumble_strength = from_file.wheel_rumble_strength;
+    options.config.wheel_rumble_engine   = from_file.wheel_rumble_engine;
     options.config.wheel_buttons       = from_file.wheel_buttons;
     options.config.wheel_shifter_neutral  = from_file.wheel_shifter_neutral;
     options.config.wheel_shift_neutral_ms = from_file.wheel_shift_neutral_ms;
@@ -944,8 +946,9 @@ int main(int argc, char** argv)
     options.config.wheel_accel_half    = from_file.wheel_accel_half;
     options.config.wheel_brake_half    = from_file.wheel_brake_half;
 
-    options.config.pad_rumble          = from_file.pad_rumble;
-    options.config.pad_rumble_strength = from_file.pad_rumble_strength;
+    options.config.pad_rumble           = from_file.pad_rumble;
+    options.config.pad_rumble_strength  = from_file.pad_rumble_strength;
+    options.config.pad_rumble_cornering = from_file.pad_rumble_cornering;
     if (!options.given.outputs_network) {
         options.config.outputs_network = from_file.outputs_network;
     }
@@ -2396,7 +2399,8 @@ int main(int argc, char** argv)
                                    options.config.pad_axis_buttons);
                 input.set_pad_stick_sensitivity(options.config.pad_stick_sensitivity);
                 input.set_pad_rumble(options.config.pad_rumble,
-                                     options.config.pad_rumble_strength);
+                                     options.config.pad_rumble_strength,
+                                     options.config.pad_rumble_cornering);
                 input.set_present_placement(options.config.aspect_mode,
                                             options.config.scaling_method);
                 input.set_sinden_border(options.config.sinden_border);
