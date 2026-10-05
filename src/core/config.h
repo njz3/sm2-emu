@@ -170,6 +170,13 @@ struct Config {
 
     // -- steering wheel ----------------------------------------------------
 
+    /// Read wheels and gamepads while the emulator's window is not in front: a
+    /// wheel or a panel driven from another program (a cabinet's panel fed
+    /// through vJoy, say) keeps steering the game, and its buttons and axes can
+    /// be bound in the wheel settings without clicking back into the window.
+    /// The keyboard and the mouse still need the window in front.
+    bool input_background = false;
+
     /// Synthesised centring resistance on a wheel that supports it: a spring
     /// whose strength grows with how far the wheel is turned. The drive board is
     /// not emulated, so there is no authentic motor force to replay; this is a

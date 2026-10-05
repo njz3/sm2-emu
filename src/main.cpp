@@ -109,6 +109,14 @@ enum class GraphicsBackendChoice {
     return false;
 }
 
+/// Lets SDL deliver wheel and gamepad events while the window is not in front,
+/// or not. SDL takes the change at any time; an environment variable of the
+/// same name still has the last word.
+void apply_input_background(bool on)
+{
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, on ? "1" : "0");
+}
+
 /// Build the input layer's wheel settings from the persisted config.
 [[nodiscard]] sm2::osd::Input::WheelSettings wheel_settings_from(const sm2::Config& c)
 {
@@ -890,6 +898,7 @@ int main(int argc, char** argv)
     options.config.wheel_ffb           = from_file.wheel_ffb;
     options.config.wheel_ffb_strength  = from_file.wheel_ffb_strength;
     options.config.wheel_ffb_invert    = from_file.wheel_ffb_invert;
+    options.config.input_background    = from_file.input_background;
     options.config.wheel_steer_degrees = from_file.wheel_steer_degrees;
     options.config.wheel_lock_degrees  = from_file.wheel_lock_degrees;
     options.config.wheel_rumble          = from_file.wheel_rumble;
@@ -1942,6 +1951,8 @@ int main(int argc, char** argv)
         // reporting but not worth refusing to run over: the keyboard covers
         // everything the cabinet has.
         osd::Input input;
+        bool input_background = options.config.input_background;
+        apply_input_background(input_background);
         if (!input.init(wheel_settings_from(options.config))) {
             SM2_WARN("gamepads are unavailable; the keyboard still works");
         }
@@ -2133,6 +2144,12 @@ int main(int argc, char** argv)
 
         while (running) {
             const u64 frame_start_ns = SDL_GetTicksNS();
+
+            // Inputs in the background, as the wheel settings last set it.
+            if (options.config.input_background != input_background) {
+                input_background = options.config.input_background;
+                apply_input_background(input_background);
+            }
 
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
