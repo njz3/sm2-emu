@@ -565,6 +565,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->wheel_panel_spring)) {
                 bad_value();
             }
+        } else if (key == "input_background") {
+            if (!parse_bool(value, &out->input_background)) {
+                bad_value();
+            }
         } else if (key == "wheel_ffb_invert") {
             if (!parse_bool(value, &out->wheel_ffb_invert)) {
                 bad_value();
@@ -975,6 +979,10 @@ bool save_config(const std::string& path, const Config& config)
         << "# Where this cabinet sits in the ring, 0-based (bookkeeping only).\n"
         << "link_cabinet_index = " << config.link_cabinet_index << "\n"
         << "\n"
+        << "# Read wheels and gamepads while the window is not in front, for a\n"
+        << "# wheel or panel driven from another program. Keyboard and mouse still\n"
+        << "# need the window in front.\n"
+        << "input_background = " << bool_text(config.input_background) << "\n"
         << "# Steering-wheel force feedback: a synthesised centring spring (the\n"
         << "# drive board is not emulated, so this is a feel, not the real motor\n"
         << "# force). Strength is 0..100 percent of the wheel's maximum torque.\n"

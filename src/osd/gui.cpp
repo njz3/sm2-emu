@@ -846,6 +846,20 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
     }
     ImGui::Spacing();
 
+    // For a wheel or a panel driven from another program's window.
+    ImGui::Checkbox("Read in the background", &config.input_background);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Wheels and gamepads keep working while the emulator's\n"
+                          "window is not in front: a wheel or a panel driven from\n"
+                          "another program (a cabinet panel through vJoy, say) still\n"
+                          "steers the game, and its buttons and axes can be bound\n"
+                          "below without clicking back into this window. The\n"
+                          "keyboard and the mouse still need the window in front.");
+    }
+    ImGui::Spacing();
+
     // -- feel ---------------------------------------------------------------
     ImGui::Checkbox("Force feedback", &config.wheel_ffb);
     ImGui::SameLine();
