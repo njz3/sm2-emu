@@ -2298,9 +2298,10 @@ int main(int argc, char** argv)
                         }
                         break;
                     default:
-                        if (!gui.visible()) {
-                            input.handle_event(event);
-                        }
+                        // Devices plugged in and axes seen moving, which the
+                        // overlay needs too: the wheel's calibration reads an
+                        // axis only once it has moved.
+                        input.handle_event(event);
                         break;
                 }
             }
