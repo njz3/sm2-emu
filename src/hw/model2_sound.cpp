@@ -70,8 +70,10 @@ constexpr u64 kCyclesPerSample = 256;
 /// Wait states on a 68000 access to RAM or the SCSP: a fixed two, plus up to
 /// kContentionCycles more as the SCSP's own sample fetches take the RAM bus.
 /// The contention term is fitted to a board capture of House of the Dead. The
-/// fixed two keep Sega Rally's music at its soundtrack's tempo: +0.48% with
-/// them, +1.45% without (see SCSP.md, "Tempo and the fixed wait states").
+/// fixed two keep the music near the hardware's tempo: House of the Dead's
+/// attract music runs +0.5% against a cabinet recording with them, +1.33%
+/// without; Sega Rally's +0.48% against its soundtrack with them, +1.45%
+/// without.
 constexpr u32 kBusWaitCycles    = 2;
 constexpr u32 kContentionCycles = 12;
 

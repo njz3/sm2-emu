@@ -257,6 +257,7 @@ private:
     void draw_fps_overlay(float measured_hz, const char* renderer_label);
     void draw_notification();
     void draw_crosshairs(const class Input* input);
+    void draw_calibration_markers(const class Input* input);
     void draw_sinden_border(const Config& config);
 
     enum class DirPickerTarget { None, RomDir, NvramDir, ScreenshotDir };

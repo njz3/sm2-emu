@@ -223,6 +223,11 @@ public:
         bool  mouse  = false;  ///< Aimed by the system mouse pointer.
         float x      = 0.5f;
         float y      = 0.5f;
+        /// The host tool is calibrating this gun (KEY_CONFIG held); its current
+        /// target sits at win_x/win_y, 0..1 across the window rather than the image.
+        bool  calibrating = false;
+        float win_x       = 0.5f;
+        float win_y       = 0.5f;
     };
     [[nodiscard]] const std::array<GunAim, kPlayers>& gun_aims() const { return m_gun_aims; }
 
@@ -337,6 +342,7 @@ private:
         /// not whip to the stop the way the cabinet's heavy wheel never could.
         int            constant_hold  = 0;
         int            constant_dir   = 0;  ///< sign of the held constant force.
+        int            board_dir      = 0;  ///< the drive board's last push direction, +1 left.
         int            last_deflection = 0; ///< steering position last frame, for friction.
 
         /// Axis numbers on the device. Steering is the self-centring one;
@@ -447,8 +453,11 @@ private:
     bool                             m_recoil_enabled  = true;
     u32                              m_recoil_strength = 60;
 
-    /// The drive board's current force command.
+    /// The drive board's current force command, and Sega Rally's chop setting:
+    /// 0 is off, n chops the torque with a period of 2^(n+2) board ticks. It
+    /// outlives the torque commands until a $10 ends it, as on the board.
     DriveCommand                     m_drive_command;
+    int                              m_drive_pulse = 0;
 
     /// Daytona's drive board, which works out its forces from the wheel: fed
     /// the game's bytes, it drives a force-feedback wheel.
@@ -457,9 +466,6 @@ private:
     /// Indy 500's drive board (Touring Car, Over Rev, Super GT), the same way.
     IndyBoard                        m_indy;
 
-    /// Sega Rally's board-side torque chopping: 0 off, 1..7 set by $11..$17.
-    /// It outlives the torque commands until a $10 ends it, as on the board.
-    u8                               m_drive_chop  = 0;
     /// The Sega Rally board's interrupts counted since start, simulated: its
     /// chopping flips on bits of this count.
     double                           m_drive_ticks = 0.0;

@@ -224,6 +224,7 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
         if (config.lightgun_crosshair) {
             draw_crosshairs(input);
         }
+        draw_calibration_markers(input);
     }
 
     // Full-screen picker when active and Settings is closed; F10 opens Settings
@@ -1831,7 +1832,7 @@ void Gui::draw_crosshairs(const Input* input)
 
     for (usize player = 0; player < aims.size(); ++player) {
         const Input::GunAim& aim = aims[player];
-        if (!aim.active) {
+        if (!aim.active || aim.calibrating) {
             continue;
         }
         float fx = aim.x;
@@ -1857,6 +1858,49 @@ void Gui::draw_crosshairs(const Input* input)
         list->AddLine(ImVec2(cx + radius * 0.4f, cy), ImVec2(cx + radius * 1.6f, cy), colour, 2.0f);
         list->AddLine(ImVec2(cx, cy - radius * 1.6f), ImVec2(cx, cy - radius * 0.4f), colour, 2.0f);
         list->AddLine(ImVec2(cx, cy + radius * 0.4f), ImVec2(cx, cy + radius * 1.6f), colour, 2.0f);
+    }
+}
+
+// A host calibration tool (Batocera's) steps the gun's reported position through
+// its targets and expects the screen to show where each one is, so the player
+// can shoot it. The marker is drawn on the window rather than the game image,
+// because the tool works in screen space, and regardless of the crosshair
+// setting, because these guns usually run without one.
+void Gui::draw_calibration_markers(const Input* input)
+{
+    if (input == nullptr) {
+        return;
+    }
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.DisplaySize.x < 1.0f || io.DisplaySize.y < 1.0f) {
+        return;
+    }
+
+    ImDrawList* list   = ImGui::GetForegroundDrawList();
+    const float radius = std::max(12.0f, io.DisplaySize.y * 0.03f);
+    bool        any    = false;
+    for (const Input::GunAim& aim : input->gun_aims()) {
+        if (!aim.active || !aim.calibrating) {
+            continue;
+        }
+        any = true;
+        const float cx = std::clamp(aim.win_x, 0.0f, 1.0f) * io.DisplaySize.x;
+        const float cy = std::clamp(aim.win_y, 0.0f, 1.0f) * io.DisplaySize.y;
+        const ImU32 white = IM_COL32(255, 255, 255, 240);
+        const ImU32 red   = IM_COL32(255, 40, 40, 240);
+        list->AddCircle(ImVec2(cx, cy), radius, white, 32, 3.0f);
+        list->AddCircleFilled(ImVec2(cx, cy), radius * 0.2f, red);
+        list->AddLine(ImVec2(cx - radius * 1.8f, cy), ImVec2(cx + radius * 1.8f, cy), white, 2.0f);
+        list->AddLine(ImVec2(cx, cy - radius * 1.8f), ImVec2(cx, cy + radius * 1.8f), white, 2.0f);
+    }
+    if (any) {
+        const char* text = "CALIBRATING GUN - shoot each target";
+        const ImVec2 size = ImGui::CalcTextSize(text);
+        const ImVec2 pos((io.DisplaySize.x - size.x) * 0.5f, io.DisplaySize.y * 0.08f);
+        list->AddRectFilled(ImVec2(pos.x - 12.0f, pos.y - 6.0f),
+                            ImVec2(pos.x + size.x + 12.0f, pos.y + size.y + 6.0f),
+                            IM_COL32(0, 0, 0, 160), 4.0f);
+        list->AddText(pos, IM_COL32(255, 255, 255, 255), text);
     }
 }
 
