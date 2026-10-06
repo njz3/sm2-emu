@@ -294,6 +294,16 @@ void ScspMame::serialize(Archive& ar)
 	ar.raw(m_midi_transmit_byte);
 	ar.raw(m_random_state);
 
+	// The output filter's state is in the save-state format from version 3 on;
+	// an older state leaves it as reset.
+	if (ar.format_version() >= 3) {
+		for (OutputLpf& f : m_out_lpf)
+		{
+			ar.raw(f.z1);
+			ar.raw(f.z2);
+		}
+	}
+
 	if (ar.loading() && !ar.failed()) {
 		// Re-bind each slot's LFO table/scale pointers from its (restored)
 		// registers, exactly as a register write to LFO control would.
@@ -786,6 +796,24 @@ void ScspMame::init()
 	m_active_slots = 0;
 
 	LFO_Init();
+	// 2-pole Butterworth low-pass approximating the board's analogue output stage.
+	// Tuned against a hardware recording: 8 kHz matched the 4-11 kHz balance.
+	constexpr float kOutputLpfHz = 8000.0f;
+	{
+		const float w0 = 2.0f * 3.14159265f * kOutputLpfHz / float(sample_rate());
+		const float cw = std::cos(w0);
+		const float alpha = std::sin(w0) / (2.0f * 0.70710678f);
+		const float a0 = 1.0f + alpha;
+		for (OutputLpf& f : m_out_lpf)
+		{
+			f.b0 = ((1.0f - cw) * 0.5f) / a0;
+			f.b1 = (1.0f - cw) / a0;
+			f.b2 = f.b0;
+			f.a1 = (-2.0f * cw) / a0;
+			f.a2 = (1.0f - alpha) / a0;
+			f.z1 = f.z2 = 0.0f;
+		}
+	}
 	// no "pend"
 	m_udata.data[0x20/2] = 0;
 	m_TimCnt[0] = 0xffff;
@@ -1220,7 +1248,7 @@ u16 ScspMame::r16(u32 addr)
 }
 
 
-inline s32 ScspMame::UpdateSlot(SCSP_SLOT *slot)
+inline s32 ScspMame::UpdateSlot(SCSP_SLOT* slot)
 {
 	if (SSCTL(slot) == 3) // manual says cannot be used
 	{
@@ -1237,13 +1265,35 @@ inline s32 ScspMame::UpdateSlot(SCSP_SLOT *slot)
 	s32 sample = 0; // NB: Shouldn't be necessary, but GCC 8.2.1 claims otherwise.
 	int step = slot->step;
 	u32 addr1, addr2, addr_select;                                   // current and next sample addresses
-	u32 *addr[2]      = {&addr1, &addr2};                          // used for linear interpolation
-	u32 *slot_addr[2] = {&(slot->cur_addr), &(slot->nxt_addr)};    //
+	u32* addr[2] = { &addr1, &addr2 };                          // used for linear interpolation
+	u32* slot_addr[2] = { &(slot->cur_addr), &(slot->nxt_addr) };    //
+
+	// SCSP pitch‑LFO sensitivity → depth scaling table
+	// Based on Table 4.17 (± cents displacement)
+	// Values tuned to match real hardware vibrato strength
+	static const int PLFO_DEPTH_TABLE[8] =
+	{
+		0,   // PLFOS = 0 → no pitch modulation
+		2,   // PLFOS = 1 → ±7 cents
+		4,   // PLFOS = 2 → ±13.5 cents
+		6,   // PLFOS = 3 → ±27 cents
+		10,  // PLFOS = 4 → ±55 cents
+		18,  // PLFOS = 5 → ±112 cents
+		30,  // PLFOS = 6 → ±230 cents
+		50   // PLFOS = 7 → ±494 cents
+	};
 
 	if (PLFOS(slot) != 0)
-	{
-		step = step * PLFO_Step(&(slot->PLFO));
-		step >>= SHIFT;
+	{	
+		s32 lfo = PLFO_Step(&(slot->PLFO));
+
+		// Lookup hardware‑accurate depth
+		const s32 depth = PLFO_DEPTH_TABLE[PLFOS(slot)];
+
+		// Apply SCSP‑style pitch modulation
+		const s32 scaled = ((lfo - (1 << SHIFT)) * depth >> 4) + (1 << SHIFT);
+
+		step = (step * scaled) >> SHIFT;
 	}
 
 	s32 base1 = s32(slot->cur_addr >> SHIFT);
@@ -1256,9 +1306,22 @@ inline s32 ScspMame::UpdateSlot(SCSP_SLOT *slot)
 	{
 		const s32 sum = m_RINGBUF[(m_BUFPTR + MDXSL(slot)) & 63] + m_RINGBUF[(m_BUFPTR + MDYSL(slot)) & 63];
 		const s32 pos = sign_extend((sum << (MDL(slot) - 4)) + fpart, 11 + SHIFT);
+		const s32 one = 1 << SHIFT;
+		const s32 mask = one - 1;
+
 		base1 += pos >> SHIFT;
 		base2 += pos >> SHIFT;
-		fpart = pos & ((1 << SHIFT) - 1);
+
+		// fraction of the FM fractional offset applied to the interpolation weight, in 1/16ths
+		// 0 = no buzz, 4 = original 1/4 (slightly too strong)
+		constexpr s32 FM_FRAC_BLEND = 1;
+		constexpr s32 FM_FRAC_DIV = 1;
+
+		s32 delta = ((pos & mask) - fpart) & mask;
+		if (delta >= (one >> 1))
+			delta -= one;
+
+		fpart = (fpart + ((delta * FM_FRAC_BLEND) >> 4)) & mask;
 	}
 
 	if (PCM8B(slot))

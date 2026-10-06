@@ -137,11 +137,13 @@ private:
 //   2  the sound board records which SCSP core wrote its state (SCSP.md).
 //      Version 1 files still load: they can only come from the MAME-derived
 //      core, and Model2Sound reads them as such.
+//   3  the MAME-derived SCSP core saves its output filter's state (upstream's
+//      PR #9). Versions 1 and 2 still load, the filter as reset.
 
 namespace state {
 
 inline constexpr char     kMagic[8]      = {'S', 'M', '2', 'S', 'T', 'A', 'T', 'E'};
-inline constexpr u32      kFormatVersion = 2;
+inline constexpr u32      kFormatVersion = 3;
 
 /// The oldest version read_header() accepts. Every serialize() that changed
 /// layout since has to keep reading this one (see Archive::format_version).
