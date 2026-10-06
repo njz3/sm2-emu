@@ -12,6 +12,33 @@ the current implementation (derived from MAME) as a selectable reference.
 All the comparisons in this file were made on **audio captures**, measured by scripts;
 none of them comes from listening. See "Comparison method: audio captures".
 
+## Where things stand (2026-10-06)
+
+- `dev/network_output_scsp` has upstream main 2e056f2 merged in (cbc820d): v0.9.40 and
+  upstream's PR #9. Both cores build and pass `--savestate-test`. The mame core gives the
+  same WAVs as upstream's own build on the 16 A/B games (tag `m9dev` against `m9up`,
+  1,500 frames each, all 16 bit-identical).
+- Upstream now has the sound 68000's two fixed wait states (our PR #5) and PR #9's changes
+  to the mame core: see "Upstream's PR #9: changes to the mame core".
+- Steps 1 to 10 are done; step 0 (licence) and step 11 (per-game validation, default
+  core) are not.
+
+Next, in this order:
+1. The tempo error the three measured games share, +0.4% to +0.65% with the two fixed
+   wait cycles: trace the SCSP timer settings of dynamcop's sound program first, then the
+   interrupt latency (see "Tempo and the fixed wait states").
+2. PR #9's vibrato depth no longer follows the manual's table 4.17: measure a game that
+   uses the pitch LFO (von) on both cores, then decide what to report upstream, together
+   with the output filter that is never applied and the save-state layout it changed.
+3. Step 11: per-game validation on both cores, then the choice of the default core.
+4. Step 0: the licence decision.
+
+For a new session: the measurement scripts are in `tools/`, which git ignores (see
+"Tools"). The reference recordings are in `build/scsp_ab/ref_*.wav`, also outside git:
+`ref_hotd_hw.wav` and `ref_dynamcop_hw.wav` (cabinets), `ref_power_games_ost.wav` (Sega
+Rally) and `ref_daytona_ost.wav`. The captures quoted below are in `build/scsp_ab` under
+their tags: `m9dev`, `m9up`, `m9_hotd`, `m9_dynamcop`, `hotdfw0`..`hotdfw4`, `fw*`.
+
 ## References
 
 ### Official Sega documentation (online)
@@ -198,6 +225,11 @@ Built only with `SM2_SCSP_MEDNAFEN=ON` (the default; CMake then defines
       existed then.
 - [x] `--savestate-test` covers it: a state whose core id has been altered must be refused
       without touching the machine.
+- [x] Format 3 since the merge of upstream's PR #9 (2026-10-06): `ScspMame` saves its
+      output filter's state from version 3 on ([scsp.cpp:299](src/hw/scsp.cpp:299)), and
+      versions 1 and 2 still load, the filter as reset. A version 2 state made with the
+      previous build was loaded to check it. Upstream added that state without a new
+      version, so its own older states are read out of step there.
 - The new core's own layout changes from step to step while it is being written (step 7
   added the stack delay, step 8 the DSP's latches): states made with an earlier step of
   the mednafen core do not load in a later one.
@@ -775,9 +807,9 @@ a cabinet recording of its attract mode (see "Audio references"), the same way.
 
 | Fixed wait cycles | Sega Rally against the OST | Dynamite Cop against the cabinet | House of the Dead against the cabinet |
 |---|---|---|---|
-| 0 (upstream) | +1.45% (17 ms) | +0.66% (56 ms) | +1.34% / +1.33% (35 ms) |
+| 0 (upstream from 88d5557 to PR #5) | +1.45% (17 ms) | +0.66% (56 ms) | +1.34% / +1.33% (35 ms) |
 | 1 | +0.78% (10 ms) | — | +0.91% / +0.97% (30 / 25 ms) |
-| 2 (before 88d5557; restored) | +0.48% (6 ms) | +0.65% (44 ms) | +0.48% / +0.57% (28 / 19 ms) |
+| 2 (restored here, upstream again since PR #5) | +0.48% (6 ms) | +0.65% (44 ms) | +0.48% / +0.57% (28 / 19 ms) |
 | 3 | +0.45% (6 ms) | — | +0.07% / +0.21% (26 / 20 ms) |
 | 4 | +0.37% (6 ms) | +0.63% (42 ms) | −0.28% / −0.22% (17 / 14 ms) |
 
@@ -801,7 +833,8 @@ at 27.8 and 135.1 s; the two figures are those passes, which agree within 0.15%.
   [model2_sound.cpp](src/hw/model2_sound.cpp)). Captures with it are bit-identical to the
   sweep's two-cycle ones. Upstream made the change for House of the Dead, yet House of the
   Dead's own cabinet recording is for the fixed cycles: without them its music goes from
-  +0.5% to +1.3%. These figures are to go upstream.
+  +0.5% to +1.3%. These figures went upstream with PR #5, merged on 2026-10-04 (51310b2):
+  upstream main has the two fixed cycles again.
 - **What remains** (+0.4% on Sega Rally, +0.65% on Dynamite Cop, pitch exact on both) is
   not the 68000's speed. Next candidates: the period of the SCSP timers the sound programs
   run on (their settings can be traced, on dynamcop first), the interrupt latency, or for
@@ -823,6 +856,40 @@ passes at about 28.3, 81.6 and 134.7 s.
 House of the Dead: `python tools/hw_fit.py tools <recording> 0 62 27.8 name=capture.wav`
 (135.07 for the second pass), and for its pitch
 `python tools/fine_pitch.py <recording> 2 58 name=capture.wav@29.83`.
+
+## Upstream's PR #9: changes to the mame core
+
+Upstream merged PR #9 from pnixon-afk ("Update SCSP implementation with latest
+adjustments", e1aafb7, merged as 2e056f2) on 2026-10-06. It changes the MAME-derived core
+in three places:
+- **Vibrato depth.** `UpdateSlot` now multiplies the pitch LFO's deviation by a new
+  `PLFO_DEPTH_TABLE` ([scsp.cpp:1274](src/hw/scsp.cpp:1274)), 2/16 to 50/16 for PLFOS 1
+  to 7. But that deviation already carries table 4.17's depth (`PSCALE`, applied in
+  `PLFO_Step`), so the depth is scaled twice and no longer follows the table: ±0.9 cents
+  at PLFOS 1 instead of ±7, ±10 at 3 instead of ±27, ±126 at 5 instead of ±112, and
+  +1227/−2588 cents at 7 instead of ±494. Its comment says the values were tuned to match
+  real hardware; that was not checked here.
+- **FM interpolation.** Under FM, only 1/16 of the change the modulation makes to the
+  fractional position reaches the interpolation weight (`FM_FRAC_BLEND`,
+  [scsp.cpp:1317](src/hw/scsp.cpp:1317)); the integer part still moves in full. MAME and
+  Mednafen both interpolate at the modulated position.
+- **Output filter.** A 2-pole Butterworth low-pass at 8 kHz, "tuned against a hardware
+  recording", is set up in `init()` ([scsp.cpp:801](src/hw/scsp.cpp:801)) and its state is
+  saved, but nothing applies it: it does not change the output.
+
+Merged into `ScspMame` (cbc820d); the one conflict was `UpdateSlot`'s signature. The
+filter's state raised the save-state format to 3 (see "Save states").
+
+Checks on 2026-10-06:
+- The mame core is bit-identical to upstream's build on the 16 A/B games (`m9dev`, `m9up`).
+- House of the Dead, 3 minutes of attract: bit-identical to the capture made before the
+  merge (`m9_hotd` against `hotdfw2`), so PR #9 does not touch it there.
+- Dynamite Cop, 3 minutes of attract (`m9_dynamcop` against `fw2_mame_dynamcop`): the
+  first difference comes at 176.8 s, the last 11 s of the capture, at −39 dB from the
+  signal. Tempo (+0.65%) and pitch (+0.1 cent) against the cabinet are unchanged.
+- The mednafen core is not touched; captures of it before the merge still stand.
+- The mame core's earlier captures stand for games that use neither FM nor the pitch LFO.
+  Von is the one A/B game seen using the pitch LFO (step 6) and was not measured again.
 
 ## Check against the official manual
 
@@ -912,9 +979,11 @@ places (each checked in the code):
 | 9 | The MIDI input FIFO is 4 bytes, with MIFULL and MIOVF ([SCSP manual 4.2.10](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_2a.htm)) | a 32-byte FIFO, nothing lost | [scsp.h:216](src/hw/scsp.h:216), [scsp.cpp:540](src/hw/scsp.cpp:540) |
 | 10 | Register 0x404 shows MIFULL, MIOVF, MOEMP and MOFULL ([SCSP manual table 4.3](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_12.htm), [4.2.10](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_2a.htm)) | the flag byte is never updated | [scsp.cpp:1017](src/hw/scsp.cpp:1017) |
 | 11 | Interrupt sources 9 (MIDI output empty) and 10 (every sample) exist ([SCSP manual table 4.31](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_2c.htm)) | neither is ever raised (the sample interrupt is commented out) | [scsp.cpp:1057](src/hw/scsp.cpp:1057) |
+| 12 | The vibrato's depth by PLFOS is ±7 to ±494 cents ([SCSP manual table 4.17](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_26.htm)) | since upstream's PR #9, the table's deviation is scaled again by 2/16 to 50/16: ±0.9 cents at PLFOS 1, +1227/−2588 at 7 | [scsp.cpp:1274](src/hw/scsp.cpp:1274) |
 
-Where the mame core agrees with the manuals and the hardware model does not: the vibrato
-depth (PLFOS, [SCSP manual table 4.17](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_26.htm)), which the new core now follows as well.
+The vibrato depth (PLFOS, [SCSP manual table 4.17](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_26.htm)) is where the mame core
+agreed with the manuals and the hardware model did not, and the new core was made to follow
+the table as well. Since upstream's PR #9 the mame core no longer does (row 12).
 
 Differences the manuals do not settle, left to the hardware model: memory accesses allowed
 on odd DSP steps only and carried out at once (the SCSP manual's budget of 64 DSP accesses
@@ -945,6 +1014,9 @@ Found in the initial comparison of 2026-09-29. "sm2" means the current mame core
   the interpolation's next sample uses the next slot's phase.
 - SBCTL applied after interpolation (sm2) against before (Mednafen); xorshift noise (sm2)
   against the hardware's 17-bit LFSR (Mednafen).
+- Since upstream's PR #9, sm2 lets only 1/16 of the modulation's fractional change into
+  the interpolation weight ([scsp.cpp:1317](src/hw/scsp.cpp:1317)); Mednafen interpolates
+  at the modulated position.
 
 ### LFO
 - sm2: frequency in Hz, separate PLFO/ALFO phases, only advances for active slots,
@@ -987,9 +1059,10 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
 
 | Game | Feature | mame | mednafen | Notes |
 |---|---|---|---|---|
-| hotd | FM, tempo (contention fitted on it), DSP from 30 s of attract | — | — | cores equivalent over 3 min of attract; FM to be recorded in play; upstream dropped the fixed wait states for it, kept here for Sega Rally |
+| hotd | FM, tempo (contention fitted on it), DSP from 30 s of attract | ⚠️ | — | tempo +0.5% against a cabinet recording with the fixed wait states (+1.33% without), pitch within a cent; cores equivalent over 3 min of attract; PR #9 leaves its attract bit-identical; FM to be recorded in play |
 | vf2 | DSP reverb | — | — | |
-| dynamcop | DSP reverb (strongest use) | ⚠️ | ⚠️ | against a cabinet recording: reverb and pitch match, tempo 0.65% fast on both cores, whatever the sound 68000's wait states |
+| dynamcop | DSP reverb (strongest use) | ⚠️ | ⚠️ | against a cabinet recording: reverb and pitch match, tempo 0.65% fast on both cores, whatever the sound 68000's wait states; PR #9 changes the mame core's output from 176.8 s of attract only |
+| von | pitch LFO (the one A/B game using it in 26 s) | — | — | PR #9 changed the mame core's vibrato depth; to measure on both cores |
 | doa | DSP, MADRS | — | — | |
 | daytona | original Model 2 | — | — | Model 1 sound board, no SCSP; aligns with its OST at −0.10% tempo, pitch +7.5 cents |
 | srallyc | MSLC (end-of-music beeps) | ⚠️ | ⚠️ | tempo +0.48% against the OST with the fixed wait states (+1.45% without, +2.5% before the 68000 fix); drier than the OST, but no DSP program in attract |
@@ -1103,3 +1176,12 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
   wait states, +0.5% with two, +0.1–0.2% with three, pitch within a cent. Its tempo follows
   the 68000's speed all the way, unlike Sega Rally's beyond two cycles. Two cycles kept. See
   "Tempo and the fixed wait states".
+- **2026-10-04**: upstream merged PR #5 (51310b2): the sound 68000's two fixed wait states
+  are back in upstream main, on the strength of the figures above.
+- **2026-10-06**: merged upstream main up to 2e056f2 (cbc820d): upstream's PR #9 changes the
+  mame core's vibrato depth and FM interpolation and adds an output filter that is never
+  applied; save-state format 3. The mame core matches upstream's build on the 16 A/B games;
+  House of the Dead's attract is unchanged by it and Dynamite Cop's changes only in its last
+  11 s, tempo and pitch unchanged. See "Upstream's PR #9: changes to the mame core". Added
+  "Where things stand" at the top, and the reference recordings now sit in
+  `build/scsp_ab/ref_*.wav`.
