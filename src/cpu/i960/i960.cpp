@@ -193,7 +193,7 @@ u32 I960::get_ea(u32 opcode)
 
 		case 0x5:   // address of this instruction + the offset dword + 8
 			// which in reality is "address of next instruction + the offset dword"
-			ret = m_bus->fetch32(m_IP);
+			ret = fetch_word(m_IP);
 			m_IP += 4;
 			ret += m_IP;
 			return ret;
@@ -202,22 +202,22 @@ u32 I960::get_ea(u32 opcode)
 			return m_r[abase] + (m_r[index] << scale);
 
 		case 0xc:
-			ret = m_bus->fetch32(m_IP);
+			ret = fetch_word(m_IP);
 			m_IP += 4;
 			return ret;
 
 		case 0xd:
-			ret = m_bus->fetch32(m_IP) + m_r[abase];
+			ret = fetch_word(m_IP) + m_r[abase];
 			m_IP += 4;
 			return ret;
 
 		case 0xe:
-			ret = m_bus->fetch32(m_IP) + (m_r[index] << scale);
+			ret = fetch_word(m_IP) + (m_r[index] << scale);
 			m_IP += 4;
 			return ret;
 
 		case 0xf:
-			ret = m_bus->fetch32(m_IP) + m_r[abase] + (m_r[index] << scale);
+			ret = fetch_word(m_IP) + m_r[abase] + (m_r[index] << scale);
 			m_IP += 4;
 			return ret;
 
@@ -2343,7 +2343,7 @@ s32 I960::run(s32 cycles)
 
             m_PIP = m_IP;
 
-            const u32 opcode = m_bus->fetch32(m_IP);
+            const u32 opcode = fetch_word(m_IP);
             m_IP += 4;
 
             if (m_trace_hook != nullptr) {
