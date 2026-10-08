@@ -442,6 +442,21 @@ s32 SHARC::run(s32 cycles)
 
         --m_icount;
         ++m_instruction_count;
+
+        // Settled one-NOP DO loop waiting on a host flag (the 2B FIFO wait):
+        // with no DMA or interrupt pending, nothing changes until the host
+        // runs again, so skip to the end of the slice.
+        if (m_icount > 0 && m_opcode == 0 && m_pc == m_laddr.addr && m_laddr.loop_type == 0
+            && !(m_stky & LSEM) && TOP_PC() == m_pc && m_daddr == m_pc
+            && m_faddr == m_pc + 1 && m_nfaddr == m_pc + 2
+            && m_systemreg_latency_cycles <= 0 && m_irq_pending == 0
+            && (m_dma_status & ((1u << 6) | (1u << 7))) == 0 && !m_write_stalled
+            && m_astat == m_astat_old && m_astat_old == m_astat_old_old
+            && m_astat_old_old == m_astat_old_old_old
+            && !DO_CONDITION_CODE(m_laddr.code)) {
+            m_instruction_count += static_cast<u64>(m_icount);
+            m_icount = 0;
+        }
     }
 
     return cycles - m_icount;
