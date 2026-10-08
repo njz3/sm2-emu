@@ -204,7 +204,9 @@ s32 MB86235::run(s32 cycles)
 
         // MAME's program space is 12 bits wide and truncates the address for it;
         // PC itself is never masked, so the mask goes on the fetch.
-        const u64 opcode = m_bus->program_read(curpc & 0xfff);
+        const u32 pc_word = curpc & 0xfff;
+        const u64 opcode = m_program_fast != nullptr ? m_program_fast[pc_word]
+                                                     : m_bus->program_read(pc_word);
 
         m_ppc = curpc;
 
@@ -225,6 +227,15 @@ s32 MB86235::run(s32 cycles)
 
         m_icount--;
         ++m_instruction_count;
+
+        // Stalled on an empty input FIFO: only the host fills it, and the host
+        // does not run during this slice, so the re-runs until its end are
+        // identical. Skip them; the next call retries the instruction.
+        if (m_fifo_state.has_stalled && (m_st & RP) == 0 && !m_fifo_out_pending
+            && m_bus->fifo_in_empty()) {
+            m_icount = 0;
+            break;
+        }
     }
 
     // A control op charges itself extra cycles, so the budget can be overrun by
