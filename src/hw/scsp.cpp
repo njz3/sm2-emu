@@ -1311,7 +1311,6 @@ inline s32 Scsp::UpdateSlot(SCSP_SLOT* slot)
 		// fraction of the FM fractional offset applied to the interpolation weight, in 1/16ths
 		// 0 = no buzz, 4 = original 1/4 (slightly too strong)
 		constexpr s32 FM_FRAC_BLEND = 1;
-		constexpr s32 FM_FRAC_DIV = 1;
 
 		s32 delta = ((pos & mask) - fpart) & mask;
 		if (delta >= (one >> 1))

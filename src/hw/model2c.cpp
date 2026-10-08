@@ -173,6 +173,8 @@ CoproTgpx4::CoproTgpx4()
 
     m_fifo_out.set_on_full([this] { m_cpu.set_halted(true); });
     m_fifo_out.set_on_unfull([this] { m_cpu.set_halted(false); });
+
+    m_cpu.bind_program(m_program.data());
 }
 
 void CoproTgpx4::attach(std::span<const u32> data_rom, std::span<u32> buffer_ram)
@@ -356,6 +358,9 @@ bool Model2C::init(const rom::GameSpec& game, rom::RomSet roms)
 
     // Allocate RAM.
     m_work_ram.assign(0x100000, 0);
+    // i960 instruction fetch straight from ROM and work RAM (the hot_read windows).
+    m_cpu.bind_fetch_window(0, kRomMainCpu, m_rom_maincpu.data(), m_rom_maincpu.size(), 0x200000);
+    m_cpu.bind_fetch_window(1, kWorkRam, m_work_ram.data(), m_work_ram.size(), 0x100000);
     m_scratch_ram.assign(0x40000, 0);
     m_buffer_ram.assign(0x20000 / 4, 0);
     m_tile_ram.assign(0x10000, 0);
