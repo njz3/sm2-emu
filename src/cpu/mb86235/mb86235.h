@@ -103,6 +103,9 @@ public:
     void set_halted(bool halted) { m_halted = halted; }
     [[nodiscard]] bool halted() const { return m_halted; }
 
+    /// Fetch straight from the board's program RAM; null uses the Bus.
+    void bind_program(u64* words) { m_program_fast = words; }
+
     /// Re-run the current instruction because a FIFO access could not complete
     /// (MAME: mb86235_device::stall).
     void stall() { m_fifo_state.has_stalled = true; }
@@ -172,6 +175,7 @@ private:
     };
 
     Bus* m_bus = nullptr;
+    u64* m_program_fast = nullptr;
 
     // -- on-chip data RAM ---------------------------------------------------
     // MAME's internal_abus/internal_bbus maps: 0x400 words each.

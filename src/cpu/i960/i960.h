@@ -15,6 +15,7 @@
 #include "core/types.h"
 #include "cpu/bus.h"
 
+#include <cstring>
 #include <exception>
 #include <string>
 
@@ -118,6 +119,18 @@ public:
     void set_halted(bool halted) { m_halted = halted; }
     [[nodiscard]] bool halted() const { return m_halted; }
 
+    /// Fetch straight from host memory inside this window (0: main ROM,
+    /// 1: work RAM, same bounds as hot_read); elsewhere fetch uses the Bus.
+    void bind_fetch_window(unsigned index, u32 start, const u8* base, usize bytes, u32 window)
+    {
+        u32 limit = 0;
+        if (base != nullptr && bytes >= 4) {
+            const usize last = bytes - 3;
+            limit = last < window ? static_cast<u32>(last) : window;
+        }
+        m_fetch[index & 1] = FetchWindow{start, limit, base};
+    }
+
     /// True once a Fault has been caught. The core will not execute further.
     [[nodiscard]] bool faulted() const { return m_faulted; }
     [[nodiscard]] const std::string& fault_message() const { return m_fault_message; }
@@ -176,6 +189,25 @@ private:
     std::string m_fault_message;
 
     Bus* m_bus = nullptr;
+
+    struct FetchWindow {
+        u32       start = 0;
+        u32       limit = 0;
+        const u8* base  = nullptr;
+    };
+    FetchWindow m_fetch[2]{};
+
+    u32 fetch_word(u32 address)
+    {
+        for (const FetchWindow& w : m_fetch) {
+            if (const u32 offset = address - w.start; offset < w.limit) {
+                u32 v;
+                std::memcpy(&v, w.base + offset, sizeof(v));
+                return v;
+            }
+        }
+        return m_bus->fetch32(address);
+    }
 
     u32 m_r[0x20]{};
     u32 m_rcache[I960_RCACHE_SIZE][0x10]{};
