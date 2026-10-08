@@ -12,32 +12,40 @@ the current implementation (derived from MAME) as a selectable reference.
 All the comparisons in this file were made on **audio captures**, measured by scripts;
 none of them comes from listening. See "Comparison method: audio captures".
 
-## Where things stand (2026-10-06)
+## Where things stand (2026-10-08)
 
-- `dev/network_output_scsp` has upstream main 2e056f2 merged in (cbc820d): v0.9.40 and
-  upstream's PR #9. Both cores build and pass `--savestate-test`. The mame core gives the
-  same WAVs as upstream's own build on the 16 A/B games (tag `m9dev` against `m9up`,
-  1,500 frames each, all 16 bit-identical).
+- `dev/network_output_scsp` has upstream main d7e1cab merged in (efe0731): v0.9.42, with
+  upstream's PR #9 (mame core) and PR #10 (Model 2B/2C coprocessor speed-up). Both cores
+  build and pass `--savestate-test`. The mame core gives the same WAVs as upstream's own
+  build on the 16 A/B games (tag `m10dev` against `m10up`, 1,500 frames each, all 16
+  bit-identical), and the same as before PR #10 (`m9dev`).
 - Upstream now has the sound 68000's two fixed wait states (our PR #5) and PR #9's changes
   to the mame core: see "Upstream's PR #9: changes to the mame core".
 - Steps 1 to 10 are done; step 0 (licence) and step 11 (per-game validation, default
   core) are not.
 
 Next, in this order:
-1. The tempo error the three measured games share, +0.4% to +0.65% with the two fixed
-   wait cycles: trace the SCSP timer settings of dynamcop's sound program first, then the
-   interrupt latency (see "Tempo and the fixed wait states").
-2. PR #9's vibrato depth no longer follows the manual's table 4.17: measure a game that
-   uses the pitch LFO (von) on both cores, then decide what to report upstream, together
-   with the output filter that is never applied and the save-state layout it changed.
+1. The tempo error of Sega Rally, Dynamite Cop and House of the Dead, +0.4% to +0.65% with
+   the two fixed wait cycles. Virtual On keeps the cabinet's tempo within 0.05% (see
+   "Check against a hardware recording: Virtual On"), so the error is not common to every
+   game: find what the three fast games' sound programs use that von's does not, the SCSP
+   timers first (their settings in dynamcop), then the interrupt latency (see "Tempo and
+   the fixed wait states").
+2. PR #9's vibrato depth no longer follows the manual's table 4.17, and the manual and
+   the hardware model still disagree on it. Von's attract hardly uses a vibrato, so its
+   recording cannot settle either question: a passage with a clear vibrato is needed
+   (von in play, or vcop2 or bel, which use one briefly). Then decide what to report
+   upstream, together with the output filter that is never applied and the save-state
+   layout it changed.
 3. Step 11: per-game validation on both cores, then the choice of the default core.
 4. Step 0: the licence decision.
 
 For a new session: the measurement scripts are in `tools/`, which git ignores (see
 "Tools"). The reference recordings are in `build/scsp_ab/ref_*.wav`, also outside git:
-`ref_hotd_hw.wav` and `ref_dynamcop_hw.wav` (cabinets), `ref_power_games_ost.wav` (Sega
-Rally) and `ref_daytona_ost.wav`. The captures quoted below are in `build/scsp_ab` under
-their tags: `m9dev`, `m9up`, `m9_hotd`, `m9_dynamcop`, `hotdfw0`..`hotdfw4`, `fw*`.
+`ref_hotd_hw.wav`, `ref_dynamcop_hw.wav` and `ref_von_hw.wav` (cabinets),
+`ref_power_games_ost.wav` (Sega Rally) and `ref_daytona_ost.wav`. The captures quoted below
+are in `build/scsp_ab` under their tags: `m10dev`, `m10up`, `m9dev`, `m9up`, `m9_hotd`,
+`m9_dynamcop`, `vib_*` (von), `hotdfw0`..`hotdfw4`, `fw*`.
 
 ## References
 
@@ -115,6 +123,9 @@ which lists the original documents.
 - The House of the Dead, attract mode recorded on **real hardware** ("Model 2 Hardware
   Capture", [YouTube](https://www.youtube.com/watch?v=5O9s1V9RoPs)), supplied as the video's
   AAC audio (62 s, 128 kbit/s, 44.1 kHz), decoded to WAV with Windows' own AAC decoder.
+- Cyber Troopers Virtual On, attract mode recorded on **real hardware** (Game Nexus, "Arcade
+  and Attract Mode Intros", 720p60), supplied as the video's AAC audio (303 s, 128 kbit/s,
+  44.1 kHz), decoded the same way.
 
 ## Goal
 
@@ -796,6 +807,41 @@ being silent. Scripts: [tools/hw_fit.py](tools/hw_fit.py) (tempo),
 - Daytona, for the record, measured the same way against its soundtrack: pitch +7.5 cents
   (+0.43%) with a tempo of −0.10%. That is the Model 1 sound board (MultiPCM), not the SCSP.
 
+## Check against a hardware recording: Virtual On
+
+The attract mode of a real Virtual On cabinet (see "Audio references") against 6 minutes of
+attract captured from a fresh NVRAM (2026-10-08, at efe0731), each core twice: the mame core
+with upstream's PR #9 and without it (its vibrato depth and FM fraction as before), the
+mednafen core with the manual's vibrato depth and with the hardware model's, half of it.
+The two variants of each core came from one build through a temporary environment
+variable, removed since.
+
+The attract runs its scenes in a different order on the cabinet, so the recording lines up
+with the capture in stretches rather than as a whole: A (ref 20–64 s, capture 14.7 s on),
+B (ref 92–136 s, capture 88.6 s on) and C (ref 176–196 s, capture 246.1 s on).
+
+| | Hardware | mame core | mednafen core |
+|---|---|---|---|
+| Tempo, A / B / C | — | −0.04% / −0.05% / −0.05% | −0.01% / −0.02% / −0.03% |
+| Pitch, A / B | — | 0.0 / +0.1 cent | 0.0 / +0.1 cent |
+| L/R correlation, A / B | 0.989 / 0.990 | 0.982 / 0.984 | 0.983 / 0.986 |
+| side/mid, A / B | −21.0 / −22.2 dB | −19.9 / −21.1 dB | −20.2 / −21.5 dB |
+| Envelope dips, A / B | 9.9 / 9.8 dB | 9.4 / 9.7 dB | 9.4 / 10.1 dB |
+| 2 / 4 / 8 kHz octaves against 500 Hz, A | +3.9 / +4.0 / −1.4 dB | +3.6 / +4.3 / +1.5 dB | +3.6 / +4.4 / +1.0 dB |
+| 2 / 4 / 8 kHz octaves against 500 Hz, B | +4.0 / +4.4 / −0.9 dB | +2.9 / +3.2 / +0.5 dB | +3.0 / +3.2 / −0.0 dB |
+
+- **Vibrato: not settled.** Von's attract hardly uses one. The mame core's two variants are
+  bit-identical over the 6 minutes, and the mednafen core's differ on 0.01% of the samples,
+  at −81.5 dB. Neither PR #9's depth nor the manual against the model can be judged on it.
+- **Tempo: exact, on both cores.** Within 0.05% of the cabinet on all three stretches, with
+  residuals of 1 to 2 ms. Unlike Sega Rally, Dynamite Cop and House of the Dead, 0.4% to
+  0.65% fast, von's music is not, so their error is not one every sound program shares.
+- **Pitch: exact.** Within 0.1 cent, so the recording's clock is right.
+- **Reverb: close.** The emulation is a little wider (side/mid 1 dB higher, L/R correlation
+  0.005 lower); the mednafen core is slightly the closer.
+- **Tone: the cabinet is darker at the top**, 1 to 3 dB in the 8 kHz octave, as Dynamite
+  Cop's is above 2 kHz. PR #9's output filter, 8 kHz and never applied, aims at the same.
+
 ## Tempo and the fixed wait states
 
 Upstream's 88d5557 (2026-10-01, "improve hotd sound fidelity") dropped the fixed two wait
@@ -1062,7 +1108,7 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
 | hotd | FM, tempo (contention fitted on it), DSP from 30 s of attract | ⚠️ | — | tempo +0.5% against a cabinet recording with the fixed wait states (+1.33% without), pitch within a cent; cores equivalent over 3 min of attract; PR #9 leaves its attract bit-identical; FM to be recorded in play |
 | vf2 | DSP reverb | — | — | |
 | dynamcop | DSP reverb (strongest use) | ⚠️ | ⚠️ | against a cabinet recording: reverb and pitch match, tempo 0.65% fast on both cores, whatever the sound 68000's wait states; PR #9 changes the mame core's output from 176.8 s of attract only |
-| von | pitch LFO (the one A/B game using it in 26 s) | — | — | PR #9 changed the mame core's vibrato depth; to measure on both cores |
+| von | pitch LFO (the one A/B game using it in 26 s) | ✅ | ✅ | against a cabinet recording: tempo within 0.05%, pitch within 0.1 cent, reverb close, 1–3 dB brighter at 8 kHz, on both cores; its attract hardly uses the vibrato, so PR #9's depth is still to judge |
 | doa | DSP, MADRS | — | — | |
 | daytona | original Model 2 | — | — | Model 1 sound board, no SCSP; aligns with its OST at −0.10% tempo, pitch +7.5 cents |
 | srallyc | MSLC (end-of-music beeps) | ⚠️ | ⚠️ | tempo +0.48% against the OST with the fixed wait states (+1.45% without, +2.5% before the 68000 fix); drier than the OST, but no DSP program in attract |
@@ -1185,3 +1231,9 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
   11 s, tempo and pitch unchanged. See "Upstream's PR #9: changes to the mame core". Added
   "Where things stand" at the top, and the reference recordings now sit in
   `build/scsp_ab/ref_*.wav`.
+- **2026-10-08**: merged upstream main up to d7e1cab (efe0731): the Model 2B/2C coprocessor
+  speed-up (PR #10) and the low-resolution overlay (PR #11). The mame core still matches
+  upstream's build on the 16 A/B games, bit-identical to before. Checked against a cabinet
+  recording of Virtual On's attract: tempo and pitch exact on both cores, reverb close, the
+  cabinet darker at 8 kHz; the attract hardly uses the vibrato, so that question stays open.
+  See "Check against a hardware recording: Virtual On".
