@@ -38,8 +38,11 @@ Next, in this order:
    the Magician's theme (PLFOS 1 and 2). Those tracks are the material: cabinet
    recordings of them, against both cores captured in play (a save state or a scripted
    run, since the attract does not reach them). Von's attract hardly uses a vibrato and
-   could not settle it. Then decide what to report upstream, with the output filter that
-   is never applied and the save-state layout it changed.
+   could not settle it. Compare on both cores the manual's depth, the hardware model's
+   and upstream's table, with and without upstream's FM blend. The mednafen core does not
+   take upstream's changes meanwhile (see "Not carried over to the mednafen core"). Then
+   decide what to report upstream, with the output filter that is never applied and the
+   save-state layout it changed.
 3. Step 11: per-game validation on both cores, then the choice of the default core.
 4. Step 0: the licence decision.
 
@@ -939,6 +942,34 @@ tuning the PLFOS value a von track uses the same way. Neither the double scaling
 higher pitch was measured here yet: a vibrato does not move a note's mean pitch by itself,
 so the sharpness he heard may come from the FM rather than the depth.
 
+**Not carried over to the mednafen core** (decided 2026-10-10). Each change is a few lines
+there, but each answers a fault of the mame core that the mednafen core does not have:
+- **The depth table.** It scales a depth the mame core already applies, so it follows
+  neither the manual nor the hardware model, except at PLFOS 3: ±0.9 cents at PLFOS 1
+  (model ±3.5, manual ±7), ±13.5 at 3 (model ±13.5, manual ±27), +1227/−2588 at 7 (model
+  ±247, manual ±494). Its PLFOS 3, found by ear, is the hardware model's depth, which the
+  mednafen core had before step 9 doubled it to follow the manual
+  ([scsp_mdfn.cpp:1158](src/hw/scsp_mdfn.cpp:1158)). That points at going back to the
+  model's depth, not at taking the table, whose low values are far below both.
+- **The FM blend.** The "buzz" left under the track most likely comes from what the mame
+  core lacks: the sound stack's four-slot delay (its `SCSP_FM_DELAY` code is dead,
+  [scsp.cpp:1474](src/hw/scsp.cpp:1474), row 8 of "Where the mame core departs from the
+  official documentation"), so for the slots just before a carrier the FM reads another
+  generation of samples. The blend damps the symptom. The mednafen core has the delay
+  ([scsp_mdfn.cpp:1468](src/hw/scsp_mdfn.cpp:1468)) and interpolates at the modulated
+  position, placing the second sample with the next slot's fraction as the hardware model
+  does ([scsp_mdfn.cpp:1050](src/hw/scsp_mdfn.cpp:1050)); the blend would likely make it
+  worse.
+- **The output filter.** Applied nowhere, upstream included. A filter like it makes sense,
+  since both cabinet recordings are 1 to 3 dB darker around 8 kHz, but after both cores, in
+  `Model2Sound`, fitted to those recordings, bearing in mind that the recording chain may
+  account for part of it.
+
+The depth and the blend are to be settled by measurement on the tracks upstream's author
+used (next steps, item 2): cabinet recordings of House of the Dead's chapters 2 and 3, its
+boss and the Magician's theme, and the same tracks captured on both cores, from save states
+in those chapters or the sound test of the service menu if there is one.
+
 Merged into `ScspMame` (cbc820d), PR #12 too (34437e4); the one conflict was `UpdateSlot`'s
 signature. The filter's state raised the save-state format to 3 (see "Save states").
 
@@ -1259,3 +1290,8 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
   the hardware model's depth) and PR #13 (gun aim). The mame core still matches upstream's
   build on the 16 A/B games, bit-identical to before. PR #9's author explained what he
   tuned and on which tracks; see "Upstream's PR #9: changes to the mame core".
+- **2026-10-10**: PR #9's and #12's changes are not carried over to the mednafen core: the
+  depth table scales twice and only meets the hardware model at PLFOS 3, the FM blend works
+  around the stack delay the mame core lacks and the mednafen core has, and the output
+  filter belongs after both cores. Both to be measured on House of the Dead's in-game
+  tracks. See "Not carried over to the mednafen core".
