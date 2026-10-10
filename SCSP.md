@@ -12,15 +12,16 @@ the current implementation (derived from MAME) as a selectable reference.
 All the comparisons in this file were made on **audio captures**, measured by scripts;
 none of them comes from listening. See "Comparison method: audio captures".
 
-## Where things stand (2026-10-08)
+## Where things stand (2026-10-10)
 
-- `dev/network_output_scsp` has upstream main d7e1cab merged in (efe0731): v0.9.42, with
-  upstream's PR #9 (mame core) and PR #10 (Model 2B/2C coprocessor speed-up). Both cores
-  build and pass `--savestate-test`. The mame core gives the same WAVs as upstream's own
-  build on the 16 A/B games (tag `m10dev` against `m10up`, 1,500 frames each, all 16
-  bit-identical), and the same as before PR #10 (`m9dev`).
-- Upstream now has the sound 68000's two fixed wait states (our PR #5) and PR #9's changes
-  to the mame core: see "Upstream's PR #9: changes to the mame core".
+- `dev/network_output_scsp` has upstream main 3c9e79a merged in (34437e4): v0.9.43, with
+  the translated interface, PR #12 (the vibrato depth at PLFOS 3) and PR #13 (gun aim).
+  Both cores build. The mame core gives the same WAVs as upstream's own build on the 16
+  A/B games (tag `m11dev` against `m11up`, 1,500 frames each, all 16 bit-identical), and
+  the same as before (`m10dev`): none of them uses PLFOS 3 in that time.
+- Upstream now has the sound 68000's two fixed wait states (our PR #5) and the vibrato and
+  FM changes of PR #9 and #12 in the mame core: see "Upstream's PR #9: changes to the mame
+  core".
 - Steps 1 to 10 are done; step 0 (licence) and step 11 (per-game validation, default
   core) are not.
 
@@ -31,20 +32,23 @@ Next, in this order:
    game: find what the three fast games' sound programs use that von's does not, the SCSP
    timers first (their settings in dynamcop), then the interrupt latency (see "Tempo and
    the fixed wait states").
-2. PR #9's vibrato depth no longer follows the manual's table 4.17, and the manual and
-   the hardware model still disagree on it. Von's attract hardly uses a vibrato, so its
-   recording cannot settle either question: a passage with a clear vibrato is needed
-   (von in play, or vcop2 or bel, which use one briefly). Then decide what to report
-   upstream, together with the output filter that is never applied and the save-state
-   layout it changed.
+2. The vibrato depth: upstream's table (PR #9, #12) no longer follows the manual's table
+   4.17, and the manual and the hardware model still disagree on it. Its author tuned it
+   on House of the Dead in play: chapters 2 and 3 and the boss music (FM with PLFOS 3) and
+   the Magician's theme (PLFOS 1 and 2). Those tracks are the material: cabinet
+   recordings of them, against both cores captured in play (a save state or a scripted
+   run, since the attract does not reach them). Von's attract hardly uses a vibrato and
+   could not settle it. Then decide what to report upstream, with the output filter that
+   is never applied and the save-state layout it changed.
 3. Step 11: per-game validation on both cores, then the choice of the default core.
 4. Step 0: the licence decision.
 
-For a new session: the measurement scripts are in `tools/`, which git ignores (see
-"Tools"). The reference recordings are in `build/scsp_ab/ref_*.wav`, also outside git:
+For a new session: since v0.9.43 the build needs two more submodules, harfbuzz and
+SheenBidi (`git submodule update --init --depth 1`). The measurement scripts are in
+`tools/`, which git ignores (see "Tools"). The reference recordings are in `build/scsp_ab/ref_*.wav`, also outside git:
 `ref_hotd_hw.wav`, `ref_dynamcop_hw.wav` and `ref_von_hw.wav` (cabinets),
 `ref_power_games_ost.wav` (Sega Rally) and `ref_daytona_ost.wav`. The captures quoted below
-are in `build/scsp_ab` under their tags: `m10dev`, `m10up`, `m9dev`, `m9up`, `m9_hotd`,
+are in `build/scsp_ab` under their tags: `m11dev`, `m11up`, `m10dev`, `m10up`, `m9dev`, `m9up`, `m9_hotd`,
 `m9_dynamcop`, `vib_*` (von), `hotdfw0`..`hotdfw4`, `fw*`.
 
 ## References
@@ -914,7 +918,9 @@ in three places:
   `PLFO_Step`), so the depth is scaled twice and no longer follows the table: ±0.9 cents
   at PLFOS 1 instead of ±7, ±10 at 3 instead of ±27, ±126 at 5 instead of ±112, and
   +1227/−2588 cents at 7 instead of ±494. Its comment says the values were tuned to match
-  real hardware; that was not checked here.
+  real hardware; that was not checked here. Upstream's PR #12 (ec9c3ac, 2026-10-08, same
+  author) raised PLFOS 3 from 6/16 to 8/16: ±13.5 cents, which is exactly the hardware
+  model's depth there, half the manual's ±27.
 - **FM interpolation.** Under FM, only 1/16 of the change the modulation makes to the
   fractional position reaches the interpolation weight (`FM_FRAC_BLEND`,
   [scsp.cpp:1317](src/hw/scsp.cpp:1317)); the integer part still moves in full. MAME and
@@ -923,8 +929,18 @@ in three places:
   recording", is set up in `init()` ([scsp.cpp:801](src/hw/scsp.cpp:801)) and its state is
   saved, but nothing applies it: it does not change the output.
 
-Merged into `ScspMame` (cbc820d); the one conflict was `UpdateSlot`'s signature. The
-filter's state raised the save-state format to 3 (see "Save states").
+**What its author says** (pnixon-afk, in a comment passed on by the user, 2026-10-10): he
+targeted House of the Dead's chapter 2, chapter 3 and boss tracks. Before his change the
+FM modulation did not seem to apply correctly: its "buzz" sat idly underneath the track
+instead of following it as on hardware captures, and without the table those FM tracks
+played at a higher pitch than the hardware. From his research, House of the Dead uses
+PLFOS 1 and 2 only in the Magician's theme, and PLFOS 3 in its other FM tracks. He suggests
+tuning the PLFOS value a von track uses the same way. Neither the double scaling nor the
+higher pitch was measured here yet: a vibrato does not move a note's mean pitch by itself,
+so the sharpness he heard may come from the FM rather than the depth.
+
+Merged into `ScspMame` (cbc820d), PR #12 too (34437e4); the one conflict was `UpdateSlot`'s
+signature. The filter's state raised the save-state format to 3 (see "Save states").
 
 Checks on 2026-10-06:
 - The mame core is bit-identical to upstream's build on the 16 A/B games (`m9dev`, `m9up`).
@@ -1025,7 +1041,7 @@ places (each checked in the code):
 | 9 | The MIDI input FIFO is 4 bytes, with MIFULL and MIOVF ([SCSP manual 4.2.10](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_2a.htm)) | a 32-byte FIFO, nothing lost | [scsp.h:216](src/hw/scsp.h:216), [scsp.cpp:540](src/hw/scsp.cpp:540) |
 | 10 | Register 0x404 shows MIFULL, MIOVF, MOEMP and MOFULL ([SCSP manual table 4.3](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_12.htm), [4.2.10](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_2a.htm)) | the flag byte is never updated | [scsp.cpp:1017](src/hw/scsp.cpp:1017) |
 | 11 | Interrupt sources 9 (MIDI output empty) and 10 (every sample) exist ([SCSP manual table 4.31](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_2c.htm)) | neither is ever raised (the sample interrupt is commented out) | [scsp.cpp:1057](src/hw/scsp.cpp:1057) |
-| 12 | The vibrato's depth by PLFOS is ±7 to ±494 cents ([SCSP manual table 4.17](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_26.htm)) | since upstream's PR #9, the table's deviation is scaled again by 2/16 to 50/16: ±0.9 cents at PLFOS 1, +1227/−2588 at 7 | [scsp.cpp:1274](src/hw/scsp.cpp:1274) |
+| 12 | The vibrato's depth by PLFOS is ±7 to ±494 cents ([SCSP manual table 4.17](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_26.htm)) | since upstream's PR #9 and #12, the table's deviation is scaled again by 2/16 to 50/16: ±0.9 cents at PLFOS 1, ±13.5 at 3 (the hardware model's), +1227/−2588 at 7 | [scsp.cpp:1274](src/hw/scsp.cpp:1274) |
 
 The vibrato depth (PLFOS, [SCSP manual table 4.17](https://www.infochunk.com/saturn/segahtml_en/hard/scsp/hon/p04_26.htm)) is where the mame core
 agreed with the manuals and the hardware model did not, and the new core was made to follow
@@ -1237,3 +1253,9 @@ Legend: ✅ correct, ⚠️ difference measured or heard, ❌ broken, — not te
   recording of Virtual On's attract: tempo and pitch exact on both cores, reverb close, the
   cabinet darker at 8 kHz; the attract hardly uses the vibrato, so that question stays open.
   See "Check against a hardware recording: Virtual On".
+- **2026-10-10**: merged upstream main up to 3c9e79a (34437e4): v0.9.43's translated
+  interface (with the harfbuzz and SheenBidi submodules; our interface strings now go
+  through `tr()`, `tr_id()` and `tooltip()` as upstream's do), PR #12 (PLFOS 3 at 8/16,
+  the hardware model's depth) and PR #13 (gun aim). The mame core still matches upstream's
+  build on the 16 A/B games, bit-identical to before. PR #9's author explained what he
+  tuned and on which tracks; see "Upstream's PR #9: changes to the mame core".
