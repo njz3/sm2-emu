@@ -268,8 +268,9 @@ in the settings overlay (`F10`):
   used, and guns with a motor get recoil. Windows is covered below. A Sinden
   border is available if the gun needs one, and the mouse remains the fallback
   aiming device on every platform. A gun calibrated to the whole screen is
-  mapped onto the game image, so no 4:3 mode is needed; shooting a side bar or
-  past the screen edge counts as off screen, but the picture's own edge does not.
+  mapped onto the game image, so no 4:3 mode is needed; shooting a side bar,
+  past the screen edge or at the picture's very edge counts as off screen, so
+  a gun that cannot aim past an edge can still reload.
   With the Sinden border on, the gun aims against that border instead. A host
   calibration tool that holds `KEY_CONFIG` (Batocera's gun calibrators) gets
   its targets drawn on screen, so a gun can be recalibrated without leaving
@@ -318,6 +319,23 @@ Support/sm2-emu` on macOS); `--config <dir>` overrides both, and whichever file
 was used is named in the log. Changes made in the overlay are saved on exit. A
 command-line flag always beats the file, and an unparseable line is reported and
 skipped rather than refused.
+
+### Language
+
+The overlay follows the system's preferred language (`language = auto`), or
+whichever one is picked under **Video → Language** or set as `language` in
+`sm2-emu.ini` (`en`, `de`, `ja`, `pt_BR`, ...); it switches live. English is
+drawn in the built-in font, other languages in the fonts the system already
+has (fontconfig on Linux, CoreText on macOS, DirectWrite on Windows), and
+right-to-left and complex scripts are shaped with HarfBuzz and SheenBidi. If
+the system has no font for a language, the overlay stays in English.
+
+The translations live in `data/lang/` as gettext `.po` files. The initial set
+was machine-translated, so corrections from native speakers are very welcome:
+edit the `.po` file (any PO editor such as Poedit works) and open a pull
+request. After changing overlay strings in the source, `data/lang/update-po.sh`
+refreshes the template and merges it into every catalog; its header explains
+how to start a new language.
 
 ### Video: scaling, aspect and CRT
 
