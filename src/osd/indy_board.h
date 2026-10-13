@@ -39,7 +39,15 @@ public:
     };
 
     /// As at power-up: the centre at $80, base 2, effect stop, no vibration.
-    void reset() { *this = IndyBoard{}; }
+    void reset()
+    {
+        const int dip = m_dip_power;
+        *this         = IndyBoard{};
+        m_dip_power   = dip;
+    }
+
+    /// to every strength.
+    void set_dip(int switches) { m_dip_power = switches; }
 
     /// A byte the game wrote to the board.
     void command(u8 value);

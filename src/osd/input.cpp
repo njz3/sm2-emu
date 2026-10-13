@@ -1290,6 +1290,8 @@ void Input::update_force_feedback(const rom::GameSpec& game)
 
         // Positive levels push the wheel left, as WheelForce::set_force takes them.
         int game_force = 0;
+        m_daytona.set_dip(static_cast<int>(m_wheel_settings.drive_dip));
+        m_indy.set_dip(static_cast<int>(m_wheel_settings.drive_dip));
         if (game.drive_protocol == rom::DriveProtocol::Daytona) {
             // The board's start-up calibration is run against the simulated
             // spring.
@@ -1356,6 +1358,8 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             const int dir   = push_direction(command, pot);
             int       force = mag;
             if (game.drive_protocol == rom::DriveProtocol::Rally) {
+                // The operator's strength, DIP switches 1-3: 0..7 more power.
+                force += static_cast<int>(m_wheel_settings.drive_dip) * ceiling / kBoardFullPower;
                 // An outward push also gets the calibration power, capped at the
                 // spring's force at that point, since a PC wheel has no gear drag.
                 const bool outward = dir > 0 ? deflection < 0 : deflection >= 0;

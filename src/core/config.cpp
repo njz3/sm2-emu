@@ -681,6 +681,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->wheel_indy_full_power)) {
                 bad_value();
             }
+        } else if (key == "wheel_drive_dip") {
+            if (!parse_u32(value, &out->wheel_drive_dip)) {
+                bad_value();
+            }
         } else if (key == "input_background") {
             if (!parse_bool(value, &out->input_background)) {
                 bad_value();
@@ -923,6 +927,7 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     out->wheel_panel_spring    = std::min(out->wheel_panel_spring, 100u);
     out->wheel_indy_full_power = std::clamp(out->wheel_indy_full_power, 1u, 63u);
     out->wheel_indy_deadband   = std::min(out->wheel_indy_deadband, out->wheel_indy_full_power - 1);
+    out->wheel_drive_dip       = std::min(out->wheel_drive_dip, 7u);
     out->wheel_shift_neutral_ms = std::min(out->wheel_shift_neutral_ms, 500u);
     out->wheel_rumble_strength = std::min(out->wheel_rumble_strength, 100u);
     out->pad_rumble_strength = std::min(out->pad_rumble_strength, 100u);
@@ -932,6 +937,7 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     if (out->outputs_network_port == 0 || out->outputs_network_port > 65535) {
         out->outputs_network_port = 8000;
     }
+    out->outputs_network_udp_port = std::min(out->outputs_network_udp_port, 65535u);  // 0 is "off"
     // A sane rotation range: tight enough to be usable, and never zero (which
     // would divide by zero when scaling the steering).
     out->wheel_steer_degrees = std::clamp(out->wheel_steer_degrees, 90u, 1080u);
@@ -1092,6 +1098,8 @@ bool save_config(const std::string& path, const Config& config)
         << "# power, as the board sends it to the motor drive board.\n"
         << "wheel_indy_deadband = " << config.wheel_indy_deadband << "\n"
         << "wheel_indy_full_power = " << config.wheel_indy_full_power << "\n"
+        << "# The drive board's DIP switches for the motor's strength, 0..7 (0 all\n"
+        << "wheel_drive_dip = " << config.wheel_drive_dip << "\n"
         << "# Reverses the force, for a wheel whose driver pushes the wrong way:\n"
         << "# one that pulls away from the centre instead of bringing it back.\n"
         << "wheel_ffb_invert = " << bool_text(config.wheel_ffb_invert) << "\n"

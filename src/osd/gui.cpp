@@ -1071,6 +1071,7 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
         resistance = ((resistance + 5) / 10) * 10;  // snap to 10 % steps
         config.wheel_ffb_strength = static_cast<u32>(std::clamp(resistance, 0, 100));
     }
+    ImGui::TextDisabled("%s", tr("100 % = the force of the arcade cabinet."));
 
     // The light spring of the one panel that has one.
     int panel_spring = static_cast<int>(config.wheel_panel_spring);
@@ -1089,6 +1090,20 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
     }
     ImGui::TextDisabled("%s", tr("Sega Rally Championship and Daytona USA only, all versions."));
 
+    // The operator's strength on the drive board's DIP switches.
+    int drive_dip = static_cast<int>(config.wheel_drive_dip);
+    if (ImGui::SliderInt(tr_id("Drive board DIP strength"), &drive_dip, 0, 7)) {
+        config.wheel_drive_dip = static_cast<u32>(std::clamp(drive_dip, 0, 7));
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        tooltip(tr("The motor strength set on the drive board's DIP switches,\n"
+                   "the switches ON counted in binary: 0 all OFF, as from the\n"
+                   "factory. Sega Rally: switches 1-3, 0 to 7 added to every\n"
+                   "torque. Daytona USA: switches 1-3, 4 times that. Indy 500,\n"
+                   "0 to 7 added to every force."));
+    }
 
     ImGui::Checkbox(tr_id("Invert force feedback"), &config.wheel_ffb_invert);
     ImGui::SameLine();

@@ -134,6 +134,7 @@ void apply_input_background(bool on)
     w.panel_spring    = c.wheel_panel_spring;
     w.indy_deadband   = c.wheel_indy_deadband;
     w.indy_full_power = c.wheel_indy_full_power;
+    w.drive_dip       = c.wheel_drive_dip;
     w.ffb_invert      = c.wheel_ffb_invert;
     w.steer_degrees   = c.wheel_steer_degrees;
     w.lock_degrees    = c.wheel_lock_degrees;
@@ -977,6 +978,7 @@ int main(int argc, char** argv)
     options.config.wheel_panel_spring  = from_file.wheel_panel_spring;
     options.config.wheel_indy_deadband   = from_file.wheel_indy_deadband;
     options.config.wheel_indy_full_power = from_file.wheel_indy_full_power;
+    options.config.wheel_drive_dip       = from_file.wheel_drive_dip;
     options.config.wheel_ffb_invert    = from_file.wheel_ffb_invert;
     options.config.input_background    = from_file.input_background;
     options.config.wheel_steer_degrees = from_file.wheel_steer_degrees;

@@ -199,6 +199,11 @@ struct Config {
     u32 wheel_indy_deadband   = 0;
     u32 wheel_indy_full_power = 63;
 
+    /// The operator's strength on the drive board's DIP switches, 0..7 (the
+    /// switches ON counted in binary; 0, all OFF, as from the factory): Sega
+    /// Rally's 1-3 add 0..7 to every torque, Daytona's 1-3 add 4 times that,
+    u32 wheel_drive_dip = 0;
+
     /// Reverses the wheel's force, for a driver that pushes right on the
     /// positive force with which DirectInput, SDL and Linux push left.
     bool wheel_ffb_invert = false;

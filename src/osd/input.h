@@ -113,6 +113,8 @@ public:
         /// the one giving the full strength (see Config::wheel_indy_deadband).
         u32  indy_deadband   = 0;
         u32  indy_full_power = 63;
+        /// The drive board's DIP strength, 0..7 (see Config::wheel_drive_dip).
+        u32  drive_dip       = 0;
         /// Reverses the force, for a driver that pushes right on the positive
         /// force with which DirectInput, SDL and Linux push left.
         bool ffb_invert    = false;
