@@ -40,3 +40,9 @@ tests/
 tools/
 cfg/
 snap/
+
+# Autopilot: save states, models and runs are large and local
+autopilot/runs/
+autopilot/states/
+autopilot/*.pt
+autopilot/bin/
