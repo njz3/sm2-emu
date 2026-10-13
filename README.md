@@ -277,6 +277,20 @@ in the settings overlay (`F10`):
   the game.
 - **Gamepad rumble** on the driving games, driven from the emulated drive board.
 
+#### Over Rev and Super GT 24h: the drive board and the test menu
+
+These two Jaleco games use the Indy 500 drive board (EPR-18261), and a setting
+of their test menu decides whether they drive it. Open the test menu with
+`Test` (`0`); `Service` (`9`) moves down and `Test` changes the value.
+
+- **Over Rev**: GAME ASSIGNMENTS, FOUNDATIONAL SETTING, **HARDWARE TYPE**. The
+  default NORMAL (2in1) sends nothing to the drive board, so a wheel gets no
+  force. SEGA INDY, SEGA INDY DX / GT24h and SEGA STCC all drive it, with the
+  same commands.
+- **Super GT 24h**: GAME ASSIGNMENTS, **I/O TYPE**. A (the default) and B drive
+  the board, with the same commands; C sends nothing. Each type reads the
+  pedals its own way round, which sm2-emu follows: they work in all three.
+
 #### Light guns on Windows
 
 - **Detection:** a mouse counts as a gun if its HID product name contains

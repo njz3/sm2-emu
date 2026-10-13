@@ -3584,7 +3584,8 @@
 
     <!-- The drive board only hears from the game once HARDWARE TYPE in the
          test menu's Foundational Setting is SEGA STCC; the default NORMAL (2in1)
-         cabinet has no force feedback. -->
+         cabinet has no force feedback. SEGA INDY and SEGA INDY DX / GT24h drive
+         it too, with the same commands. -->
     <!-- Analogue mux wiring, from MAME's model2c_state::overrev2c. -->
     <analog>
       <channel index="0" control="steer" rest="0x80"/>
