@@ -279,6 +279,7 @@ public:
     }
     [[nodiscard]] std::span<const u32> buffer_ram() const override { return m_buffer_ram; }
     [[nodiscard]] std::span<const u8> work_ram() const override { return m_work_ram; }
+    [[nodiscard]] std::span<const u8> scratch_ram() const override { return m_scratch_ram; }
 
     [[nodiscard]] u32 geometry_read_start_address() const override
     {

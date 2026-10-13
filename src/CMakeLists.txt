@@ -358,6 +358,11 @@ endif()
 
 add_executable(sm2-emu
     main.cpp
+    telemetry/telemetry.cpp
+    telemetry/indy500.cpp
+    telemetry/stcc.cpp
+    telemetry/srally.cpp
+    telemetry/daytona.cpp
 )
 
 # On macOS build a proper .app bundle so the Finder/Dock show the icon and the

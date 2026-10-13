@@ -262,6 +262,10 @@ public:
     /// The host CPU's work RAM, for state comparison against MAME's own.
     [[nodiscard]] virtual std::span<const u8> work_ram() const = 0;
 
+    /// The host CPU's scratch RAM at 0x00200000, where some games (Touring
+    /// Car) keep what others keep in the work RAM.
+    [[nodiscard]] virtual std::span<const u8> scratch_ram() const = 0;
+
     /// Byte offset in the display list where the geometry engine starts each
     /// frame. Needed to walk the buffer the way the engine does.
     [[nodiscard]] virtual u32 geometry_read_start_address() const = 0;

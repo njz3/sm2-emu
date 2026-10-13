@@ -453,6 +453,16 @@ void TcpServer::broadcast(std::string_view text)
     }
 }
 
+usize TcpServer::take_lines()
+{
+    usize n = 0;
+    for (Client& c : m_clients) {
+        n += c.lines;
+        c.lines = 0;
+    }
+    return n;
+}
+
 void TcpServer::flush()
 {
 #if defined(MSG_NOSIGNAL)
@@ -464,12 +474,15 @@ void TcpServer::flush()
         Client& c    = m_clients[i];
         bool    dead = false;
 
-        // Clients never need to talk to us; read and discard, which is also how
-        // a closed connection shows up.
+        // What clients send is only counted in lines (an acknowledgement, see
+        // take_lines()); reading is also how a closed connection shows up.
         char scratch[256];
         for (;;) {
             const auto got = ::recv(c.fd, scratch, sizeof scratch, 0);
             if (got > 0) {
+                for (int k = 0; k < static_cast<int>(got); ++k) {
+                    c.lines += scratch[k] == '\n' ? 1 : 0;
+                }
                 continue;
             }
             if (got == 0 || !would_block()) {

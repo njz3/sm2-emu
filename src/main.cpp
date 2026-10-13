@@ -49,6 +49,7 @@
 #include "render/texture_replace.h"
 #include "rom/game_db.h"
 #include "rom/rom_loader.h"
+#include "telemetry/telemetry.h"
 
 #include <map>
 #include <memory>
@@ -253,6 +254,14 @@ struct Options {
     /// Run this many frames headless, report, and exit. Zero means run normally.
     sm2::u32 boot_test    = 0;
 
+    /// --telemetry PORT: serve the telemetry there, over the settings' port.
+    sm2::u32 telemetry_port = 0;
+
+    /// Each published telemetry frame waits for a client's line before the
+    /// next frame runs, so a driver's controls land on the frame they were
+    /// computed for.
+    bool telemetry_sync = false;
+
     /// Save-state round-trip self-test: boot this many frames, then run the
     /// save/advance/load/re-advance check (see the handler). Zero means off.
     sm2::u32 savestate_test = 0;
@@ -307,6 +316,10 @@ void print_usage()
         "                      hide the mouse cursor (for the gun titles)\n"
         "      --list-gamepads Show which gamepads were recognised and which\n"
         "                      player each would drive\n"
+        "      --telemetry <port>  Serve the racing games' telemetry (cars, race)\n"
+        "                      to TCP clients, one JSON line a frame\n"
+        "      --telemetry-sync  After each telemetry frame, wait (250 ms at most)\n"
+        "                      for a client's line before running the next one\n"
         "      --list-games    List the games in the ROM database\n"
         "      --list-gpus     List the Vulkan devices that could be used\n"
         "      --log-level <l> trace, debug, info, warning or error\n"
@@ -408,6 +421,14 @@ void print_usage()
             }
             out->config.render_scale = scale;
             out->given.render_scale  = true;
+        } else if (std::strcmp(arg, "--telemetry") == 0) {
+            if (index + 1 >= argc) {
+                SM2_ERROR("--telemetry requires a TCP port");
+                return false;
+            }
+            out->telemetry_port = static_cast<sm2::u32>(std::strtoul(argv[++index], nullptr, 10));
+        } else if (std::strcmp(arg, "--telemetry-sync") == 0) {
+            out->telemetry_sync = true;
         } else if (std::strcmp(arg, "--no-vsync") == 0) {
             out->config.vsync = false;
             out->given.vsync  = true;
@@ -1007,9 +1028,14 @@ int main(int argc, char** argv)
     options.config.wheel_steer_deadzone  = from_file.wheel_steer_deadzone;
     options.config.game_volume           = from_file.game_volume;
     options.config.game_volumes          = from_file.game_volumes;
-    options.config.outputs_network      = from_file.outputs_network;
-    options.config.outputs_network_port = from_file.outputs_network_port;
-    options.config.outputs_windows      = from_file.outputs_windows;
+    if (!options.given.outputs_network) {
+        options.config.outputs_network = from_file.outputs_network;
+    }
+    options.config.outputs_network_port     = from_file.outputs_network_port;
+    options.config.telemetry_port =
+        options.telemetry_port != 0 ? options.telemetry_port : from_file.telemetry_port;
+    options.config.outputs_network_udp_port = from_file.outputs_network_udp_port;
+    options.config.outputs_windows          = from_file.outputs_windows;
 
     options.config.link_enabled        = from_file.link_enabled;
     options.config.link_local_ip       = from_file.link_local_ip;
@@ -2109,6 +2135,22 @@ int main(int argc, char** argv)
         // own 44100 Hz and left to SDL to resample.
         osd::Audio audio;
         osd::Outputs outputs;
+
+        // The racing games' telemetry, to TCP clients.
+        telemetry::Server                         telemetry_server;
+        bool                                      telemetry_sync_waited = false;
+        bool                                      telemetry_sync_acked  = false;
+        hw::Inputs                                telemetry_inputs_used;  ///< the last frame's, for telemetry
+        std::unique_ptr<telemetry::GameTelemetry> telemetry_decoder;
+        telemetry::Frame                          telemetry_frame;
+        u64                                       telemetry_frames = 0;
+        if (options.config.telemetry_port != 0) {
+            static_cast<void>(
+                telemetry_server.open(static_cast<u16>(options.config.telemetry_port)));
+        }
+        if (loaded.has_value()) {
+            telemetry_decoder = telemetry::make_telemetry(loaded->game);
+        }
         if (sound_board != nullptr) {
             static_cast<void>(audio.init(sound_board->sample_rate()));
         }
@@ -2421,6 +2463,7 @@ int main(int argc, char** argv)
 
             outputs.configure(options.config.outputs_network,
                               static_cast<u16>(options.config.outputs_network_port),
+                              static_cast<u16>(options.config.outputs_network_udp_port),
                               options.config.outputs_windows);
             if (machine_iface != nullptr && loaded.has_value()) {
                 outputs.set_game(loaded->game.name, loaded->game.parent,
@@ -2493,6 +2536,45 @@ int main(int argc, char** argv)
                 input.update_drive_board(loaded->game, drive_writes.view());
                 outputs.update(machine_iface->lamp_latch(), drive_writes.view(),
                                machine_iface->work_ram());
+                ++telemetry_frames;
+                if (options.telemetry_sync && telemetry_decoder && telemetry_server.clients() == 0
+                    && !telemetry_sync_waited) {
+                    // Lockstep: no frame runs before the driver is there (once).
+                    telemetry_sync_waited = true;
+                    telemetry_server.wait_client(15000);
+                }
+                if (telemetry_decoder && telemetry_server.clients() != 0
+                    && telemetry_decoder->decode({machine_iface->work_ram(), machine_iface->scratch_ram()}, telemetry_frames,
+                                                 telemetry_frame)) {
+                    for (usize i = 0; i < telemetry_frame.analog.size(); ++i) {
+                        telemetry_frame.analog[i] = telemetry_inputs_used.analog[i];
+                    }
+                    telemetry_frame.in0 = telemetry_inputs_used.in0;
+                    telemetry_frame.in1 = telemetry_inputs_used.in1;
+                    telemetry_server.publish(telemetry_frame);
+                    // The first frame waits longer: the driver's first answer comes slower.
+                    if (options.telemetry_sync
+                        && telemetry_server.wait_ack(telemetry_sync_acked ? 250 : 5000)) {
+                        telemetry_sync_acked = true;
+                        // The client has set its controls for this frame: read them again
+                        // (the joysticks' reports come in as window messages: pump them).
+                        SDL_PumpEvents();
+                        SDL_UpdateJoysticks();
+                        // Their motion events too (an axis counts once it has moved);
+                        // only those: the rest waits for the loop's own turn.
+                        SDL_Event joystick_events[64];
+                        int       count = 0;
+                        while ((count = SDL_PeepEvents(joystick_events, 64, SDL_GETEVENT,
+                                                       SDL_EVENT_JOYSTICK_AXIS_MOTION,
+                                                       SDL_EVENT_JOYSTICK_UPDATE_COMPLETE))
+                               > 0) {
+                            for (int e = 0; e < count; ++e) {
+                                input.handle_event(joystick_events[e]);
+                            }
+                        }
+                        input.poll(&machine_iface->inputs(), loaded->game);
+                    }
+                }
                 input.update_force_feedback(loaded->game);
                 input.update_pad_rumble(loaded->game);
                 if (options.coin_at != 0) {
@@ -2505,6 +2587,7 @@ int main(int argc, char** argv)
                     machine_iface->inputs().in1 &= static_cast<u8>(~press.in1);
                 }
 
+                telemetry_inputs_used = machine_iface->inputs();
                 machine_iface->set_draw_distance(options.config.extended_draw_distance);
                 {
                     auto scope = core::maybe_scope(stage_run_frame, profile_sample);
@@ -2810,6 +2893,11 @@ int main(int argc, char** argv)
                     options.config.link_enabled, comm.enabled(), comm.link_alive(),
                     comm.link_id(), comm.link_count()});
             }
+            {
+                const osd::Outputs::NetworkStatus status = outputs.network_status();
+                gui.set_outputs_status(
+                    osd::Gui::OutputsStatus{status.listening, status.clients, status.error});
+            }
             // GPU capabilities gate the enhancement options in the GUI.
             {
                 const render::Capabilities caps = backend->capabilities();
@@ -2873,6 +2961,9 @@ int main(int argc, char** argv)
                 break;
             }
             outputs.poll();
+            if (telemetry_server.valid()) {
+                telemetry_server.poll();
+            }
 
             // Esc asked to unload the game and return to the picker. Handled
             // after the frame is submitted, mirroring the launch path below in
@@ -2917,13 +3008,15 @@ int main(int argc, char** argv)
                 if (const std::optional<std::filesystem::path> archive =
                         find_set_archive(database, options.config.rom_dir, *pick)) {
                     chosen = load_game(database, archive->string(), *pick,
-                                       options.config.nvram_dir, options.log_unmapped);
+                                       options.config.nvram_dir, options.log_unmapped,
+                                       scsp_core_of(options.config));
                 }
                 if (!chosen.has_value()) {
                     SM2_ERROR("picker: could not load '%s' from rom_dir", pick->c_str());
                 } else {
                     loaded        = std::move(chosen);
                     machine_iface = loaded->machine_iface.get();
+                    telemetry_decoder = telemetry::make_telemetry(loaded->game);
                     machine       = loaded->machine;
                     machine_2b    = loaded->machine_2b;
                     machine_2c    = loaded->machine_2c;
