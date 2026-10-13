@@ -358,6 +358,7 @@ endif()
 
 add_executable(sm2-emu
     main.cpp
+    agent.cpp
     telemetry/telemetry.cpp
     telemetry/indy500.cpp
     telemetry/stcc.cpp
