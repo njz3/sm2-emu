@@ -84,7 +84,7 @@ What is left:
 | Indy 500 EEPROM centre | `indy_board_centre`, `src/hw/indy_drive_reply.h` | done: `$FF` read as `$80` (upstream's, in place of the EEPROM repair) |
 | Over Rev / Super GT 24h board settings | README, `data/games.xml` | documented |
 | Super GT 24h's pedals by its I/O TYPE | `Model2B::analog_value`, `repair_sgt24h_io_type` | done, upstream too (PR #23); a blank backup RAM's I/O TYPE becomes A |
-| `--agent` mode: headless, driven over stdin/stdout | `src/agent.cpp` | done; `tel` answers the telemetry |
+| `--agent` mode: headless, driven over stdin/stdout | `src/agent.cpp` | done; `tel` answers the telemetry; named holds (`set`/`get`), the force feedback's commands (`ffb`) and the board's ports (`servo`) as in Supermodel's agent mode; `--agent-device` reads vJoy and drives its FFB |
 | Python client of the agent mode | `autopilot/sm2agent.py` | done |
 | Telemetry: per-game RAM decoding, TCP server | `src/telemetry/`, `--telemetry PORT` | done for Indy 500 |
 | Indy 500 RAM map | below | done for what driving needs |
@@ -728,3 +728,13 @@ network makes of it afterwards, a policy iteration).
   with the screen; checked against the screen (time, position, lap, lap time,
   speed, gear, revs), the attract mode (nothing), the speed from successive
   positions, and Over Rev's Model 2B sets.
+- 2026-10-14, night: the agent mode for force feedback benches, in Supermodel's
+  protocol (its session wrote the same for Model 3): inputs held by name
+  (`set Steering 0.3`, `setraw`, `release`, `get`, `inputs`), `step [N]`, the
+  force feedback's commands per frame (`ffb`: `FRAME Steering EFFECT FORCE`),
+  the drive board model's ports (`servo`: `FRAME NMI PORT VALUE`, 28/2A/2E
+  on EPR-18261, 27/46 on Daytona's), `frame`, `shot`, `ready`/`bye`. Without a
+  device a virtual wheel runs the force feedback; with `--agent-device` the
+  controllers are read through SDL (vJoy: the axis reaches the game the next
+  frame) and the force goes to the wheel (vJoy got the recorded values). All in
+  `src/agent.cpp`; `Input` only has hooks (`AgentHooks`).
