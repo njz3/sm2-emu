@@ -738,3 +738,11 @@ network makes of it afterwards, a policy iteration).
   controllers are read through SDL (vJoy: the axis reaches the game the next
   frame) and the force goes to the wheel (vJoy got the recorded values). All in
   `src/agent.cpp`; `Input` only has hooks (`AgentHooks`).
+- Then aligned with Supermodel, at the user's request: the trigonometric way
+  of a real wheel and BackForceFeeder (an axis +1 at its left end, a constant
+  force > 0 pushing left; the positional step's STEER stays -1 left for the
+  autopilot), and the board's ports at every interrupt (the agent steps the
+  models one at a time: 2A/2E 8.69 times a frame on EPR-18261, 46 17.38 times
+  on Daytona's). With a device, DirectInput rather than Raw Input: 94 axis
+  changes in 100 read in the very next frame (50 in 60 before); a `settle`
+  wait (2 ms) for the rest, to measure while BackForceFeeder is off.
