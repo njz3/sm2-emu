@@ -744,5 +744,7 @@ network makes of it afterwards, a policy iteration).
   autopilot), and the board's ports at every interrupt (the agent steps the
   models one at a time: 2A/2E 8.69 times a frame on EPR-18261, 46 17.38 times
   on Daytona's). With a device, DirectInput rather than Raw Input: 94 axis
-  changes in 100 read in the very next frame (50 in 60 before); a `settle`
-  wait (2 ms) for the rest, to measure while BackForceFeeder is off.
+  changes in 100 read in the very next frame (50 in 60 before); with a
+  `settle` wait before a step, measured with BackForceFeeder off: 1 ms and
+  more, 100 in 100, and 300 in 300 at the default 2 ms. Through vJoy the
+  records have its sign: +1.0 gave +10000, -0.127 gave -1269.
