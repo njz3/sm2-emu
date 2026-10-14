@@ -6,9 +6,10 @@ to drive the games through vJoy while the drive-board commands and the force
 feedback the emulator sends are logged, to compare sm2-emu's force feedback
 with the real boards'. Indy 500 first, then Touring Car, Sega Rally, Daytona.
 
-Everything here is local work on the `dev/network_output_scsp` branch.
+Everything here is on the `dev/ffbedition` branch of the user's fork,
+njz3/sm2-emu (named `dev/network_output_scsp` until 13 October 2026), pushed.
 
-## Where it stands (2026-10-13, morning)
+## Where it stands (2026-10-14, evening)
 
 - **Indy 500 is won** by the autopilot: from 33rd on the grid of the oval, 1st
   at the flag, 2'31"069, best lap 36"518 (the cabinet's record 37"248). The
@@ -28,8 +29,9 @@ Everything here is local work on the `dev/network_output_scsp` branch.
   drives like the networks that only generalise (10th to 17th); through vJoy
   without the lockstep (the controls a frame or two late) it was 23rd after
   three laps.
-- **Telemetry** for Indy 500, Touring Car, Sega Rally and Daytona, served over
-  TCP by sm2-emu (`--telemetry`) and to agent mode (`tel`).
+- **Telemetry** for Indy 500, Touring Car, Sega Rally, Daytona, Super GT 24h
+  and Over Rev, served over TCP by sm2-emu (`--telemetry`) and to agent mode
+  (`tel`).
 - **vJoy autopilot**, standalone, for the four games, logging the drive board's
   bytes and the force feedback sent to vJoy; a BackForceFeeder script for the
   cabinet (untested).
@@ -40,6 +42,36 @@ Everything here is local work on the `dev/network_output_scsp` branch.
   Daytona's springs and pushes stronger than the board's formula.
 - Touring Car: the autopilot finishes 4th from 8th (the three leaders lap at
   its pace). Sega Rally and Daytona: driven around their first course.
+- **Force feedback of Indy 500's family, done in the code**: the torque in
+  proportion to the board's two powers (`wheel_indy_deadband` 0,
+  `wheel_indy_full_power` 63), the brake `2x` a damper, the board's answer on
+  port D (the test menus work), the DIP strength setting, the board in the
+  save states, an EEPROM centre of `$FF` taken as the factory's `$80` (in the
+  board's answer, upstream's `indy_board_centre`, since 14 October). The
+  real board, EPR-18261 on the cabinet Racecab1 (measured by the
+  BackForceFeeder session on 13 October), confirmed the model's 500 Hz NMI and
+  the brake as a damper. Not yet tried on the user's wheel (Sega Rally and
+  Daytona were, found faithful at 100 %).
+- **Over Rev** drives its board only once its HARDWARE TYPE (test menu) is a
+  Sega cabinet (README). **Super GT 24h** drives it with I/O TYPE A, the
+  default, or B, the same commands, and not with C; each type reads the
+  pedals its own way round, which sm2-emu follows since 14 October (read in
+  the game's program, checked in a race with all three), upstream too (PR
+  #23). A blank backup RAM leaves Super GT 24h's I/O TYPE at `FFFF`, no type
+  (pedals garbage, no board): sm2-emu sets it to A. From a blank NVRAM, Super
+  GT 24h races with its force feedback; Over Rev sends nothing until its
+  HARDWARE TYPE is set.
+- **Published**: committed and pushed on `dev/ffbedition`; a Windows release
+  zip made like the CI's, `build\bin\sm2-emu-v0.9.45-67-g826c72c-njz3-windows-x86_64.zip`
+  (SHA-256 `427B3A8881EC1446699D15CA56B8860BB515F259A937359F95CBCDCBB46302A8`;
+  it predates the blank backup RAM fix).
+
+What is left:
+
+- the user's own test of Indy 500 and Touring Car on the wheel;
+- the PR left for dmanlfc: `pr/wheel-panel-spring` (`6e45bcd`, the panel
+  spring and the DIP strength settings, its PR message written);
+- the autopilot: a win in Touring Car, races in Sega Rally and Daytona.
 
 ## Pieces
 
@@ -47,7 +79,11 @@ Everything here is local work on the `dev/network_output_scsp` branch.
 |:--|:--|:--|
 | Drive board answers on port D / IN2 | `src/hw/model2*.cpp`, `src/hw/indy_drive_reply.h` | done: Indy family, Sega Rally, Daytona |
 | Drive board DIP strength setting | Wheel tab, `wheel_drive_dip` | done |
-| Indy family motor response curve | `wheel_indy_deadband`, `wheel_indy_full_power` | done, to tune against M2PAC |
+| Indy family motor response | `wheel_indy_deadband`, `wheel_indy_full_power` | done: in proportion to the power (0 and 63 by default) |
+| Drive board model in the save states | the save state's host section | done |
+| Indy 500 EEPROM centre | `indy_board_centre`, `src/hw/indy_drive_reply.h` | done: `$FF` read as `$80` (upstream's, in place of the EEPROM repair) |
+| Over Rev / Super GT 24h board settings | README, `data/games.xml` | documented |
+| Super GT 24h's pedals by its I/O TYPE | `Model2B::analog_value`, `repair_sgt24h_io_type` | done, upstream too (PR #23); a blank backup RAM's I/O TYPE becomes A |
 | `--agent` mode: headless, driven over stdin/stdout | `src/agent.cpp` | done; `tel` answers the telemetry |
 | Python client of the agent mode | `autopilot/sm2agent.py` | done |
 | Telemetry: per-game RAM decoding, TCP server | `src/telemetry/`, `--telemetry PORT` | done for Indy 500 |
@@ -66,6 +102,8 @@ Everything here is local work on the `dev/network_output_scsp` branch.
 | Sega Rally telemetry, map, vJoy | `src/telemetry/srally.cpp`, `autopilot/srally_telemetry.py` | positions, headings, progress; the Desert mapped; FFB compared |
 | Daytona telemetry, map, vJoy | `src/telemetry/daytona.cpp`, `autopilot/daytona_telemetry.py` | positions, headings, progress; the beginner course mapped; FFB compared |
 | FFB comparison, all four boards | `autopilot/ffb_compare.py` | done: the tables below |
+| Super GT 24h telemetry | `src/telemetry/sgt24h.cpp` | all 14 cars, the player's orientation, gear, revs, positions, laps, clocks; checked against the screen |
+| Over Rev telemetry | `src/telemetry/overrev.cpp` | all 8 cars, the player's angles, gear, revs, laps, clocks, positions counted from progress; checked against the screen, the Model 2B sets too |
 
 ## Running it
 
@@ -125,18 +163,20 @@ training), `replay_win.py` (replays a planned race and checks it).
 ## The drive boards' DIP switches
 
 From the three EPROMs' programs (BackForceFeeder `docs/EPR-*`), the switches
-that set the motor's strength. A switch ON reads 0.
+that set the motor's strength. A switch ON reads 0. On EPR-18261's board,
+measured on the cabinet Racecab1 (13 October 2026), switch n is bit 8 - n:
+its strength switches are 1-1 to 1-3, not 1-6 to 1-8 as read before.
 
 | Board | Switches | Effect | Maximum |
 |:--|:--|:--|:--|
 | Sega Rally (EPR-17891) | 1-3 | 0 to 7 added to every torque's power (1..32) | all three ON: +7 |
 | Daytona USA (EPR-16488A) | 1-3 | (0 to 7) x 4 added to every power | all three ON: +28 |
-| Indy 500 family (EPR-18261) | 1-6, 1-7, 1-8 | 0 to 7 added to every strength `(2n + base) * 2` | all three ON: +7 |
+| Indy 500 family (EPR-18261) | 1-1, 1-2, 1-3 (bits 7, 6, 5: +4, +2, +1) | 0 to 7 added to every strength `(2n + base) * 2` | all three ON: +7 |
 
 sm2-emu's `wheel_drive_dip` (0..7, the Wheel tab's "Drive board DIP strength")
 is that number: 7 is the maximum on every board. Other switches the programs
-read: Sega Rally 4 and Daytona 4 skip the power-up calibration; Indy 2-8 turns
-the damping off; 1-1/1-2 (Indy) and 7-8 (Rally) select test modes.
+read: Sega Rally 4 and Daytona 4 skip the power-up calibration; Indy 2-1 turns
+the damping off; 1-7/1-8 (Indy) and 7-8 (Rally) select test modes.
 
 ## Indy 500: the work RAM
 
@@ -224,6 +264,74 @@ recording). Map of the Desert: `runs/srally_desert_line.npz` (a loop of 300
 AI segments, 3145 units); decoders `src/telemetry/srally.cpp`,
 `autopilot/srally_telemetry.py`; the pure pursuit drives it (60 s on the
 clock: the first checkpoint is not reached yet).
+
+## Super GT 24h: the work RAM
+
+Found on 14 October 2026 by recording the work RAM while driving (from a
+save state at the start of a race) and matching it with the screen: the
+speedometer, the clocks, the position, the lap, the gear and the tachometer.
+Metres; the game counts 60 frames a second (its 2400 frames are 40 s), so its
+speeds are the speedometer's and 4 % above those from successive positions.
+
+| Address | Type | What |
+|:--|:--|:--|
+| `00518424` | 14 x `0x1728` | the cars, the player last (`0052B12C`) |
+| car `-0C` | u8 | race position, 0 leading |
+| car `-04` | u8 | laps done |
+| car `+00` | float | distance along the course, 3000 a lap; the grid is just past the line (the player 14th at 46) |
+| car `+0C/+10/+14` | float | x, y (up), z |
+| car `+34` | s32 | heading, 65536 a turn, = -atan2(dx, dz) (also +40) |
+| car `+84C` | float | speed, metres a frame |
+| player `+C8` | u8 | gear, 0 first (also `005111A8`) |
+| player `+220` | u16 | revs (848 idle, about 8500 at the shifts) |
+| player `+764` | 9 floats | orientation, world from car, row-major (the AI cars leave it zero) |
+| player `+168..+194` | floats | the four wheels' x, y, z |
+| `0051119C` | u16 | the speedometer, km/h |
+| `00510948` | u32 | game state: 0 boot, 1 attract mode, 7 coin, 2 car select, 3 race and its countdown, 4 game over |
+| `00510F2C` | u16 | lap time, frames |
+| `00510F64` | u8 | the player's laps done; `00510F6C` the race's laps (5); `00510F7C` its position, 0 leading |
+| `00510F74` | s16 | time left, frames (negative after the game over); checkpoints at about 1750 and the line |
+
+The AI cars run up to about 480 km/h by their own speed (+84C matches their
+motion): the game keeps them with the player. Line from the AI cars, driven by
+a pure pursuit (scratchpad `sgt_pilot.py`): a lap in 3360 frames, 14th to
+12th.
+
+## Over Rev: the work RAM
+
+Found the same way (Challenge Cup, round 1: 8 cars, 3 laps, finish 5th or
+better). Half-metres, 60 frames a second. The Model 2B sets (`overrevb`,
+`overrevba`) give the same values at the same addresses.
+
+| Address | Type | What |
+|:--|:--|:--|
+| `0059E6A8` | 7 x `0x2A8` | the AI cars |
+| AI `+050` | u8 | laps done |
+| AI `+0A4` | s32 | heading, 65536 a turn: heading = pi/2 - value |
+| AI `+0E0` | float | speed, half-metres a frame |
+| AI `+100/+104/+108` | float | x, y (up), z; +10C.. the frame before |
+| AI `+1EC` | float | distance, from its own origin |
+| AI `+1F0` | float | distance from the start line, negative on the grid; 2964 a lap |
+| `00590DE4` | s32 | the player's roll (orient()'s roll is minus it); +10 pitch, +14 heading = -value (65536 a turn) |
+| `00595A5C` | u8 | the player's gear, 1 first |
+| `00595A7C` | float | its revs (1200 idle, about 7000 at the shifts) |
+| `00595AA4` | float | its distance into the lap, back to 0 at the line |
+| `00595AB8` | float | its speed, m/s |
+| `00595B24..` | floats | its wheels: x at +00, y at +10, z at +20, four each |
+| `00595C04/08/0C` | float | its x, y, z |
+| `00595C9C` | s32 | its laps from the start line: -1 on the grid, which is 1647 behind it |
+| `00595CAC` / `00595CB0` | u16 | race time / lap time, frames |
+| `00595CE0` | u8 | seconds left; `00595CE4` laps done |
+| `00595CE8` | float | the position the display shows, sliding from one to the next |
+| `00595D18` | u8 | the race's laps (3) |
+| `0051D33C` | float | the lap's length, 2963.8 |
+
+No integer race position: the decoder counts it from the cars' progress
+(the player's laps from the line plus its distance into the lap over the
+length; the AI's +1F0 over the length), which matched the display on all
+689 settled samples of a race. Attract mode and menus: the clocks at zero
+(the decoder answers nothing then). Pursuit on the AI line, by its nearest
+point (scratchpad `ovr_pilot.py`): 3 laps, 8th to 6th.
 
 ## The telemetry server
 
@@ -568,3 +676,55 @@ network makes of it afterwards, a policy iteration).
 - Score network (`q_train.py`): the planner scores every candidate at each
   decision; a network learns those scores (13 labels a decision) from the
   telemetry, or from the picture, and chooses alone (`policy_q.py`).
+- 2026-10-13, afternoon: the force feedback work committed, each piece on its
+  board's PR branch and on this branch (`ef3b80f` the answers on port D,
+  `6b8d83d` the Indy family's torque in proportion, `7144055` the DIP setting,
+  `c124909` the board in the save states, `edd3993` the EEPROM centre), and
+  pushed; upstream merged (PR #14, `91dbef1`); the telemetry (`3cba294`), the
+  agent mode (`bb3dd04`) and the autopilot with this log (`3b7e965`)
+  committed.
+- EPR-18261 measured on the cabinet Racecab1 by the BackForceFeeder session
+  (`utils/DriveboardProbe`, BFF `docs/EPR-18261-Indy500-DriveBoard`): the NMI
+  at 500 Hz, the brake `2x` a damper, the reply complemented, a switch ON reads
+  0 and switch n is bit 8 - n.
+- Virtua Racing (Model 1) left out of sm2-emu: its board's EPROM, EPR-15111,
+  dumped by the owner of a Twin, read and run in a MAME built with only `vr`
+  (njz3/mame, branch `vr-driveboard`); BFF `docs/EPR-15111-VirtuaRacing-DriveBoard`.
+  Both sides wait for both calibrations: the BackForceFeeder now does the
+  board's handshake (01, then 07, each echoed on Rx; BFF `5340a9f`).
+- 2026-10-13, evening: the Over Rev and Super GT 24h note (`f8f1b8f`);
+  `pr/merged-romset-clones` merged (`2393fc0`); the release zip built and
+  checked (`--help`, `--list-games`); the branch renamed `dev/ffbedition`.
+- 2026-10-14: upstream merged the drive board PRs (#15-#22: Sega Rally's,
+  Indy 500's and Daytona's boards, the H shifter, the half-axis pedals,
+  background input, merged romsets), and dev merged upstream (`73fe0ec`,
+  `318e42a`). Super GT 24h's pedals: its I/O TYPE, the backup RAM's halfword
+  at 0x0A (A 1, B 3, C 0), picks P = raw (C) or 256 - raw (A, B), full
+  throttle and braking at the lowest P; sm2-emu fed them reversed always, so
+  A and B drove alone and a full press read as released. Fixed (`5c8a2d5`,
+  and `pr/sgt24h-pedals` for upstream); the game writes the drive board for
+  A and B only. Agent mode reported every drive board byte as 00 (a dangling
+  temporary): fixed (`ce7509b`). The Indy family's strength switches named
+  1-1..1-3 everywhere (they were 1-6..1-8).
+- 2026-10-14, afternoon: release zip `v0.9.45-67-g826c72c`. The FFB tests run
+  again from an NVRAM that does not exist yet: Super GT 24h's blank backup RAM
+  (all ones, as in MAME) leaves its I/O TYPE at `FFFF`, since the game's set-up
+  (0x67920) writes only the header; the pedals read garbage and the board gets
+  nothing. Such a value becomes A (`ea74922`); then a race through vJoy from a
+  blank NVRAM: 259 km/h, the board's commands and 61 FFB packets. Over Rev from
+  a blank NVRAM: HARDWARE TYPE NORMAL, no board commands, the pedals right.
+  `pr/outputs-network-tab` and `pr/outputs-udp-announce` deleted (too
+  specific to BackForceFeeder; their code stays on this branch).
+- 2026-10-14, evening: dmanlfc's tidy-up (`e0eced8`); `pr/sgt24h-pedals` and
+  `pr/wheel-panel-spring` rebased on it, one commit each, comments short in
+  his style (`83c6690`, `6e45bcd`). He merged the first as PR #23
+  (`653c851`); dev merged upstream (`575dc93`): upstream's code and comments,
+  dev keeps the `wheel_panel_spring` and `wheel_drive_dip` settings, the SCSP
+  core choice and `scratch_ram()`; checked with Super GT 24h from a blank
+  NVRAM (a race, the board's commands), pushed.
+- 2026-10-14, night: telemetry for Super GT 24h and Over Rev
+  (`src/telemetry/sgt24h.cpp`, `overrev.cpp`), their RAM found by recording it
+  while a pure pursuit drove on lines made from the AI cars, and matching it
+  with the screen; checked against the screen (time, position, lap, lap time,
+  speed, gear, revs), the attract mode (nothing), the speed from successive
+  positions, and Over Rev's Model 2B sets.
