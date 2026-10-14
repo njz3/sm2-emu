@@ -128,6 +128,10 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                 if (sound != nullptr) {
                     sound->clear_pending_samples();
                 }
+                // Kept in a local: a range-for over the view of the temporary
+                // would read it after its end.
+                const auto writes = machine.take_drive_board_writes();
+                for (const u8 b : writes.view()) {
                     char hex[4];
                     std::snprintf(hex, sizeof(hex), " %02X", b);
                     drive += hex;
