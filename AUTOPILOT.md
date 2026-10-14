@@ -8,8 +8,11 @@ with the real boards'. Indy 500 first, then Touring Car, Sega Rally, Daytona.
 
 Everything here is on the `dev/ffbedition` branch of the user's fork,
 njz3/sm2-emu (named `dev/network_output_scsp` until 13 October 2026), pushed.
+Since 14 October that branch is upstream's main (v0.9.46, `cec4404`) and only
+its own commits on top, rebuilt from the merged branch (whose last state is
+kept locally as `backup/dev-ffbedition-e9d9d76`).
 
-## Where it stands (2026-10-14, evening)
+## Where it stands (2026-10-14, night)
 
 - **Indy 500 is won** by the autopilot: from 33rd on the grid of the oval, 1st
   at the flag, 2'31"069, best lap 36"518 (the cabinet's record 37"248). The
@@ -31,7 +34,15 @@ njz3/sm2-emu (named `dev/network_output_scsp` until 13 October 2026), pushed.
   three laps.
 - **Telemetry** for Indy 500, Touring Car, Sega Rally, Daytona, Super GT 24h
   and Over Rev, served over TCP by sm2-emu (`--telemetry`) and to agent mode
-  (`tel`).
+  (`tel`); the last two checked against the screen in a race of each.
+- **Agent mode for force feedback benches**, in the protocol of Supermodel's
+  agent mode, so one client drives both emulators: inputs held by name
+  (`set Steering 1` fully left, trigonometrically, as a real wheel and
+  BackForceFeeder), the force feedback's commands frame by frame (`ffb`, a
+  constant > 0 pushing left), the drive board model's ports at every
+  interrupt (`servo`), a virtual wheel or, with `--agent-device`, vJoy read
+  in the very next frame (300 in 300) and given the force (its packets match
+  the records).
 - **vJoy autopilot**, standalone, for the four games, logging the drive board's
   bytes and the force feedback sent to vJoy; a BackForceFeeder script for the
   cabinet (untested).
@@ -61,17 +72,24 @@ njz3/sm2-emu (named `dev/network_output_scsp` until 13 October 2026), pushed.
   (pedals garbage, no board): sm2-emu sets it to A. From a blank NVRAM, Super
   GT 24h races with its force feedback; Over Rev sends nothing until its
   HARDWARE TYPE is set.
-- **Published**: committed and pushed on `dev/ffbedition`; a Windows release
-  zip made like the CI's, `build\bin\sm2-emu-v0.9.45-67-g826c72c-njz3-windows-x86_64.zip`
-  (SHA-256 `427B3A8881EC1446699D15CA56B8860BB515F259A937359F95CBCDCBB46302A8`;
-  it predates the blank backup RAM fix).
+- **Published**: committed and pushed on `dev/ffbedition`; the last Windows
+  release zip made like the CI's, `build\bin\sm2-emu-v0.9.45-67-g826c72c-njz3-windows-x86_64.zip`
+  (SHA-256 `427B3A8881EC1446699D15CA56B8860BB515F259A937359F95CBCDCBB46302A8`),
+  predates the blank backup RAM fix, the two new telemetries and the agent
+  mode's benches.
 
 What is left:
 
 - the user's own test of Indy 500 and Touring Car on the wheel;
-- the PR left for dmanlfc: `pr/wheel-panel-spring` (`6e45bcd`, the panel
-  spring and the DIP strength settings, its PR message written);
-- the autopilot: a win in Touring Car, races in Sega Rally and Daytona.
+- the PR left for dmanlfc: `pr/wheel-panel-spring` (the panel spring and the
+  DIP strength settings, its PR message written), up to date with upstream's
+  v0.9.46 (`0b00319`, merged, pushed);
+- a force feedback bench run with the agent mode on each board, and one
+  analysis script for sm2-emu's and Supermodel's journals (sm2-emu's board
+  models run each interrupt with the frame's wheel position; Sega Rally's
+  board has no model: its commands only);
+- the autopilot: a win in Touring Car, races in Sega Rally and Daytona;
+- a release zip with the current branch.
 
 ## Pieces
 
