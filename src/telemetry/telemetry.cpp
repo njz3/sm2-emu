@@ -17,6 +17,8 @@
 #include "rom/game.h"
 #include "telemetry/daytona.h"
 #include "telemetry/indy500.h"
+#include "telemetry/overrev.h"
+#include "telemetry/sgt24h.h"
 #include "telemetry/srally.h"
 #include "telemetry/stcc.h"
 
@@ -131,6 +133,12 @@ std::unique_ptr<GameTelemetry> make_telemetry(const rom::GameSpec& game)
     }
     if (family == "daytona") {
         return std::make_unique<DaytonaTelemetry>();
+    }
+    if (family == "sgt24h") {
+        return std::make_unique<Sgt24hTelemetry>();
+    }
+    if (family == "overrev") {
+        return std::make_unique<OverRevTelemetry>();
     }
     return nullptr;
 }

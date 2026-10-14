@@ -364,6 +364,8 @@ add_executable(sm2-emu
     telemetry/stcc.cpp
     telemetry/srally.cpp
     telemetry/daytona.cpp
+    telemetry/sgt24h.cpp
+    telemetry/overrev.cpp
 )
 
 # On macOS build a proper .app bundle so the Finder/Dock show the icon and the
