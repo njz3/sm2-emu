@@ -1204,13 +1204,14 @@ void Input::serialize_drive_board(Archive& ar)
 
 bool Input::wheel_ffb_active(const rom::GameSpec& game) const
 {
-    return m_wheel.handle != nullptr && m_wheel.ffb && m_wheel_settings.ffb
-        && game.drive_board && m_wheel.steer_axis >= 0;
+    const bool wheel =
+        virtual_wheel() || (m_wheel.handle != nullptr && m_wheel.ffb && m_wheel.steer_axis >= 0);
+    return wheel && m_wheel_settings.ffb && game.drive_board;
 }
 
 void Input::update_force_feedback(const rom::GameSpec& game)
 {
-    if (m_wheel.handle == nullptr) {
+    if (m_wheel.handle == nullptr && !virtual_wheel()) {
         return;
     }
 
@@ -1234,14 +1235,22 @@ void Input::update_force_feedback(const rom::GameSpec& game)
 
         // An axis that has not reported yet says nothing about where the wheel is.
         const bool steer_known =
-            m_wheel.steer_axis >= Wheel::kMaxAxes
+            virtual_wheel() || m_wheel.steer_axis >= Wheel::kMaxAxes
             || (m_wheel.axes_moved & (1u << m_wheel.steer_axis)) != 0;
         if (steer_known && m_wheel.autocenter && m_wheel.ffb) {
             m_wheel.ffb->set_autocenter(0);
             m_wheel.autocenter = false;
+            agent_ffb("selfcenter", 0);
         }
-        const int deflection =
-            steer_known ? static_cast<int>(wheel_axis(m_wheel.steer_axis)) : 0;
+        int deflection =
+            steer_known && !virtual_wheel() ? static_cast<int>(wheel_axis(m_wheel.steer_axis)) : 0;
+        if (virtual_wheel()) {
+            // The game's lock over the wheel's rotation.
+            deflection = static_cast<int>(std::clamp(
+                m_agent->steer * 32767.0f * static_cast<float>(m_wheel_settings.lock_degrees)
+                    / static_cast<float>(std::max(1u, m_wheel_settings.steer_degrees)),
+                -32767.0f, 32767.0f));
+        }
         const int velocity = deflection - m_wheel.last_deflection;
         m_wheel.last_deflection = deflection;
 
@@ -1303,6 +1312,9 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             const int breakaway = std::max(0, (calib_force + unit - 1) / unit - 1);
             const DaytonaBoard::Output out =
                 m_daytona.step(board_counts(deflection, steer, lock), board_ticks, breakaway);
+            if (m_agent != nullptr && m_agent->daytona) {
+                m_agent->daytona(out);
+            }
             const int force = out.power * ceiling / kBoardFullPower;
             switch (out.way) {
                 case DaytonaBoard::Way::Down: game_force = force; break;   // left
@@ -1327,13 +1339,16 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             bool up_is_left = false;
             for (const rom::AnalogChannel& channel : game.analog) {
                 if (u8 value = 0; channel.control == rom::AnalogControl::Steer
-                                  && sample_wheel_channel(channel, &value)) {
-                    position   = value;
+                                  && (virtual_wheel() || sample_wheel_channel(channel, &value))) {
+                    position   = virtual_wheel() ? m_agent->steer_value : value;
                     up_is_left = channel.reverse;
                     break;
                 }
             }
             const IndyBoard::Output out = m_indy.step(position, IndyBoard::kNmiHz / kMachineHz);
+            if (m_agent != nullptr && m_agent->indy) {
+                m_agent->indy(out);
+            }
             const int dead   = static_cast<int>(m_wheel_settings.indy_deadband);
             const int full   = static_cast<int>(m_wheel_settings.indy_full_power);
             const auto torque = [dead, full, ceiling](int power) {
@@ -1383,7 +1398,7 @@ void Input::update_force_feedback(const rom::GameSpec& game)
                         // Faster than the frames can show: its mean as the
                         // torque, its swing as a vibration where there is one.
                         force = force * 5 / 8;
-                        if (m_wheel.ffb->has_rumble()) {
+                        if (virtual_wheel() || m_wheel.ffb->has_rumble()) {
                             chop_swing     = std::min(force, 32767);
                             chop_period_ms = static_cast<u16>(
                                 std::max(1.0, 2.0 * flip * 1000.0 / kDriveBoardIrqHz));
@@ -1482,17 +1497,23 @@ void Input::update_force_feedback(const rom::GameSpec& game)
     // Positive left, like the deflection's spring: a wheel turned right is
     // pulled back left. Reversed for a driver that has it the other way.
     const int force_out = m_wheel_settings.ffb_invert ? -level : level;
-    if (m_wheel.ffb && worth_sending(force_out, m_wheel.force_level)) {
+    if ((m_wheel.ffb || virtual_wheel()) && worth_sending(force_out, m_wheel.force_level)) {
         m_wheel.force_level = force_out;
-        m_wheel.ffb->set_force(static_cast<s16>(force_out));
+        if (m_wheel.ffb) {
+            m_wheel.ffb->set_force(static_cast<s16>(force_out));
+        }
+        agent_ffb("constant", force_out);
     }
 
-    if (m_wheel.ffb && m_wheel.ffb->has_rumble()) {
+    if (virtual_wheel() || (m_wheel.ffb && m_wheel.ffb->has_rumble())) {
         const bool new_period = rumble_now != 0 && rumble_period != m_wheel.rumble_period;
         if (worth_sending(rumble_now, m_wheel.rumble_mag) || new_period) {
             m_wheel.rumble_mag    = rumble_now;
             m_wheel.rumble_period = rumble_period;
-            m_wheel.ffb->set_rumble(static_cast<s16>(rumble_now), rumble_period);
+            if (m_wheel.ffb) {
+                m_wheel.ffb->set_rumble(static_cast<s16>(rumble_now), rumble_period);
+            }
+            agent_ffb("vibrate", rumble_now);
         }
     } else if (m_wheel.can_rumble) {
         // A wheel has no rumble motors; its driver swings the steering instead.
@@ -1520,6 +1541,9 @@ void Input::release_force_feedback()
 {
     if (!m_wheel.ffb) {
         return;
+    }
+    if (m_wheel.force_level != 0 || m_wheel.rumble_mag > 0) {
+        agent_ffb("stop", 0);
     }
     if (m_wheel.force_level != 0) {
         m_wheel.force_level = 0;

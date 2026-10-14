@@ -24,6 +24,7 @@
 #include <SDL3/SDL.h>
 
 #include <array>
+#include <functional>
 #include <memory>
 #include <span>
 #include <string>
@@ -230,6 +231,20 @@ public:
 
     /// Drive gamepad rumble from the drive board; call once per frame.
     void update_pad_rumble(const rom::GameSpec& game);
+
+    /// The agent mode's hooks (src/agent.cpp): a wheel with no device, at the
+    /// position it sets, and what the force feedback and the board models put
+    /// out. Null otherwise.
+    struct AgentHooks {
+        bool  virtual_wheel = false;
+        float steer         = 0.0f;  ///< -1..1 of the game's lock, + right.
+        u8    steer_value   = 0x80;  ///< The steering byte the game reads.
+        /// What goes to the wheel: constant (the level), vibrate, selfcenter, stop.
+        std::function<void(const char* effect, int value)> ffb;
+        std::function<void(const IndyBoard::Output&)>      indy;
+        std::function<void(const DaytonaBoard::Output&)>   daytona;
+    };
+    void set_agent_hooks(AgentHooks* hooks) { m_agent = hooks; }
 
     /// Names of the gamepads currently open, in player order. An empty string means
     /// that player has no pad.
@@ -543,6 +558,15 @@ private:
     /// The Sega Rally board's interrupts counted since start, simulated: its
     /// chopping flips on bits of this count.
     double                           m_drive_ticks = 0.0;
+
+    AgentHooks* m_agent = nullptr;
+    [[nodiscard]] bool virtual_wheel() const { return m_agent != nullptr && m_agent->virtual_wheel; }
+    void agent_ffb(const char* effect, int value)
+    {
+        if (m_agent != nullptr && m_agent->ffb) {
+            m_agent->ffb(effect, value);
+        }
+    }
 
     /// The burst currently playing, shared by every pad: one drive board, one car.
     int                              m_pad_rumble_level    = 0;

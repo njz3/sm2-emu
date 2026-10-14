@@ -257,6 +257,7 @@ struct Options {
 
     /// Serve an agent's commands over stdin/stdout instead of running (see agent.h).
     bool agent = false;
+    bool agent_device = false;  ///< --agent-device: the agent with the controllers.
 
     /// --telemetry PORT: serve the telemetry there, over the settings' port.
     sm2::u32 telemetry_port = 0;
@@ -322,6 +323,8 @@ void print_usage()
         "                      player each would drive\n"
         "      --agent         Serve a driving agent's commands over stdin and\n"
         "                      stdout, headless (see src/agent.h)\n"
+        "      --agent-device  The same, with the controllers and the wheel's force\n"
+        "                      feedback (a wheel, vJoy)\n"
         "      --telemetry <port>  Serve the racing games' telemetry (cars, race)\n"
         "                      to TCP clients, one JSON line a frame\n"
         "      --telemetry-sync  After each telemetry frame, wait (250 ms at most)\n"
@@ -429,6 +432,9 @@ void print_usage()
             out->given.render_scale  = true;
         } else if (std::strcmp(arg, "--agent") == 0) {
             out->agent = true;
+        } else if (std::strcmp(arg, "--agent-device") == 0) {
+            out->agent        = true;
+            out->agent_device = true;
         } else if (std::strcmp(arg, "--telemetry") == 0) {
             if (index + 1 >= argc) {
                 SM2_ERROR("--telemetry requires a TCP port");
@@ -1519,7 +1525,8 @@ int main(int argc, char** argv)
             SM2_ERROR("--agent needs a ROM");
             return 1;
         }
-        return sm2::run_agent(*machine_iface, sound_board, loaded->game);
+        return sm2::run_agent(*machine_iface, sound_board, loaded->game,
+                              {options.agent_device, wheel_settings_from(options.config)});
     }
 
     // No window, no Vulkan: just run the machine and report where it got to.
