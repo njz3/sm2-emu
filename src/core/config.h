@@ -343,7 +343,8 @@ struct Config {
         /// defaults are SDL's positional layout: South 0, East 1, West 2,
         /// North 3, Back 4, Start 6, LeftShoulder 9, RightShoulder 10, DpadUp 11,
         /// DpadDown 12, DpadLeft 13, DpadRight 14. The shoulders doubling as
-        /// Button 3/4 lives in the input layer, outside these bindings.
+        /// Button 3/4 lives in the input layer, and only while Button 3/4 keep
+        /// these defaults and no panel role binds the shoulders.
         std::array<std::array<s32, kPadRoleCount>, 2> buttons = {{
             // B1  B2  B3  B4  Up  Dn  Lf  Rt  Start Coin GearUp GearDown
             {  0,  1,  2,  3, 11, 12, 13, 14,  6,   4,   10,    9 },

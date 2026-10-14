@@ -2119,17 +2119,27 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             kButton1, kButton2, kButton3, kButton4, kUp, kDown, kLeft, kRight,
         };
         const auto& binds = m_pad_buttons[pad.player];
+        bool lb_bound = false;
+        bool rb_bound = false;
         for (usize role = 0; role < std::size(kPadRoleBit); ++role) {
             if (binding_held(pad.handle, binds[role])) {
                 port &= static_cast<u8>(~kPadRoleBit[role]);
             }
+            lb_bound |= binds[role] == SDL_GAMEPAD_BUTTON_LEFT_SHOULDER;
+            rb_bound |= binds[role] == SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER;
         }
 
-        // The shoulders also act as Button 3/4, outside the bindings.
-        if (SDL_GetGamepadButton(pad.handle, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
+        // The shoulders also act as Button 3/4 while those keep their default
+        // binding and the shoulder isn't bound to one of the roles above.
+        static const auto kDefaults = Config::PadLayout{}.buttons[0];
+        constexpr auto kB3 = static_cast<u32>(Config::PadRole::Button3);
+        constexpr auto kB4 = static_cast<u32>(Config::PadRole::Button4);
+        lb_bound |= binds[kB3] != kDefaults[kB3];
+        rb_bound |= binds[kB4] != kDefaults[kB4];
+        if (!lb_bound && SDL_GetGamepadButton(pad.handle, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
             port &= static_cast<u8>(~kButton3);
         }
-        if (SDL_GetGamepadButton(pad.handle, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
+        if (!rb_bound && SDL_GetGamepadButton(pad.handle, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) {
             port &= static_cast<u8>(~kButton4);
         }
 
