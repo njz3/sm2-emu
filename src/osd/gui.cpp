@@ -1102,6 +1102,7 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
                    "the switches ON counted in binary: 0 all OFF, as from the\n"
                    "factory. Sega Rally: switches 1-3, 0 to 7 added to every\n"
                    "torque. Daytona USA: switches 1-3, 4 times that. Indy 500,\n"
+                   "Touring Car, Over Rev, Super GT 24h: switches 1-1 to 1-3,\n"
                    "0 to 7 added to every force."));
     }
 
