@@ -105,7 +105,9 @@ class Sm2Agent:
         return self.step_wait()
 
     def set(self, name, value):
-        """Hold an input by its name (see inputs()): Steering -1..1, pedals 0..1, a switch 0/1."""
+        """Hold an input by its name (see inputs()): Steering -1..1 trigonometrically (+1 fully
+        left, as a real wheel and BackForceFeeder; step()'s steer is the other way), pedals 0..1,
+        a switch 0/1."""
         self._send(f"set {name} {value}")
         return self._line() == "ok"
 
@@ -132,7 +134,8 @@ class Sm2Agent:
 
     def ffb(self):
         """The force feedback's commands since the last call: [(frame, effect, force -1..1)].
-        A constant force > 0 pushes towards Steering +1 (vJoy gets -force * 10000)."""
+        A constant force > 0 pushes left, towards Steering +1 (trigonometric, as a real wheel;
+        vJoy gets force * 10000)."""
         self._send("ffb")
         n = int(self._line().split()[1])
         out = []

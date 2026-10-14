@@ -1310,11 +1310,11 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             const int calib_force = centring_spring(
                 board_deflection(kDaytonaCalibCounts, steer, lock), panel_full);
             const int breakaway = std::max(0, (calib_force + unit - 1) / unit - 1);
+            const int counts = board_counts(deflection, steer, lock);
             const DaytonaBoard::Output out =
-                m_daytona.step(board_counts(deflection, steer, lock), board_ticks, breakaway);
-            if (m_agent != nullptr && m_agent->daytona) {
-                m_agent->daytona(out);
-            }
+                m_agent != nullptr && m_agent->daytona
+                    ? m_agent->daytona(m_daytona, counts, board_ticks, breakaway)
+                    : m_daytona.step(counts, board_ticks, breakaway);
             const int force = out.power * ceiling / kBoardFullPower;
             switch (out.way) {
                 case DaytonaBoard::Way::Down: game_force = force; break;   // left
@@ -1345,10 +1345,10 @@ void Input::update_force_feedback(const rom::GameSpec& game)
                     break;
                 }
             }
-            const IndyBoard::Output out = m_indy.step(position, IndyBoard::kNmiHz / kMachineHz);
-            if (m_agent != nullptr && m_agent->indy) {
-                m_agent->indy(out);
-            }
+            const double nmis = IndyBoard::kNmiHz / kMachineHz;
+            const IndyBoard::Output out = m_agent != nullptr && m_agent->indy
+                                              ? m_agent->indy(m_indy, position, nmis)
+                                              : m_indy.step(position, nmis);
             const int dead   = static_cast<int>(m_wheel_settings.indy_deadband);
             const int full   = static_cast<int>(m_wheel_settings.indy_full_power);
             const auto torque = [dead, full, ceiling](int power) {

@@ -24,8 +24,11 @@
 //   step [N]
 //       The same with the holds as they are (one frame without N).
 //   set INPUT VALUE / setraw INPUT RAW / release INPUT|all
-//       Hold an input, by its name in `inputs`: Steering -1..1, Accelerator,
-//       Brake and the other analogue controls 0..1, a switch 0 or 1, Gear 0
+//       Hold an input, by its name in `inputs`: an axis -1..1 the way a real
+//       wheel turns, trigonometrically, +1 at its left (low) end and -1 at its
+//       right: Steering 1 fully left (as BackForceFeeder and Supermodel have
+//       it; the positional step's STEER is the other way). Accelerator, Brake
+//       and the other analogue controls 0..1, a switch 0 or 1, Gear 0
 //       (neutral) to 4; RAW the byte the game reads (a port, a channel, the
 //       gear bits), decimal or 0x hex. Held from the next frame on, over the
 //       controllers with --agent-device, else over the controls at rest.
@@ -38,10 +41,11 @@
 //       The force feedback's commands since the last `ffb`: "ffb N", then N
 //       lines "FRAME Steering EFFECT FORCE", EFFECT constant, vibrate,
 //       selfcenter or stop, FORCE -1..1 of the device's range. A constant
-//       force > 0 pushes towards Steering +1 (right), as in Supermodel's agent
-//       mode; DirectInput takes it the other way, so vJoy gets a magnitude of
-//       -FORCE * 10000. A vibrate's FORCE is its magnitude. Recorded with or
-//       without a device (see AgentOptions).
+//       force > 0 pushes left, towards Steering +1, < 0 right: the
+//       trigonometric way of a real wheel and BackForceFeeder's, also
+//       DirectInput's, so vJoy gets a magnitude of FORCE * 10000. A vibrate's
+//       FORCE is its magnitude. Recorded with or without a device (see
+//       AgentOptions).
 //   servo on|off / servo
 //       Record the emulated drive board's ports, or read them since the last
 //       `servo`: "servo N", then N lines "FRAME NMI PORT VALUE", PORT and VALUE
@@ -49,8 +53,13 @@
 //       has them: the command it is shown (28 on EPR-18261, 27 on Sega Rally's
 //       and Daytona's), its motor outputs (2A and 2E on EPR-18261, each power
 //       bit-reversed and complemented; 46 on Daytona's, complemented, bit 6 the
-//       way up, bit 7 down). The models run once a frame: one write a port a
-//       frame, the NMI count jumping.
+//       way up, bit 7 down), one write a port at every interrupt: the agent
+//       runs the board models one interrupt at a time. Sega Rally's board has
+//       no model: its commands only.
+//   settle [MS]
+//       With --agent-device: how long a step waits before it reads the
+//       controllers, so that an axis set just before is read in its first
+//       frame, as in Supermodel (2 ms unless set). Answer: "settle MS".
 //   frame
 //       "frame N", the frames run.
 //   obs W H
@@ -386,17 +395,24 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
     osd::Input input;
     if (options.device) {
         SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+        // DirectInput, read when asked, rather than Raw Input's messages: an
+        // axis set before a step is read in that frame, as in Supermodel.
+        SDL_SetHint(SDL_HINT_JOYSTICK_RAWINPUT, "0");
         if (!SDL_Init(0) || !input.init(options.wheel)) {
             SM2_ERROR("--agent-device: the controllers do not open: %s", SDL_GetError());
             return 1;
         }
     }
-    input.set_wheel_settings(options.wheel);
+    // A virtual wheel is there for its force feedback.
+    osd::Input::WheelSettings wheel = options.wheel;
+    wheel.ffb = wheel.ffb || !options.device;
+    input.set_wheel_settings(wheel);
     std::vector<FfbRecord>   ffb_log;
     std::vector<BoardRecord> board_log;
     bool                     servo   = false;
-    u64                      nmis    = 0;
-    double                   nmi_acc = 0.0;
+    int                      settle  = 2;    ///< ms, with a device.
+    u64                      nmis    = 0;    ///< The board's interrupts run.
+    double                   nmi_acc = 0.0;  ///< And a fraction of the next.
     const bool indy  = game.drive_protocol == rom::DriveProtocol::Indy;
     const auto board = [&](u8 port, u8 value) {
         if (servo && board_log.size() < 4000000) {
@@ -406,22 +422,36 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
     osd::Input::AgentHooks hooks;
     hooks.virtual_wheel = !options.device;
     hooks.ffb           = [&](const char* effect, int value) {
-        // Input's level pushes left when positive: the record has it towards
-        // Steering +1.
-        const float force = static_cast<float>(value) / 32767.0f;
+        // Input's level pushes left when positive, as the record has it.
         if (ffb_log.size() < 1000000) {
-            ffb_log.push_back({frames, effect, std::strcmp(effect, "constant") == 0 ? -force : force});
+            ffb_log.push_back({frames, effect, static_cast<float>(value) / 32767.0f});
         }
     };
-    hooks.indy = [&](const osd::IndyBoard::Output& out) {
-        board(0x2A, indy_port_byte(out.up));
-        board(0x2E, indy_port_byte(out.down));
+    // The models' interrupts one at a time, each output journaled: the same
+    // outputs at the end of the frame as all of them at once.
+    hooks.indy = [&](osd::IndyBoard& b, int position, double n) {
+        osd::IndyBoard::Output out = {};
+        bool                   ran = false;
+        for (nmi_acc += n; nmi_acc >= 1.0; nmi_acc -= 1.0, ran = true) {
+            ++nmis;
+            out = b.step(position, 1.0);
+            board(0x2A, indy_port_byte(out.up));
+            board(0x2E, indy_port_byte(out.down));
+        }
+        return ran ? out : b.step(position, 0.0);
     };
-    hooks.daytona = [&](const osd::DaytonaBoard::Output& out) {
-        const u8 way = out.way == osd::DaytonaBoard::Way::Up     ? 0x40
-                     : out.way == osd::DaytonaBoard::Way::Down ? 0x80
-                                                               : 0x00;
-        board(0x46, static_cast<u8>(~(way | (out.power & 0x3f))));
+    hooks.daytona = [&](osd::DaytonaBoard& b, int counts, double n, int breakaway) {
+        osd::DaytonaBoard::Output out = {};
+        bool                      ran = false;
+        for (nmi_acc += n; nmi_acc >= 1.0; nmi_acc -= 1.0, ran = true) {
+            ++nmis;
+            out = b.step(counts, 1.0, breakaway);
+            const u8 way = out.way == osd::DaytonaBoard::Way::Up     ? 0x40
+                         : out.way == osd::DaytonaBoard::Way::Down ? 0x80
+                                                                   : 0x00;
+            board(0x46, static_cast<u8>(~(way | (out.power & 0x3f))));
+        }
+        return ran ? out : b.step(counts, 0.0, breakaway);
     };
     input.set_agent_hooks(&hooks);
     hw::set_host_state([&input](Archive& ar) { input.serialize_drive_board(ar); });
@@ -477,8 +507,13 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                 find("IN1")->held = static_cast<int>(in1 & 0xff);
             }
             std::string drive;
+            if (options.device && settle > 0) {
+                // vJoy's report reaches DirectInput a moment after the axis is set.
+                SDL_Delay(static_cast<u32>(settle));
+            }
             for (unsigned i = 0; i < n; ++i) {
                 if (options.device) {
+                    SDL_UpdateJoysticks();
                     SDL_Event event;
                     while (SDL_PollEvent(&event)) {
                         input.handle_event(event);
@@ -506,15 +541,18 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                     std::snprintf(hex, sizeof(hex), " %02X", b);
                     drive += hex;
                 }
-                // The commands are shown to the board, then it runs the frame's NMIs.
+                // The commands are shown to the board, then it runs the frame's
+                // interrupts (the models' hooks count them; Sega Rally's has none).
                 for (const u8 b : writes.view()) {
                     board(indy ? 0x28 : 0x27, b);
                 }
-                nmi_acc += (indy ? osd::IndyBoard::kNmiHz : 1000.0) / kMachineHz;
-                nmis += static_cast<u64>(nmi_acc);
-                nmi_acc -= static_cast<double>(static_cast<u64>(nmi_acc));
                 input.update_drive_board(game, writes.view());
                 input.update_force_feedback(game);
+                if (game.drive_protocol == rom::DriveProtocol::Rally) {
+                    nmi_acc += 1000.0 / kMachineHz;
+                    nmis += static_cast<u64>(nmi_acc);
+                    nmi_acc -= static_cast<double>(static_cast<u64>(nmi_acc));
+                }
             }
             std::printf("ok %llu%s\n", static_cast<unsigned long long>(frames), drive.c_str());
         } else if (std::strcmp(command, "set") == 0 || std::strcmp(command, "setraw") == 0) {
@@ -535,8 +573,10 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                 const auto channel = [&game, k]() -> const rom::AnalogChannel& {
                     return game.analog[static_cast<usize>(k->channel)];
                 };
+                // An axis trigonometrically: +1 at its left end.
+                const float side = -v;
                 switch (k->kind) {
-                    case Control::Kind::Axis:   k->held = channel_value(channel(), 0.5f + 0.5f * v); break;
+                    case Control::Kind::Axis:   k->held = channel_value(channel(), 0.5f + 0.5f * side); break;
                     case Control::Kind::Analog: k->held = channel_value(channel(), v); break;
                     case Control::Kind::Switch: k->held = v != 0.0f ? 1 : 0; break;
                     case Control::Kind::Gear:
@@ -602,6 +642,12 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                 }
                 board_log.clear();
             }
+        } else if (std::strcmp(command, "settle") == 0) {
+            int ms = settle;
+            if (std::sscanf(line, "%*s %d", &ms) == 1) {
+                settle = std::clamp(ms, 0, 100);
+            }
+            std::printf("settle %d\n", settle);
         } else if (std::strcmp(command, "frame") == 0) {
             std::printf("frame %llu\n", static_cast<unsigned long long>(frames));
         } else if (std::strcmp(command, "obs") == 0) {

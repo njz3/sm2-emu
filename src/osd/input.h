@@ -233,16 +233,16 @@ public:
     void update_pad_rumble(const rom::GameSpec& game);
 
     /// The agent mode's hooks (src/agent.cpp): a wheel with no device, at the
-    /// position it sets, and what the force feedback and the board models put
-    /// out. Null otherwise.
+    /// position it sets, what goes to the wheel, and the board models' steps,
+    /// which it runs one interrupt at a time for its journal. Null otherwise.
     struct AgentHooks {
         bool  virtual_wheel = false;
         float steer         = 0.0f;  ///< -1..1 of the game's lock, + right.
         u8    steer_value   = 0x80;  ///< The steering byte the game reads.
         /// What goes to the wheel: constant (the level), vibrate, selfcenter, stop.
         std::function<void(const char* effect, int value)> ffb;
-        std::function<void(const IndyBoard::Output&)>      indy;
-        std::function<void(const DaytonaBoard::Output&)>   daytona;
+        std::function<IndyBoard::Output(IndyBoard&, int position, double nmis)> indy;
+        std::function<DaytonaBoard::Output(DaytonaBoard&, int counts, double ticks, int breakaway)> daytona;
     };
     void set_agent_hooks(AgentHooks* hooks) { m_agent = hooks; }
 
