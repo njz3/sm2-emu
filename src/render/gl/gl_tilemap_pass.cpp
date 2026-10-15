@@ -28,11 +28,12 @@
 namespace sm2::render::gl {
 namespace {
 
+/// A game's sky panorama names, two to a word.
+constexpr usize kSkyWords = hw::Model2MachineBase::SkyPanorama::kCells
+                          * hw::Model2MachineBase::SkyPanorama::kRows / 2;
+
 constexpr u32 kModeResolveOverBackground = 0;
 constexpr u32 kModeBlendOver             = 1;
-
-constexpr usize kSurfaceBytes =
-    static_cast<usize>(TilemapPass::kSourceWidth) * TilemapPass::kSourceHeight * sizeof(u32);
 
 }  // namespace
 
@@ -41,8 +42,12 @@ TilemapPass::~TilemapPass()
     shutdown();
 }
 
-bool TilemapPass::init()
+bool TilemapPass::init(u32 columns)
 {
+    m_columns = columns;
+    m_panorama.reset();
+    m_sky_generation = 0;
+    m_panorama_state = {};
     return create_textures() && create_programs() && create_compute_resources();
 }
 
@@ -72,6 +77,17 @@ void TilemapPass::shutdown()
         DeleteProgram(m_compute_program);
         m_compute_program = 0;
     }
+    if (m_compute_ubo != 0) {
+        DeleteBuffers(1, &m_compute_ubo);
+        m_compute_ubo = 0;
+    }
+    if (m_panorama_buffer != 0) {
+        DeleteBuffers(1, &m_panorama_buffer);
+        m_panorama_buffer = 0;
+    }
+    m_tile_generation  = 0;
+    m_char_generation  = 0;
+    m_table_generation = 0;
     destroy_persistent_buffer(&m_tile_ram);
     destroy_persistent_buffer(&m_char_ram);
     destroy_persistent_buffer(&m_pens);
@@ -86,14 +102,14 @@ bool TilemapPass::create_textures()
     // The final non-integer magnification to the window is PresentPass's LINEAR.
     GenTextures(1, &m_below_texture);
     BindTexture(GL_TEXTURE_2D, m_below_texture);
-    TexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, static_cast<GLsizei>(kSourceWidth),
+    TexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, static_cast<GLsizei>(width()),
                 static_cast<GLsizei>(kSourceHeight));
     TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
     GenTextures(1, &m_above_texture);
     BindTexture(GL_TEXTURE_2D, m_above_texture);
-    TexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, static_cast<GLsizei>(kSourceWidth),
+    TexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, static_cast<GLsizei>(width()),
                 static_cast<GLsizei>(kSourceHeight));
     TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -140,8 +156,22 @@ bool TilemapPass::create_compute_resources()
     m_char_ram      = create_persistent_buffer(kCharRamBytes, GL_SHADER_STORAGE_BUFFER);
     m_pens          = create_persistent_buffer(static_cast<usize>(kPenCount) * sizeof(u32),
                                                GL_SHADER_STORAGE_BUFFER);
-    m_below_staging = create_persistent_buffer(kSurfaceBytes, GL_SHADER_STORAGE_BUFFER);
-    m_above_staging = create_persistent_buffer(kSurfaceBytes, GL_SHADER_STORAGE_BUFFER);
+    m_below_staging = create_persistent_buffer(surface_bytes(), GL_SHADER_STORAGE_BUFFER);
+    m_above_staging = create_persistent_buffer(surface_bytes(), GL_SHADER_STORAGE_BUFFER);
+    GenBuffers(1, &m_compute_ubo);
+    BindBuffer(GL_UNIFORM_BUFFER, m_compute_ubo);
+    BufferData(GL_UNIFORM_BUFFER, 112, nullptr, GL_DYNAMIC_DRAW);
+
+    // Zeroed: an entry from epoch zero is empty. A game's sky panorama names
+    // follow the cache.
+    const std::vector<u32> zeros(
+        static_cast<usize>(4) * PanoramaTracker::kWidth * PanoramaTracker::kHeight * 2
+            + kSkyWords,
+        0);
+    GenBuffers(1, &m_panorama_buffer);
+    BindBuffer(GL_SHADER_STORAGE_BUFFER, m_panorama_buffer);
+    BufferData(GL_SHADER_STORAGE_BUFFER, static_cast<GLsizeiptr>(zeros.size() * sizeof(u32)),
+               zeros.data(), GL_DYNAMIC_COPY);
     return m_tile_ram.handle != 0 && m_char_ram.handle != 0 && m_pens.handle != 0
         && m_below_staging.handle != 0 && m_above_staging.handle != 0;
 }
@@ -155,14 +185,14 @@ void TilemapPass::upload_surface_to_texture(u32 texture, std::span<const u32> pi
     // writes under SM2_TARGET_GL. This is the only tilemap upload that isn't
     // already GPU-side, so it flips here. Reached by render test mode (Last
     // Bronx's framebuffer title) and the CPU tilemap fallback.
-    std::vector<u32> flipped(static_cast<usize>(kSourceWidth) * kSourceHeight);
+    std::vector<u32> flipped(static_cast<usize>(width()) * kSourceHeight);
     for (u32 y = 0; y < kSourceHeight; ++y) {
         const u32 src_row = kSourceHeight - 1 - y;
-        std::memcpy(flipped.data() + static_cast<usize>(y) * kSourceWidth,
+        std::memcpy(flipped.data() + static_cast<usize>(y) * width() + m_columns,
                     pixels.data() + static_cast<usize>(src_row) * kSourceWidth,
                     static_cast<usize>(kSourceWidth) * sizeof(u32));
     }
-    TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(kSourceWidth),
+    TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(width()),
                  static_cast<GLsizei>(kSourceHeight), GL_RGBA, GL_UNSIGNED_BYTE,
                  flipped.data());
 }
@@ -174,7 +204,7 @@ void TilemapPass::upload_surface_from_buffer(u32 texture, u32 buffer_handle)
     // equivalent of Vulkan's vkCmdCopyBufferToImage.
     BindBuffer(GL_PIXEL_UNPACK_BUFFER, buffer_handle);
     BindTexture(GL_TEXTURE_2D, texture);
-    TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(kSourceWidth),
+    TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(width()),
                  static_cast<GLsizei>(kSourceHeight), GL_RGBA, GL_UNSIGNED_BYTE,
                  nullptr);  // null = read from bound PBO at offset 0
     BindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
@@ -201,9 +231,23 @@ void TilemapPass::dispatch_compose(const hw::Model2MachineBase& machine,
                             || m_window_mask_a_hidden != video.window_mask_a_hidden();
     const bool char_changed  = m_char_generation != machine.char_generation();
     const bool table_changed = m_table_generation != machine.table_generation();
-    if (!tile_changed && !char_changed && !table_changed) {
+    if (!tile_changed && !char_changed && !table_changed && m_composed_wide == m_wide_below) {
         return;
     }
+    if (m_columns != 0 && tile_changed) {
+        m_panorama_state = m_panorama.update(machine.tile_ram());
+    }
+    const hw::Model2MachineBase::SkyPanorama* sky =
+        m_columns != 0 ? machine.sky_panorama() : nullptr;
+    if (sky != nullptr && m_sky_generation != sky->generation) {
+        BindBuffer(GL_SHADER_STORAGE_BUFFER, m_panorama_buffer);
+        BufferSubData(GL_SHADER_STORAGE_BUFFER,
+                      static_cast<GLintptr>(static_cast<usize>(4) * PanoramaTracker::kWidth
+                                            * PanoramaTracker::kHeight * 2 * sizeof(u32)),
+                      static_cast<GLsizeiptr>(kSkyWords * sizeof(u32)), sky->names.data());
+        m_sky_generation = sky->generation;
+    }
+    m_composed_wide = m_wide_below;
 
     if (tile_changed) {
         const std::span<const u8> tile_ram = machine.tile_ram();
@@ -239,7 +283,26 @@ void TilemapPass::dispatch_compose(const hw::Model2MachineBase& machine,
     BindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, m_below_staging.handle);
     BindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, m_above_staging.handle);
 
-    const u32 groups_x = (kSourceWidth + 15) / 16;
+    u32 push[28] = {width(), m_columns, m_wide_below, m_panorama_state.cacheable};
+    if (sky != nullptr) {
+        push[16] = sky->layer + 1;
+        push[17] = sky->origin;
+        push[18] = sky->first_row;
+        push[19] = sky->rows;
+    }
+    for (u32 layer = 0; layer < 4; ++layer) {
+        push[4 + layer] = m_panorama_state.offset[layer];
+        push[8 + layer]  = m_panorama_state.offset_y[layer];
+        push[12 + layer] = m_panorama_state.epoch[layer];
+        push[20 + layer] = static_cast<u32>(m_panorama_state.wrap_rows[layer]);
+        push[24 + layer] = static_cast<u32>(m_panorama_state.wrap_rows[layer] >> 32);
+    }
+    BindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, m_panorama_buffer);
+    BindBuffer(GL_UNIFORM_BUFFER, m_compute_ubo);
+    BufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(push), push);
+    BindBufferBase(GL_UNIFORM_BUFFER, 0, m_compute_ubo);
+
+    const u32 groups_x = (width() + 15) / 16;
     const u32 groups_y = (kSourceHeight + 15) / 16;
     DispatchCompute(groups_x, groups_y, 1);
 
@@ -280,7 +343,7 @@ void TilemapPass::draw_fullscreen(u32 texture, u32 mode, bool blend, u32 backgro
     push.background[3] = 1.0F;
     push.mode           = mode;
     push.upscale        = m_upscale_2d;
-    push.source_size[0] = static_cast<float>(kSourceWidth);
+    push.source_size[0] = static_cast<float>(width());
     push.source_size[1] = static_cast<float>(kSourceHeight);
 
     UseProgram(m_program);

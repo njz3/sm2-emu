@@ -194,6 +194,54 @@ void CoproSharc::reset()
     m_cpu.set_flag_input(1, 0);
 }
 
+// The test loads the limit as an immediate, "R13 = -248.0" and four words on
+// "R13 = 248.0", each followed by a compare against the projected x. A loaded
+// state may hold the widened pair, so the scan matches the shape, not 248.
+void CoproSharc::find_view_tests()
+{
+    constexpr u32 kProgramStart = 0x20000;
+    constexpr u32 kProgramEnd   = 0x28000;
+    constexpr u64 kLoadR13      = 0x0f0d00000000ull;
+    constexpr u64 kOpcodeMask   = 0xffff00000000ull;
+
+    m_view_tests.clear();
+    for (u32 address = kProgramStart; address + 4 < kProgramEnd; ++address) {
+        const u64 minus = m_cpu.program_word(address);
+        const u64 plus  = m_cpu.program_word(address + 4);
+        if ((minus & kOpcodeMask) != kLoadR13 || (minus ^ plus) != 0x80000000ull) {
+            continue;
+        }
+        float limit = 0.0F;
+        const u32 bits = static_cast<u32>(plus & 0xffffffffull);
+        std::memcpy(&limit, &bits, sizeof(limit));
+        if (limit >= static_cast<float>(kScreenHalfWidth)
+            && limit <= static_cast<float>(kScreenHalfWidth + 256)) {
+            m_view_tests.push_back(address);
+        }
+    }
+    if (!m_view_tests.empty()) {
+        SM2_INFO("copro_sharc: %zu screen-width test(s) in the program", m_view_tests.size());
+    }
+}
+
+void CoproSharc::apply_view_half_width()
+{
+    const float half = static_cast<float>(m_view_half_width);
+    u32         plus = 0;
+    std::memcpy(&plus, &half, sizeof(plus));
+    const u32 minus = plus | 0x80000000u;
+    for (const u32 address : m_view_tests) {
+        m_cpu.set_program_word(address, 0x0f0d00000000ull | minus);
+        m_cpu.set_program_word(address + 4, 0x0f0d00000000ull | plus);
+    }
+}
+
+void CoproSharc::set_view_half_width(u32 pixels)
+{
+    m_view_half_width = pixels;
+    apply_view_half_width();
+}
+
 void CoproSharc::serialize(Archive& ar)
 {
     // The SHARC keeps its program on-chip, so its serialize covers the SRAM; no
@@ -205,6 +253,10 @@ void CoproSharc::serialize(Archive& ar)
     m_fifo_out.serialize(ar);
     ar.raw(m_control);
     ar.raw(m_upload_count);
+    if (ar.loading()) {
+        find_view_tests();
+        apply_view_half_width();
+    }
 }
 
 s32 CoproSharc::run(s32 cycles)
@@ -231,6 +283,8 @@ void CoproSharc::control_write(u32 value)
             // NOT reset the core: a reset would clear the on-chip SRAM banks
             // that the microcode was just DMA'd into.
             m_cpu.set_halted(false);
+            find_view_tests();
+            apply_view_half_width();
         }
     }
     m_control = value;
@@ -369,6 +423,7 @@ bool Model2B::init(const rom::GameSpec& game, rom::RomSet roms)
     // i960 instruction fetch straight from ROM and work RAM (the hot_read windows).
     m_cpu.bind_fetch_window(0, kRomMainCpu, m_rom_maincpu.data(), m_rom_maincpu.size(), 0x200000);
     m_cpu.bind_fetch_window(1, kWorkRam, m_work_ram.data(), m_work_ram.size(), 0x100000);
+    find_view_tests();
     m_scratch_ram.assign(0x40000, 0);
     m_buffer_ram.assign(0x20000 / 4, 0);
     m_tile_ram.assign(0x10000, 0);
@@ -1773,6 +1828,63 @@ bool Model2B::load_state(const std::string& path)
     m_palette_dirty = true;
     m_render_list.clear();
     return true;
+}
+
+
+// The AM2 library classifies a projected point against the screen with an
+// outcode: "lda -248.0; cmpr; bg; setbit 0; lda 248.0; cmpr; bl; setbit 1",
+// then culls objects whose points all fall off the same side. A wider picture
+// needs the wider limits in those tests, so they are found by shape and the
+// immediates rewritten in place.
+void Model2B::find_view_tests()
+{
+    constexpr u32 kLdaImmediate     = 0x8c003000;
+    constexpr u32 kLdaImmediateMask = 0xff07ffff;
+    constexpr u32 kMinusHalf        = 0xc3780000;  // -248.0f
+    constexpr u32 kPlusHalf         = 0x43780000;  //  248.0f
+
+    const auto word = [&](u32 address) {
+        u32 value = 0;
+        if (address + 4 <= m_rom_maincpu.size()) {
+            std::memcpy(&value, m_rom_maincpu.data() + address, 4);
+        }
+        return value;
+    };
+    const auto setbit = [&](u32 address, u32 bit) {
+        const u32 value = word(address);
+        return (value >> 24) == 0x58 && (value & 0xff) == bit;
+    };
+
+    m_view_tests.clear();
+    for (u32 address = 0; address + 40 <= m_rom_maincpu.size(); address += 4) {
+        const u32 lda = word(address);
+        if ((lda & kLdaImmediateMask) != kLdaImmediate || word(address + 4) != kMinusHalf) {
+            continue;
+        }
+        if (word(address + 20) == lda && word(address + 24) == kPlusHalf
+            && setbit(address + 16, 0x80) && setbit(address + 36, 0x81)) {
+            m_view_tests.push_back(address);
+        }
+    }
+    if (!m_view_tests.empty()) {
+        SM2_INFO("model2b: %zu screen-edge test(s) in the program", m_view_tests.size());
+    }
+}
+
+void Model2B::set_widescreen(u32 columns)
+{
+    m_geometry.set_widescreen(columns);
+    m_copro.set_view_half_width(CoproSharc::kScreenHalfWidth + columns);
+
+    const float half = static_cast<float>(CoproSharc::kScreenHalfWidth + columns);
+    u32         plus = 0;
+    std::memcpy(&plus, &half, sizeof(plus));
+    const u32 minus = plus | 0x80000000u;
+    u8* const rom   = const_cast<u8*>(m_rom_maincpu.data());
+    for (const u32 address : m_view_tests) {
+        std::memcpy(rom + address + 4, &minus, 4);
+        std::memcpy(rom + address + 24, &plus, 4);
+    }
 }
 
 }  // namespace sm2::hw

@@ -112,6 +112,10 @@ public:
     /// build_opcode_table() on load; the bus and trace hook are excluded too.
     void serialize(Archive& ar);
 
+    /// One 48-bit word of program memory, for patching an uploaded program.
+    [[nodiscard]] u64 program_word(u32 address) { return pm_read48(address); }
+    void set_program_word(u32 address, u64 data) { pm_write48(address, data); }
+
 private:
     // -- ASTAT flags --------------------------------------------------------
     static constexpr u32 AZ  = 0x00000001;

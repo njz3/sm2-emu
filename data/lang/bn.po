@@ -249,6 +249,11 @@ msgstr "বর্গাকার পিক্সেল"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (ওয়াইডস্ক্রিন)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "প্রসারিত"
 

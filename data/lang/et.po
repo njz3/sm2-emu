@@ -245,6 +245,11 @@ msgstr "Ruutpikslid"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (laiekraan)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "Venita"
 

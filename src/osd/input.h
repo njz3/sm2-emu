@@ -358,6 +358,10 @@ public:
         m_present_method = method;
     }
 
+    /// Widescreen columns each side of the 4:3 screen, 0 for none: a gun can
+    /// then aim beside the screen, past its edge.
+    void set_widescreen(u32 columns) { m_wide_columns = columns; }
+
     /// Whether the Sinden border is drawn. A gun aiming against that border
     /// reports positions on the game image; any other gun reports positions on
     /// the whole screen.
@@ -599,6 +603,7 @@ private:
 
     /// Present placement in effect, for the gun/pointer letterbox mapping.
     AspectMode    m_present_aspect = AspectMode::FourThree;
+    u32           m_wide_columns   = 0;
     ScalingMethod m_present_method = ScalingMethod::SharpBilinear;
     bool          m_sinden_border  = false;
 

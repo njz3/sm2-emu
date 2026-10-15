@@ -30,9 +30,27 @@
 namespace sm2::render::vk {
 namespace {
 
-/// Bytes in one surface.
-constexpr usize kSurfaceBytes =
-    static_cast<usize>(TilemapPass::kSourceWidth) * TilemapPass::kSourceHeight * sizeof(u32);
+struct ComputePush {
+    u32 width;
+    u32 columns;
+    u32 wide_below;
+    u32 cacheable;
+    u32 offset[4];
+    u32 offset_y[4];
+    u32 epoch[4];
+    u32 sky[4];
+    u32 wrap_low[4];
+    u32 wrap_high[4];
+};
+
+constexpr VkDeviceSize kPanoramaBytes =
+    static_cast<VkDeviceSize>(4) * PanoramaTracker::kWidth * PanoramaTracker::kHeight * 2
+    * sizeof(u32);
+/// The cache, then a game's sky panorama names (see shaders/tilemap_compose.comp).
+constexpr VkDeviceSize kSkyBytes =
+    hw::Model2MachineBase::SkyPanorama::kCells * hw::Model2MachineBase::SkyPanorama::kRows
+    * sizeof(u16);
+constexpr VkDeviceSize kPanoramaBufferBytes = kPanoramaBytes + kSkyBytes;
 
 struct PushConstants {
     float background[4];
@@ -94,10 +112,16 @@ TilemapPass::~TilemapPass()
     shutdown();
 }
 
-bool TilemapPass::init(Context& context, u32 render_scale)
+bool TilemapPass::init(Context& context, u32 render_scale, u32 columns)
 {
     m_context      = &context;
     m_render_scale = render_scale;
+    m_columns      = columns;
+    m_panorama.reset();
+    m_panorama_state      = {};
+    m_panorama_generation = 0;
+    m_panorama_cleared    = false;
+    m_sky_generation      = 0;
 
     // NEAREST: at N=1 the bands draw 1:1 (filter is a no-op); at N>1 they are
     // integer-upscaled by exactly N into the scaled composite scope, so each
@@ -196,6 +220,13 @@ void TilemapPass::shutdown()
         vkDestroySampler(device, m_sampler, nullptr);
         m_sampler = VK_NULL_HANDLE;
     }
+    if (m_panorama_buffer != VK_NULL_HANDLE) {
+        vmaDestroyBuffer(allocator, m_panorama_buffer, m_panorama_allocation);
+        m_panorama_buffer     = VK_NULL_HANDLE;
+        m_panorama_allocation = nullptr;
+    }
+    m_compute_frames = {};
+    m_surfaces       = {};
     m_context = nullptr;
 }
 
@@ -211,7 +242,7 @@ bool TilemapPass::create_surfaces()
     for (Surface& surface : m_surfaces) {
         VkBufferCreateInfo buffer{};
         buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        buffer.size  = kSurfaceBytes;
+        buffer.size  = surface_bytes();
         // STORAGE_BUFFER so the compose shader can write into this buffer
         // directly; TRANSFER_SRC is unchanged, for the copy into the sampled
         // image right after.
@@ -240,7 +271,7 @@ bool TilemapPass::create_surfaces()
         image.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         image.imageType     = VK_IMAGE_TYPE_2D;
         image.format        = VK_FORMAT_R8G8B8A8_UNORM;
-        image.extent        = VkExtent3D{kSourceWidth, kSourceHeight, 1};
+        image.extent        = VkExtent3D{width(), kSourceHeight, 1};
         image.mipLevels     = 1;
         image.arrayLayers   = 1;
         image.samples       = VK_SAMPLE_COUNT_1_BIT;
@@ -522,11 +553,23 @@ bool TilemapPass::create_compute_resources()
         }
     }
 
-    // Five storage buffers: tile RAM, character RAM and pens (read), below and
+    {
+        VkBufferCreateInfo buffer{};
+        buffer.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        buffer.size        = kPanoramaBufferBytes;
+        buffer.usage       = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        buffer.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        VmaAllocationCreateInfo allocation{};
+        allocation.usage = VMA_MEMORY_USAGE_AUTO;
+        SM2_VK_TRY(vmaCreateBuffer(m_context->allocator(), &buffer, &allocation,
+                                   &m_panorama_buffer, &m_panorama_allocation, nullptr));
+    }
+
+    // Six storage buffers: tile RAM, character RAM and pens (read), below and
     // above (written -- the same staging buffers create_surfaces() made, now
-    // also bound here as this frame's compose target).
-    VkDescriptorSetLayoutBinding bindings[5]{};
-    for (u32 index = 0; index < 5; ++index) {
+    // also bound here as this frame's compose target), and the panorama.
+    VkDescriptorSetLayoutBinding bindings[6]{};
+    for (u32 index = 0; index < 6; ++index) {
         bindings[index].binding         = index;
         bindings[index].descriptorCount = 1;
         bindings[index].stageFlags      = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -535,14 +578,14 @@ bool TilemapPass::create_compute_resources()
 
     VkDescriptorSetLayoutCreateInfo layout{};
     layout.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layout.bindingCount = 5;
+    layout.bindingCount = 6;
     layout.pBindings    = bindings;
     SM2_VK_TRY(
         vkCreateDescriptorSetLayout(device, &layout, nullptr, &m_compute_set_layout));
 
     VkDescriptorPoolSize size{};
     size.type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    size.descriptorCount = frames * 5;
+    size.descriptorCount = frames * 6;
 
     VkDescriptorPoolCreateInfo pool{};
     pool.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -567,16 +610,17 @@ bool TilemapPass::create_compute_resources()
         const u32 below_index = index * kSurfacesPerFrame + 0;
         const u32 above_index = index * kSurfacesPerFrame + 1;
 
-        const VkDescriptorBufferInfo buffers[5] = {
+        const VkDescriptorBufferInfo buffers[6] = {
             {target.tile_ram.handle, 0, target.tile_ram.size},
             {target.char_ram.handle, 0, target.char_ram.size},
             {target.pens.handle, 0, target.pens.size},
-            {m_surfaces[below_index].staging, 0, kSurfaceBytes},
-            {m_surfaces[above_index].staging, 0, kSurfaceBytes},
+            {m_surfaces[below_index].staging, 0, surface_bytes()},
+            {m_surfaces[above_index].staging, 0, surface_bytes()},
+            {m_panorama_buffer, 0, kPanoramaBufferBytes},
         };
 
-        VkWriteDescriptorSet writes[5]{};
-        for (u32 binding = 0; binding < 5; ++binding) {
+        VkWriteDescriptorSet writes[6]{};
+        for (u32 binding = 0; binding < 6; ++binding) {
             writes[binding].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[binding].dstSet          = target.set;
             writes[binding].dstBinding      = binding;
@@ -584,13 +628,19 @@ bool TilemapPass::create_compute_resources()
             writes[binding].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             writes[binding].pBufferInfo     = &buffers[binding];
         }
-        vkUpdateDescriptorSets(device, 5, writes, 0, nullptr);
+        vkUpdateDescriptorSets(device, 6, writes, 0, nullptr);
     }
 
+    VkPushConstantRange compute_range{};
+    compute_range.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    compute_range.size       = sizeof(ComputePush);
+
     VkPipelineLayoutCreateInfo pipeline_layout{};
-    pipeline_layout.sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout.setLayoutCount = 1;
-    pipeline_layout.pSetLayouts    = &m_compute_set_layout;
+    pipeline_layout.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout.setLayoutCount         = 1;
+    pipeline_layout.pSetLayouts            = &m_compute_set_layout;
+    pipeline_layout.pushConstantRangeCount = 1;
+    pipeline_layout.pPushConstantRanges    = &compute_range;
     SM2_VK_TRY(
         vkCreatePipelineLayout(device, &pipeline_layout, nullptr, &m_compute_layout));
 
@@ -645,11 +695,12 @@ void TilemapPass::upload(std::span<const u32> below, std::span<const u32> above)
     const std::span<const u32> sources[kSurfacesPerFrame] = {below, above};
     for (u32 index = 0; index < kSurfacesPerFrame; ++index) {
         Surface& target = surface(index);
-        const usize bytes =
-            std::min(kSurfaceBytes, sources[index].size_bytes());
-        std::memcpy(target.mapped, sources[index].data(), bytes);
-        if (bytes < kSurfaceBytes) {
-            std::memset(static_cast<u8*>(target.mapped) + bytes, 0, kSurfaceBytes - bytes);
+        u32*     out    = static_cast<u32*>(target.mapped);
+        std::memset(out, 0, surface_bytes());
+        const usize rows = std::min<usize>(kSourceHeight, sources[index].size() / kSourceWidth);
+        for (usize row = 0; row < rows; ++row) {
+            std::memcpy(out + row * width() + m_columns,
+                        sources[index].data() + row * kSourceWidth, kSourceWidth * sizeof(u32));
         }
     }
 
@@ -683,9 +734,15 @@ void TilemapPass::compute(const hw::Model2MachineBase& machine, const hw::Model2
                             || target.window_mask_a_hidden != video.window_mask_a_hidden();
     const bool char_changed  = target.char_generation != machine.char_generation();
     const bool table_changed = target.table_generation != machine.table_generation();
-    if (!tile_changed && !char_changed && !table_changed) {
+    if (m_columns != 0 && m_panorama_generation != machine.tile_generation()) {
+        m_panorama_state      = m_panorama.update(machine.tile_ram());
+        m_panorama_generation = machine.tile_generation();
+    }
+    m_sky = m_columns != 0 ? machine.sky_panorama() : nullptr;
+    if (!tile_changed && !char_changed && !table_changed && target.composed_wide == m_wide_below) {
         return;
     }
+    target.composed_wide = m_wide_below;
 
     if (tile_changed) {
         const std::span<const u8> tile_ram = machine.tile_ram();
@@ -741,7 +798,41 @@ void TilemapPass::dispatch_compose()
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_compute_layout, 0, 1,
                             &target.set, 0, nullptr);
 
-    const u32 groups_x = (kSourceWidth + 15) / 16;
+    if (!m_panorama_cleared) {
+        vkCmdFillBuffer(cmd, m_panorama_buffer, 0, kPanoramaBytes, 0);
+        m_panorama_cleared = true;
+    }
+    if (m_sky != nullptr && m_sky_generation != m_sky->generation) {
+        vkCmdUpdateBuffer(cmd, m_panorama_buffer, kPanoramaBytes, kSkyBytes, m_sky->names.data());
+        m_sky_generation = m_sky->generation;
+    }
+    // Last frame's dispatch wrote the panorama this one reads.
+    record_buffer_barrier(cmd, m_panorama_buffer, kPanoramaBufferBytes,
+                          VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_CLEAR_BIT,
+                          VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT | VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                          VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                          VK_ACCESS_2_SHADER_STORAGE_READ_BIT
+                              | VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT);
+
+    ComputePush push{width(), m_columns, m_wide_below, m_panorama_state.cacheable,
+                     {}, {}, {}, {}, {}, {}};
+    if (m_sky != nullptr) {
+        push.sky[0] = m_sky->layer + 1;
+        push.sky[1] = m_sky->origin;
+        push.sky[2] = m_sky->first_row;
+        push.sky[3] = m_sky->rows;
+    }
+    for (u32 layer = 0; layer < 4; ++layer) {
+        push.offset[layer]   = m_panorama_state.offset[layer];
+        push.offset_y[layer] = m_panorama_state.offset_y[layer];
+        push.epoch[layer]  = m_panorama_state.epoch[layer];
+        push.wrap_low[layer]  = static_cast<u32>(m_panorama_state.wrap_rows[layer]);
+        push.wrap_high[layer] = static_cast<u32>(m_panorama_state.wrap_rows[layer] >> 32);
+    }
+    vkCmdPushConstants(cmd, m_compute_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push),
+                       &push);
+
+    const u32 groups_x = (width() + 15) / 16;
     const u32 groups_y = (kSourceHeight + 15) / 16;
     vkCmdDispatch(cmd, groups_x, groups_y, 1);
 
@@ -749,7 +840,7 @@ void TilemapPass::dispatch_compose()
                                GpuStage::TilemapCompose, true);
 
     for (u32 index = 0; index < kSurfacesPerFrame; ++index) {
-        record_buffer_barrier(cmd, surface(index).staging, kSurfaceBytes,
+        record_buffer_barrier(cmd, surface(index).staging, surface_bytes(),
                               VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                               VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
                               VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_READ_BIT);
@@ -772,11 +863,11 @@ void TilemapPass::copy_to_image(const Surface& target)
 {
     VkBufferImageCopy region{};
     region.bufferOffset      = 0;
-    region.bufferRowLength   = kSourceWidth;
+    region.bufferRowLength   = width();
     region.bufferImageHeight = kSourceHeight;
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.imageSubresource.layerCount = 1;
-    region.imageExtent = VkExtent3D{kSourceWidth, kSourceHeight, 1};
+    region.imageExtent = VkExtent3D{width(), kSourceHeight, 1};
 
     vkCmdCopyBufferToImage(m_context->cmd(), target.staging, target.image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
@@ -810,7 +901,7 @@ void TilemapPass::record_below(VkImageView                      target,
 
     // The composite scope is N*native: the bands stretch to fill it and the 3D
     // draws into it at the scaled size.
-    const VkExtent2D extent{kSourceWidth * m_render_scale, kSourceHeight * m_render_scale};
+    const VkExtent2D extent{width() * m_render_scale, kSourceHeight * m_render_scale};
     const VkViewport viewport{0.0F, 0.0F, static_cast<float>(extent.width),
                               static_cast<float>(extent.height), 0.0F, 1.0F};
     const VkRect2D   scissor{{0, 0}, extent};
@@ -839,7 +930,7 @@ void TilemapPass::record_below(VkImageView                      target,
     push.background[3] = 1.0F;
     push.mode          = kModeResolveOverBackground;
     push.upscale       = m_upscale_2d;
-    push.source_size[0] = static_cast<float>(kSourceWidth);
+    push.source_size[0] = static_cast<float>(width());
     push.source_size[1] = static_cast<float>(kSourceHeight);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline_opaque);
@@ -857,7 +948,7 @@ void TilemapPass::record_above()
     // The 3D draw between record_below() and here set per-batch scissors; restore
     // the full composite viewport and scissor so this fullscreen draw is not
     // clipped to the last polygon batch's rectangle.
-    const VkExtent2D extent{kSourceWidth * m_render_scale, kSourceHeight * m_render_scale};
+    const VkExtent2D extent{width() * m_render_scale, kSourceHeight * m_render_scale};
     const VkViewport viewport{0.0F, 0.0F, static_cast<float>(extent.width),
                               static_cast<float>(extent.height), 0.0F, 1.0F};
     const VkRect2D   scissor{{0, 0}, extent};
@@ -868,7 +959,7 @@ void TilemapPass::record_above()
     push.background[3] = 1.0F;
     push.mode          = kModeBlendOver;
     push.upscale       = m_upscale_2d;
-    push.source_size[0] = static_cast<float>(kSourceWidth);
+    push.source_size[0] = static_cast<float>(width());
     push.source_size[1] = static_cast<float>(kSourceHeight);
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline_blend);

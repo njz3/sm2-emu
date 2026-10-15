@@ -242,6 +242,17 @@ public:
         m_crtc_yoffset = y;
     }
 
+    /// Widescreen: full-width windows grow by `columns` on each side and every
+    /// screen x moves right by the same amount, so the raster becomes
+    /// kRasterWidth + 2 * columns wide. Zero is the hardware's own raster.
+    /// Place the 3D in a frame `columns` wider on each side. `widen` also grows
+    /// full-screen windows into those columns; without it the 3D stays 4:3.
+    void set_widescreen(u32 columns, bool widen = true)
+    {
+        m_wide_columns = static_cast<s32>(columns);
+        m_widen        = widen;
+    }
+
     /// 0x10400000. Sky Target reads this; nothing is known about why.
     [[nodiscard]] u32 polygon_count() const;
 
@@ -286,6 +297,12 @@ private:
 
         u8        cur_window = 0;
         ClipPlane clip_plane[4][4];
+        /// Widescreen: the left and right planes of the window as the game set
+        /// it, before widening, while `widened` says it was widened.
+        ClipPlane narrow_plane[4][2];
+        bool      widened      = false;
+        /// Polygons that reach the window as the game set it.
+        u32       narrow_count = 0;
     };
 
     struct GeoState {
@@ -316,6 +333,7 @@ private:
 
     void model2_3d_push(RasterState* raster, u32 input);
     void model2_3d_project(Polygon* poly);
+    void widen_screen_overlay(Polygon* poly) const;
     void model2_3d_zclip_w(u32 data);
     void render_frame_start();
 
@@ -368,6 +386,9 @@ private:
 
     s16 m_crtc_xoffset = 0;
     s16 m_crtc_yoffset = 0;
+
+    s32 m_wide_columns = 0;
+    bool m_widen        = true;
 
     /// Counters for the frame being built, so build_render_list can report what
     /// the earlier stages discarded.

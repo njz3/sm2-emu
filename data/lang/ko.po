@@ -246,6 +246,11 @@ msgstr "정사각 픽셀"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (와이드스크린)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "늘이기"
 

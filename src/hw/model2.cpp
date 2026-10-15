@@ -699,12 +699,16 @@ u8 Model2::lightgun_offscreen_read(u8 offset) const
         return value <= axis.minimum || value >= axis.maximum;
     };
 
+    const auto x_axis = [this](const rom::LightgunAxis& axis) {
+        return rom::widened_axis(axis, m_gun_columns, Geometrizer::kRasterWidth);
+    };
+
     u16 data = 0xfffc;
-    if (offscreen(m_inputs.gun_p1x, m_game.lightgun.p1x)
+    if (offscreen(m_inputs.gun_p1x, x_axis(m_game.lightgun.p1x))
         || offscreen(m_inputs.gun_p1y, m_game.lightgun.p1y)) {
         data |= 1;
     }
-    if (offscreen(m_inputs.gun_p2x, m_game.lightgun.p2x)
+    if (offscreen(m_inputs.gun_p2x, x_axis(m_game.lightgun.p2x))
         || offscreen(m_inputs.gun_p2y, m_game.lightgun.p2y)) {
         data |= 2;
     }

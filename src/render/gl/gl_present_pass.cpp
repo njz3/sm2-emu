@@ -47,9 +47,10 @@ PresentPass::~PresentPass()
     shutdown();
 }
 
-bool PresentPass::init(u32 render_scale)
+bool PresentPass::init(u32 render_scale, u32 width)
 {
     m_render_scale = render_scale;
+    m_native_width = width;
     return create_target() && create_program();
 }
 
@@ -194,7 +195,7 @@ void PresentPass::present(u32 window_width, u32 window_height)
         float crt_curvature;
         u32   pad[2];
     } push{};
-    push.source_size[0] = static_cast<float>(kWidth);
+    push.source_size[0] = static_cast<float>(m_native_width);
     push.source_size[1] = static_cast<float>(kHeight);
     push.target_size[0] = box.width;
     push.target_size[1] = box.height;

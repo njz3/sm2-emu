@@ -873,7 +873,7 @@
   </game>
 
 
-  <game name="bel" board="model2c" gun_missile="true">
+  <game name="bel" board="model2c" gun_missile="true" side_fill="pillarbox">
     <title>Behind Enemy Lines</title>
     <manufacturer>Sega / EPL Productions</manufacturer>
     <year>1997</year>
@@ -2383,10 +2383,23 @@
 
     <!-- Analogue mux wiring, from MAME's model2b_state::gunblade. -->
     <analog>
-      <channel index="0" control="p1x" min="0x69" rest="0xb1"/>
-      <channel index="1" control="p2x" max="0x96" rest="0x50"/>
-      <channel index="2" control="p1y" min="0x11" max="0xae" rest="0x5f"/>
-      <channel index="3" control="p2y" min="0x11" max="0xae" rest="0x5f"/>
+      <channel index="0" control="p1x" min="0x69" rest="0xb1">
+        <point at="0.0000" value="0x72"/>
+        <point at="0.1129" value="0x80"/>
+        <point at="0.3700" value="0xa0"/>
+        <point at="0.6210" value="0xc0"/>
+        <point at="0.8569" value="0xe0"/>
+        <point at="1.0000" value="0xf5"/>
+      </channel>
+      <channel index="1" control="p2x" max="0x96" rest="0x50">
+        <point at="0.0000" value="0x0b"/>
+        <point at="0.1421" value="0x20"/>
+        <point at="0.3780" value="0x40"/>
+        <point at="0.6300" value="0x60"/>
+        <point at="1.0000" value="0x8e"/>
+      </channel>
+      <channel index="2" control="p1y" min="0x1d" max="0xa4" rest="0x5f"/>
+      <channel index="3" control="p2y" min="0x1d" max="0xa4" rest="0x5f"/>
     </analog>
 
     <!-- Game state published as outputs. The addresses are this revision's. There is no magazine: the
@@ -3734,7 +3747,7 @@
   </game>
 
 
-  <game name="pltkids" board="model2b" protection="315-5881" key="0x042e2dc1">
+  <game name="pltkids" board="model2b" protection="315-5881" key="0x042e2dc1" side_fill="black">
     <title>Pilot Kids</title>
     <manufacturer>Psikyo</manufacturer>
     <year>1998</year>
@@ -4038,7 +4051,7 @@
   </game>
 
 
-  <game name="rchase2" board="model2b" motion_base="true">
+  <game name="rchase2" board="model2b" motion_base="true" side_fill="black">
     <title>Rail Chase 2</title>
     <manufacturer>Sega</manufacturer>
     <year>1994</year>
@@ -4054,26 +4067,24 @@
          144 lines below that. -->
     <analog>
       <channel index="0" control="p2x" min="0x34" max="0xc7" rest="0x7d" reverse="true">
-        <point at="0.0000" value="0xc7"/>
+        <point at="0.0000" value="0xc0"/>
         <point at="0.6250" value="0x80"/>
-        <point at="1.0000" value="0x34"/>
+        <point at="1.0000" value="0x40"/>
       </channel>
       <channel index="1" control="p1x" min="0x3a" max="0xca" rest="0x82" reverse="true">
-        <point at="0.0000" value="0xca"/>
+        <point at="0.0000" value="0xc0"/>
         <point at="0.3750" value="0x80"/>
-        <point at="1.0000" value="0x3a"/>
+        <point at="1.0000" value="0x40"/>
       </channel>
       <channel index="2" control="p2y" min="0x1c" max="0xcb" rest="0x73" reverse="true">
-        <point at="0.0000" value="0xcb"/>
+        <point at="0.0000" value="0xc0"/>
         <point at="0.5000" value="0x80"/>
-        <point at="0.8750" value="0x1c"/>
-        <point at="1.0000" value="0x1c"/>
+        <point at="1.0000" value="0x2b"/>
       </channel>
       <channel index="3" control="p1y" min="0x1c" max="0xcb" rest="0x73" reverse="true">
-        <point at="0.0000" value="0xcb"/>
+        <point at="0.0000" value="0xc0"/>
         <point at="0.5000" value="0x80"/>
-        <point at="0.8750" value="0x1c"/>
-        <point at="1.0000" value="0x1c"/>
+        <point at="1.0000" value="0x2b"/>
       </channel>
     </analog>
 
@@ -4148,26 +4159,24 @@
          this set. Same places on screen as rchase2, but here the values run the other way. -->
     <analog>
       <channel index="0" control="p2x" rest="0x80">
-        <point at="0.0000" value="0x00"/>
+        <point at="0.0000" value="0x40"/>
         <point at="0.6250" value="0x80"/>
-        <point at="1.0000" value="0xff"/>
+        <point at="1.0000" value="0xc0"/>
       </channel>
       <channel index="1" control="p1x" rest="0x80">
-        <point at="0.0000" value="0x00"/>
+        <point at="0.0000" value="0x40"/>
         <point at="0.3750" value="0x80"/>
-        <point at="1.0000" value="0xff"/>
+        <point at="1.0000" value="0xc0"/>
       </channel>
       <channel index="2" control="p2y" rest="0x80">
-        <point at="0.0000" value="0x00"/>
+        <point at="0.0000" value="0x40"/>
         <point at="0.5000" value="0x80"/>
-        <point at="0.8750" value="0xff"/>
-        <point at="1.0000" value="0xff"/>
+        <point at="1.0000" value="0xd5"/>
       </channel>
       <channel index="3" control="p1y" rest="0x80">
-        <point at="0.0000" value="0x00"/>
+        <point at="0.0000" value="0x40"/>
         <point at="0.5000" value="0x80"/>
-        <point at="0.8750" value="0xff"/>
-        <point at="1.0000" value="0xff"/>
+        <point at="1.0000" value="0xd5"/>
       </channel>
     </analog>
 
@@ -4213,7 +4222,7 @@
   </game>
 
 
-  <game name="schamp" board="model2b" preliminary="true">
+  <game name="schamp" board="model2b" preliminary="true" side_fill="menu">
     <title>Sonic Championship</title>
     <manufacturer>Sega</manufacturer>
     <year>1996</year>

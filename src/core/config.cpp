@@ -113,6 +113,10 @@ constexpr u32 kMaxRenderScale = 8;
         return true;
     }
     if (text == "stretch" || text == "fill") { *out = AspectMode::Stretch; return true; }
+    if (text == "16:9" || text == "16-9" || text == "widescreen") {
+        *out = AspectMode::Widescreen;
+        return true;
+    }
     return false;
 }
 
@@ -121,6 +125,7 @@ constexpr u32 kMaxRenderScale = 8;
     switch (mode) {
         case AspectMode::FourThree:   return "4:3";
         case AspectMode::SquarePixel: return "square";
+        case AspectMode::Widescreen:  return "16:9";
         case AspectMode::Stretch:     return "stretch";
     }
     return "4:3";
@@ -1031,7 +1036,8 @@ bool save_config(const std::string& path, const Config& config)
         << "scaling_method = " << scaling_method_name(config.scaling_method) << "\n"
         << "\n"
         << "# Aspect the frame is presented at. One of: 4:3 (arcade monitor),\n"
-        << "# square (raw 496x384 square pixels), stretch (fill the window).\n"
+        << "# square (raw 496x384 square pixels), stretch (fill the window),\n"
+        << "# 16:9 (widescreen: the 3D drawn wider, GPU renderers only).\n"
         << "aspect_mode = " << aspect_mode_name(config.aspect_mode) << "\n"
         << "\n"
         << "# Optional CRT cosmetic filter over the finished frame. Strengths are\n"

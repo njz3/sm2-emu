@@ -248,6 +248,11 @@ msgstr "சதுரப் பிக்சல்கள்"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (அகலத்திரை)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "நீட்டு"
 

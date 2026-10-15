@@ -199,6 +199,27 @@ public:
     /// measured separately from the main CPU's instruction time (see Geometrizer).
     [[nodiscard]] virtual u64 geometry_stage_nanoseconds() const = 0;
 
+    /// Widen the 3D raster by `columns` on each side; see Geometrizer.
+    virtual void set_widescreen(u32 columns) = 0;
+
+    /// A tile layer's whole 360-degree backdrop, which the game streams into the
+    /// 512-wide map a column at a time. The widescreen side columns draw from it.
+    struct SkyPanorama {
+        static constexpr u32 kCells = 256;  ///< 2048 pixels around
+        static constexpr u32 kRows  = 64;
+
+        u32 layer      = 0;
+        /// Panorama pixel at screen x = 0.
+        u32 origin     = 0;
+        /// Tile map row that names row 0 lands on, and how many rows follow.
+        u32 first_row  = 0;
+        u32 rows       = 0;  ///< zero: no panorama this frame
+        /// Bumped whenever `names` changes.
+        u64 generation = 0;
+        std::array<u16, kCells * kRows> names{};
+    };
+    [[nodiscard]] virtual const SkyPanorama* sky_panorama() const { return nullptr; }
+
     /// Draw the scenery to the edge of the course, where a game supports it.
     virtual void set_draw_distance(bool /*extended*/) {}
 

@@ -246,6 +246,11 @@ msgstr "方形像素"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9（宽屏）"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "拉伸"
 

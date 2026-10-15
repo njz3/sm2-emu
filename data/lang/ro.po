@@ -244,6 +244,11 @@ msgstr "Pixeli pătrați"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (ecran lat)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "Întindere"
 

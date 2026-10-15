@@ -74,6 +74,7 @@ public:
     void set_present_options(const PresentOptions& options) override;
     void set_enhancement_options(const EnhancementOptions& options) override;
     void set_texture_replacements(TextureReplacements* replacements) override;
+    void set_widescreen(u32 columns, u32 wide_background) override;
     void blit_to_swapchain() override;
     void begin_overlay_frame() override;
     void draw_overlay(bool active) override;
@@ -91,7 +92,7 @@ public:
         return m_context.device_properties().deviceName;
     }
 
-    [[nodiscard]] u32          native_width() const override { return PresentPass::kWidth; }
+    [[nodiscard]] u32          native_width() const override { return m_present.native_width(); }
     [[nodiscard]] u32          native_height() const override { return PresentPass::kHeight; }
     [[nodiscard]] NativeFormat native_format() const override
     {
@@ -125,6 +126,9 @@ private:
     /// Internal 3D render scale (1..kMaxRenderScale). Stored from the config;
     /// at 1 every target is native size and nothing behaves differently.
     u32 m_render_scale = 1;
+
+    u32 m_columns         = 0;
+    u32 m_pending_columns = 0;
 
     PresentOptions     m_present_options;
     EnhancementOptions m_enhancement_options;

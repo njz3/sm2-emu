@@ -38,8 +38,9 @@ enum class ScalingMethod : u32 { Nearest, Bilinear, SharpBilinear, Integer };
 ///
 ///   FourThree   -- the arcade monitor's 4:3 (the raster was stretched to it).
 ///   SquarePixel -- the raw 496x384 (1.29:1); square pixels, slightly narrow.
+///   Widescreen  -- 16:9: the 3D drawn wider, the 2D kept at 4:3 in the middle.
 ///   Stretch     -- fill the whole window, ignore aspect (no bars).
-enum class AspectMode : u32 { FourThree, SquarePixel, Stretch };
+enum class AspectMode : u32 { FourThree, SquarePixel, Widescreen, Stretch };
 
 /// 3D texture filtering. Faithful is the hardware-accurate in-shader filtering;
 /// Anisotropic sharpens obliquely-viewed surfaces. GPU-gated; falls back to

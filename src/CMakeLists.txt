@@ -42,6 +42,7 @@ endif()
 add_library(sm2_render STATIC
     render/geometry.cpp
     render/image_write.cpp
+    render/panorama.cpp
     render/texture_dump.cpp
     render/texture_key.cpp
     render/texture_replace.cpp

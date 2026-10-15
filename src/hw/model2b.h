@@ -75,6 +75,12 @@ public:
     [[nodiscard]] cpu::sharc::SHARC& cpu() { return m_cpu; }
     [[nodiscard]] const cpu::sharc::SHARC& cpu() const { return m_cpu; }
 
+    /// Half the screen width the program's point-visibility test uses. The
+    /// host asks the SHARC whether a point projects inside the screen before
+    /// sending its object, so a wider picture needs a wider test.
+    static constexpr u32 kScreenHalfWidth = 248;
+    void set_view_half_width(u32 pixels);
+
     [[nodiscard]] CoproFifo& fifo_in() { return m_fifo_in; }
     [[nodiscard]] CoproFifo& fifo_out() { return m_fifo_out; }
     [[nodiscard]] const CoproFifo& fifo_in() const { return m_fifo_in; }
@@ -149,6 +155,12 @@ private:
 
     u32 m_control      = 0;
     u32 m_upload_count = 0;
+
+    void find_view_tests();
+    void apply_view_half_width();
+
+    u32              m_view_half_width = kScreenHalfWidth;
+    std::vector<u32> m_view_tests;  ///< program words loading -/+ the half width
 };
 
 // ===========================================================================
@@ -223,6 +235,7 @@ public:
 
     [[nodiscard]] const RenderList& render_list() const override { return m_render_list; }
 
+    void set_widescreen(u32 columns) override;
     [[nodiscard]] u64 geometry_stage_nanoseconds() const override
     {
         return m_geometry.last_run_nanoseconds();
@@ -394,6 +407,10 @@ private:
     rom::GameSpec m_game;
 
     std::span<const u8> m_rom_maincpu;
+
+    /// Program ROM offsets of the screen-edge tests (see find_view_tests()).
+    std::vector<u32> m_view_tests;
+    void find_view_tests();
     std::span<const u8> m_rom_main_data;
     std::span<const u8> m_rom_copro_data;
     std::span<const u8> m_rom_polygons;

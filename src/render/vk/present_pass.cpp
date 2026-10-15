@@ -81,10 +81,11 @@ PresentPass::~PresentPass()
     shutdown();
 }
 
-bool PresentPass::init(Context& context, u32 render_scale)
+bool PresentPass::init(Context& context, u32 render_scale, u32 width)
 {
     m_context      = &context;
     m_render_scale = render_scale;
+    m_native_width = width;
 
     const VkFilter filters[2] = {VK_FILTER_NEAREST, VK_FILTER_LINEAR};
     for (usize i = 0; i < m_samplers.size(); ++i) {
@@ -210,7 +211,7 @@ bool PresentPass::create_targets()
         // explicit flush or a device-local copy would buy.
         VkBufferCreateInfo staging{};
         staging.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        staging.size        = static_cast<VkDeviceSize>(kWidth) * kHeight * sizeof(u32);
+        staging.size        = static_cast<VkDeviceSize>(m_native_width) * kHeight * sizeof(u32);
         staging.usage       = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
         staging.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -442,7 +443,7 @@ VkImage PresentPass::native_image() const
 void PresentPass::upload_from_host(std::span<const u32> pixels)
 {
     Target&     target = m_targets[m_current];
-    const usize bytes  = static_cast<usize>(kWidth) * kHeight * sizeof(u32);
+    const usize bytes  = static_cast<usize>(m_native_width) * kHeight * sizeof(u32);
 
     std::memcpy(target.host_mapped, pixels.data(),
                std::min(bytes, pixels.size_bytes()));
@@ -460,11 +461,11 @@ void PresentPass::upload_from_host(std::span<const u32> pixels)
                          VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT);
 
     VkBufferImageCopy region{};
-    region.bufferRowLength   = kWidth;
+    region.bufferRowLength   = m_native_width;
     region.bufferImageHeight = kHeight;
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.imageSubresource.layerCount = 1;
-    region.imageExtent = VkExtent3D{kWidth, kHeight, 1};
+    region.imageExtent = VkExtent3D{m_native_width, kHeight, 1};
     vkCmdCopyBufferToImage(cmd, target.host_staging, target.image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
@@ -535,7 +536,7 @@ void PresentPass::record()
     vkCmdSetScissor(cmd, 0, 1, &scissor);
 
     PushConstants push{};
-    push.source_size[0] = static_cast<float>(kWidth);
+    push.source_size[0] = static_cast<float>(m_native_width);
     push.source_size[1] = static_cast<float>(kHeight);
     push.target_size[0] = viewport.width;
     push.target_size[1] = viewport.height;

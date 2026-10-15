@@ -310,7 +310,7 @@ void Poly3DPass::draw_polygons()
         u32   render_scale;
         u32   texture_quality;  ///< 0 = faithful; else anisotropic tap ceiling
     } push{};
-    push.inv_raster[0]   = 1.0F / static_cast<float>(kWidth);
+    push.inv_raster[0]   = 1.0F / static_cast<float>(m_width);
     push.inv_raster[1]   = 1.0F / static_cast<float>(kHeight);
     push.render_scale    = m_render_scale;
     push.texture_quality = m_texture_quality;

@@ -243,6 +243,11 @@ msgstr "Quadratische Pixel"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (Breitbild)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "Strecken"
 

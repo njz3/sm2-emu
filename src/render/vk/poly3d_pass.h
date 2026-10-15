@@ -84,6 +84,10 @@ public:
     /// stays in native coordinates (projection is scaled by the viewport); only
     /// the target is larger.
     [[nodiscard]] bool init(Context& context, u32 render_scale);
+
+    /// Raster width to draw at, up to frame_width(kWideColumns); the fill mask
+    /// is allocated that wide, so this is live.
+    void set_width(u32 width) { m_width = width; }
     void shutdown();
 
     /// Anisotropic texture-filter quality (0 = faithful single-tap, else the
@@ -283,6 +287,9 @@ private:
 
     /// Internal 3D render scale; the fill-mask attachment is N*native.
     u32 m_render_scale = 1;
+
+    /// Raster width in native pixels: kWidth, or wider in widescreen.
+    u32 m_width = kWidth;
 
     u32 m_texture_quality = 0;  ///< 0 = faithful single-tap, else tap ceiling
 

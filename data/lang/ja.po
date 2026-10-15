@@ -246,6 +246,11 @@ msgstr "正方形ピクセル"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (ワイド)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "引き伸ばし"
 

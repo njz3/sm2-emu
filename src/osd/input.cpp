@@ -1680,7 +1680,7 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
     float ptr_fx = 0.5f;
     float ptr_fy = 0.5f;
     if (pointer.width > 1 && pointer.height > 1) {
-        const render::Letterbox box = render::compute_letterbox(
+        const render::Letterbox box = render::compute_game_rect(
             static_cast<u32>(pointer.width), static_cast<u32>(pointer.height),
             m_present_aspect, m_present_method);
         if (box.width > 0.0f && box.height > 0.0f) {
@@ -1758,7 +1758,11 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         float screen_y = 0.0f;
         float screen_w = 1.0f;
         float screen_h = 1.0f;
-        render::Letterbox gun_box{0.0f, 0.0f, 1.0f, 1.0f};
+        // A Sinden reports positions on the picture its border frames, which in
+        // widescreen is wider than the game's own screen.
+        const float wide_edge = static_cast<float>(m_wide_columns)
+                              / static_cast<float>(render::frame_width(m_wide_columns));
+        render::Letterbox gun_box{wide_edge, 0.0f, 1.0f - 2.0f * wide_edge, 1.0f};
         SDL_Window* window = SDL_GetKeyboardFocus();
         if (window == nullptr) {
             window = SDL_GetMouseFocus();
@@ -1778,7 +1782,7 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
                     && SDL_GetWindowPosition(window, &win_x, &win_y)
                     && SDL_GetWindowSize(window, &win_w, &win_h)
                     && win_w > 0 && win_h > 0 && display.w > 0 && display.h > 0);
-            const render::Letterbox box = render::compute_letterbox(
+            const render::Letterbox box = render::compute_game_rect(
                 static_cast<u32>(pix_w), static_cast<u32>(pix_h), m_present_aspect,
                 m_present_method);
             if (placed && box.width > 0.0f && box.height > 0.0f) {
@@ -1940,9 +1944,12 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
 #endif
     // Positional-gun titles draw their own in-game crosshair, so suppress ours
     // to avoid two overlapping reticles; the RS-422 lightgun titles do not.
-    const auto record = [](bool active, bool mouse, const GunInput& g) {
-        return GunAim{active, mouse, std::clamp(g.x, 0.0f, 1.0f), std::clamp(g.y, 0.0f, 1.0f),
-                      g.calibrating, g.win_x, g.win_y};
+    // Widescreen: how far past the screen's edges, as a fraction of its width,
+    // the picture reaches.
+    const float side = static_cast<float>(m_wide_columns) / static_cast<float>(render::kNativeWidth);
+    const auto record = [side](bool active, bool mouse, const GunInput& g) {
+        return GunAim{active, mouse, std::clamp(g.x, -side, 1.0f + side),
+                      std::clamp(g.y, 0.0f, 1.0f), g.calibrating, g.win_x, g.win_y};
     };
     m_gun_aims[0] = record(!positional, on_mouse[0], p1);
     m_gun_aims[1] = record(p2_active && !positional, on_mouse[1], p2);
@@ -1952,36 +1959,50 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         // into each channel's calibrated travel and overwrite the value the
         // stick sampled. No off-screen reload here, so the reload snap is not
         // applied; these titles use an explicit missile/reload button instead.
-        const auto write_channel = [&](int idx, float fraction) {
+        // X reaches into the widescreen columns: the end segments carry on
+        // past the screen's edges, as far as the 8-bit value allows.
+        const auto write_channel = [&](int idx, float fraction, float reach) {
             if (idx < 0) {
                 return;
             }
             const rom::AnalogChannel& c = game.analog[static_cast<usize>(idx)];
-            fraction         = std::clamp(fraction, 0.0f, 1.0f);
+            fraction         = std::clamp(fraction, -reach, 1.0f + reach);
+            float value      = 0.0f;
             if (c.point_count >= 2) {
-                // Interpolate between the two points around the aim.
                 usize next = 1;
                 while (next + 1 < c.point_count && fraction > c.points[next].at) {
                     ++next;
                 }
                 const rom::AnalogPoint& a = c.points[next - 1];
                 const rom::AnalogPoint& b = c.points[next];
-                const float t     = std::clamp((fraction - a.at) / (b.at - a.at), 0.0f, 1.0f);
-                const float value = std::lerp(static_cast<float>(a.value),
-                                              static_cast<float>(b.value), t);
-                inputs->analog[static_cast<usize>(idx)] = static_cast<u8>(value + 0.5f);
-                return;
+                float t = (fraction - a.at) / (b.at - a.at);
+                if ((next > 1 && t < 0.0f) || (next + 1 < c.point_count && t > 1.0f)) {
+                    t = std::clamp(t, 0.0f, 1.0f);
+                }
+                value = std::lerp(static_cast<float>(a.value), static_cast<float>(b.value), t);
+            } else {
+                const float f    = c.reverse ? 1.0f - fraction : fraction;
+                const float span = static_cast<float>(c.maximum - c.minimum);
+                value            = static_cast<float>(c.minimum) + f * span;
             }
-            const float f    = c.reverse ? 1.0f - fraction : fraction;
-            const float span = static_cast<float>(c.maximum - c.minimum);
             inputs->analog[static_cast<usize>(idx)] =
-                static_cast<u8>(static_cast<float>(c.minimum) + f * span + 0.5f);
+                static_cast<u8>(std::clamp(value, 0.0f, 255.0f) + 0.5f);
         };
-        write_channel(pos_gun_ch[0], p1.x);
-        write_channel(pos_gun_ch[1], p1.y);
-        write_channel(pos_gun_ch[2], p2.x);
-        write_channel(pos_gun_ch[3], p2.y);
+        write_channel(pos_gun_ch[0], p1.x, side);
+        write_channel(pos_gun_ch[1], p1.y, 0.0f);
+        write_channel(pos_gun_ch[2], p2.x, side);
+        write_channel(pos_gun_ch[3], p2.y, 0.0f);
     } else {
+        // X across the whole picture, which in widescreen reaches past the
+        // screen; the X axes' travel grows to match.
+        const auto across = [side](float& aim) { aim = (aim + side) / (1.0f + 2.0f * side); };
+        across(p1.x);
+        across(p2.x);
+        const rom::LightgunAxis p1x =
+            rom::widened_axis(spec.p1x, m_wide_columns, render::kNativeWidth);
+        const rom::LightgunAxis p2x =
+            rom::widened_axis(spec.p2x, m_wide_columns, render::kNativeWidth);
+
         // The picture's very edge counts as off screen, so a gun that cannot
         // aim past it can still reload.
         constexpr float kReloadZone = 0.01f;
@@ -2000,9 +2021,9 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         // RS-422 lightgun: off-screen reload snaps the aim past the corner.
         if (p1.reload) { p1.x = -1.0f; p1.y = -1.0f; }
         if (p2.reload) { p2.x = -1.0f; p2.y = -1.0f; }
-        inputs->gun_p1x = fraction_to_gun(p1.x, spec.p1x);
+        inputs->gun_p1x = fraction_to_gun(p1.x, p1x);
         inputs->gun_p1y = fraction_to_gun(p1.y, spec.p1y);
-        inputs->gun_p2x = fraction_to_gun(p2.x, spec.p2x);
+        inputs->gun_p2x = fraction_to_gun(p2.x, p2x);
         inputs->gun_p2y = fraction_to_gun(p2.y, spec.p2y);
     }
 

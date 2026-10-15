@@ -66,6 +66,9 @@ struct Capabilities {
     /// Whether the fill-mask attachment carries depth, which Blended
     /// translucency uses to order its second pass.
     bool blended_translucency = false;
+
+    /// Whether set_widescreen() can widen the native frame.
+    bool widescreen = false;
 };
 
 /// A native RGBA8 pixel format identifier, backend-neutral.
@@ -99,6 +102,13 @@ enum class NativeFormat : u32 {
 constexpr u32 kNativeWidth  = 496;
 constexpr u32 kNativeHeight = 384;
 
+/// Columns added on each side of the raster in widescreen: 496 + 2 * 83 = 662,
+/// which at the arcade's pixel shape is 16:9.
+constexpr u32 kWideColumns = 83;
+
+/// The native frame's width with `columns` added on each side.
+[[nodiscard]] constexpr u32 frame_width(u32 columns) { return kNativeWidth + 2 * columns; }
+
 /// The largest internal 3D render scale (N in 1..8). 8x is 3968x3072, enough to
 /// render the 3D at 4K on a capable GPU; clamp_scale_to_max_dimension reduces N
 /// on a device that cannot allocate a target that large.
@@ -118,7 +128,7 @@ constexpr u32 kMaxRenderScale = 8;
 [[nodiscard]] constexpr u32 clamp_scale_to_max_dimension(u32 requested, u32 max_dimension)
 {
     u32 scale = requested;
-    while (scale > 1 && (scaled_width(scale) > max_dimension
+    while (scale > 1 && (frame_width(kWideColumns) * scale > max_dimension
                          || scaled_height(scale) > max_dimension)) {
         --scale;
     }
@@ -131,6 +141,7 @@ constexpr u32 kMaxRenderScale = 8;
 /// to the usual 4:3, so a square-pixel presentation would be noticeably
 /// narrow.
 constexpr float kDisplayAspect = 4.0F / 3.0F;
+
 
 // ---------------------------------------------------------------------------
 // GPU stage timing
@@ -348,6 +359,14 @@ public:
     /// The backend uploads them before its next frame and whenever their
     /// generation() changes; the caller keeps them alive until replaced.
     virtual void set_texture_replacements(TextureReplacements* replacements) = 0;
+
+    /// Widen the native frame by `columns` on each side (0 for the hardware's
+    /// own raster). Takes effect at the next begin_frame(). `wide_background`
+    /// draws the 2D layers behind the 3D across the added columns: 0 leaves
+    /// them black, 1 mirrors the screen edge where nothing better is known,
+    /// 2 leaves such pixels black, 3 leaves them black only for a menu panel
+    /// (a row-scroll layer's foreground tile).
+    virtual void set_widescreen(u32 columns, u32 wide_background) = 0;
 
     /// Scale the finished native frame onto the window, letterboxed to the
     /// current aspect mode.

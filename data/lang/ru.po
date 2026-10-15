@@ -248,6 +248,11 @@ msgstr "Квадратные пиксели"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (широкий экран)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "Растянуть"
 

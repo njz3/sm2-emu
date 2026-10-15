@@ -14,6 +14,8 @@
 //
 #pragma once
 
+#include "hw/model2_machine_base.h"
+#include "render/panorama.h"
 #include "render/vk/context.h"
 #include "render/vk/vk_common.h"
 
@@ -61,10 +63,20 @@ public:
     TilemapPass(const TilemapPass&)            = delete;
     TilemapPass& operator=(const TilemapPass&) = delete;
 
-    /// The two band surfaces stay native (kSourceWidth x kSourceHeight); only
+    /// The two band surfaces stay native (width() x kSourceHeight); only
     /// the composite scope this pass opens is sized to N*native so the 3D drawn
-    /// between the bands fills the scaled target. `render_scale` is N.
-    [[nodiscard]] bool init(Context& context, u32 render_scale);
+    /// between the bands fills the scaled target. `render_scale` is N;
+    /// `columns` widens the frame on each side for widescreen.
+    [[nodiscard]] bool init(Context& context, u32 render_scale, u32 columns);
+
+    /// Width of the band surfaces and the native frame, in native pixels.
+    [[nodiscard]] u32 width() const { return frame_width(m_columns); }
+
+    /// Draw the layers behind the 3D across the widescreen side columns.
+    /// 0: plain side bars; 1: fill the sides, mirroring the edge as a last
+    /// resort; 2: fill the sides, black where only a mirror would do; 3: as 2,
+    /// but only for a menu panel (a row-scroll layer's foreground tile).
+    void set_wide_below(u32 mode) { m_wide_below = mode; }
     void shutdown();
 
     /// Refresh this frame's copies of tile RAM, character RAM and the pen table
@@ -91,7 +103,7 @@ public:
     ///
     /// Must be called with a command buffer open and outside any dynamic
     /// rendering scope. Both spans must hold kSourceWidth * kSourceHeight
-    /// premultiplied RGBA8 pixels.
+    /// premultiplied RGBA8 pixels; in widescreen they land in the middle.
     ///
     /// Invalidates this frame-in-flight slot's compute() cache: the two share
     /// the same staging buffers, and a slot upload() just wrote into must not
@@ -156,6 +168,7 @@ private:
         u64 char_generation  = 0;
         u64 table_generation = 0;
         bool window_mask_a_hidden = false;
+        u32  composed_wide        = 0;
     };
 
     /// Two surfaces per frame in flight: recording frame N+1 must not overwrite
@@ -218,7 +231,26 @@ private:
     /// Internal 3D render scale; the composite scope is N*native.
     u32 m_render_scale = 1;
 
+    u32  m_columns    = 0;
+    u32  m_wide_below = 0;
+
+    /// Widescreen side columns for the layers behind the 3D; see PanoramaTracker.
+    PanoramaTracker m_panorama;
+    PanoramaTracker::State m_panorama_state;
+    u64             m_panorama_generation = 0;
+    VkBuffer        m_panorama_buffer     = VK_NULL_HANDLE;
+    VmaAllocation   m_panorama_allocation = nullptr;
+    bool            m_panorama_cleared    = false;
+    /// This frame's sky panorama, and the names generation last uploaded.
+    const hw::Model2MachineBase::SkyPanorama* m_sky = nullptr;
+    u64             m_sky_generation      = 0;
+
     u32 m_upscale_2d = 0;  ///< 0 faithful, 1 xBR, 2 ScaleFX
+
+    [[nodiscard]] usize surface_bytes() const
+    {
+        return static_cast<usize>(width()) * kSourceHeight * sizeof(u32);
+    }
 };
 
 }  // namespace sm2::render::vk

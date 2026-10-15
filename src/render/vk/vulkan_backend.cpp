@@ -68,7 +68,7 @@ bool VulkanBackend::init(osd::Window& window, const BackendConfig& config)
                  scaled_height(m_render_scale));
     }
 
-    if (!m_tilemaps.init(m_context, m_render_scale)) {
+    if (!m_tilemaps.init(m_context, m_render_scale, m_columns)) {
         SM2_ERROR("could not create the 2D pipeline");
         return false;
     }
@@ -76,7 +76,7 @@ bool VulkanBackend::init(osd::Window& window, const BackendConfig& config)
         SM2_ERROR("could not create the 3D pipeline");
         return false;
     }
-    if (!m_present.init(m_context, m_render_scale)) {
+    if (!m_present.init(m_context, m_render_scale, frame_width(m_columns))) {
         SM2_ERROR("could not create the presentation pipeline");
         return false;
     }
@@ -114,6 +114,7 @@ Capabilities VulkanBackend::capabilities() const
                                ? m_context.device_properties().limits.maxSamplerAnisotropy
                                : 1.0F;
     caps.blended_translucency = m_polygons.stencil_has_depth();
+    caps.widescreen           = true;
     return caps;
 }
 
@@ -124,6 +125,21 @@ Capabilities VulkanBackend::capabilities() const
 bool VulkanBackend::begin_frame()
 {
     m_capture_requested = false;
+    if (m_pending_columns != m_columns) {
+        // The 2D surfaces and the native frame are sized by the width.
+        m_context.wait_idle();
+        m_present.shutdown();
+        m_tilemaps.shutdown();
+        m_columns = m_pending_columns;
+        if (!m_tilemaps.init(m_context, m_render_scale, m_columns)
+            || !m_present.init(m_context, m_render_scale, frame_width(m_columns))) {
+            SM2_ERROR("could not resize the native frame for widescreen");
+            return false;
+        }
+        m_present.set_options(m_present_options);
+        m_tilemaps.set_upscale_2d(static_cast<u32>(m_enhancement_options.upscale_2d));
+        m_polygons.set_width(frame_width(m_columns));
+    }
     if (!m_context.begin_frame()) {
         return false;
     }
@@ -212,6 +228,12 @@ void VulkanBackend::set_present_options(const PresentOptions& options)
     // reallocated, so this is safe to call between frames.
     m_present_options = options;
     m_present.set_options(options);
+}
+
+void VulkanBackend::set_widescreen(u32 columns, u32 wide_background)
+{
+    m_pending_columns = columns;
+    m_tilemaps.set_wide_below(wide_background);
 }
 
 void VulkanBackend::set_texture_replacements(TextureReplacements* replacements)

@@ -16,6 +16,7 @@
 
 #include "core/types.h"
 
+#include <algorithm>
 #include <array>
 #include <string>
 #include <vector>
@@ -137,6 +138,20 @@ struct LightgunAxis {
     u16 rest    = 0x200;
 };
 
+/// An X axis for widescreen: the travel the screen's `width` pixels span,
+/// extended by `columns` pixels' worth on each side within the board's 10 bits,
+/// so an aim beside the screen reads as a position past its edge rather than
+/// as off screen.
+[[nodiscard]] inline LightgunAxis widened_axis(const LightgunAxis& axis, u32 columns, u32 width)
+{
+    const u32    span  = axis.maximum > axis.minimum ? axis.maximum - axis.minimum : 0;
+    const u32    extra = (span * columns + width / 2) / width;
+    LightgunAxis out   = axis;
+    out.minimum = static_cast<u16>(axis.minimum > extra ? axis.minimum - extra : 0);
+    out.maximum = static_cast<u16>(std::min<u32>(0x3ff, axis.maximum + extra));
+    return out;
+}
+
 /// The four axes of a two-gun cabinet, in the order the interface board's mux
 /// presents them: P1 Y, P1 X, P2 Y, P2 X.
 struct LightgunSpec {
@@ -202,6 +217,14 @@ struct OutputSpec {
 /// combination rather than a child element, since so far every title needing
 /// one needs exactly one fixed configuration of it apart from the 315-5881's
 /// per-title key, which rides along in `GameSpec::protection_key`.
+enum class SideFill : u8 {
+    Mirror,     ///< Mirror the screen edge where nothing better is known.
+    Black,      ///< Leave those pixels black.
+    Menu,       ///< Black only for a row-scroll layer's foreground tiles,
+                ///< which is how some games build their menu panels.
+    Pillarbox,  ///< Keep the whole picture 4:3 with black side bars.
+};
+
 /// Which command set a title's force-feedback drive board speaks.
 enum class DriveProtocol : u8 {
     Daytona,  ///< Daytona's board (EPR-16488A): it works out the forces itself.
@@ -371,6 +394,11 @@ struct GameSpec {
     /// Wait cycles per texture RAM access. Virtual On's stage briefing lasts as
     /// long as its texture upload, which is slower on the cabinet. 0 = none.
     u32 texture_wait = 0;
+
+    /// In widescreen, which side-column pixels stay black rather than mirror
+    /// the screen edge: none, all of them, or only menu panels; or keep the
+    /// game 4:3 altogether (a 2D cockpit frame around the 3D).
+    SideFill side_fill = SideFill::Mirror;
 
     /// True when shifting is two momentary buttons (shift up / shift down) on
     /// IN1 bits 0x10 and 0x20 rather than the 0x70 sequential gate. Indy 500 and

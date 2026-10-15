@@ -351,7 +351,8 @@ bool Poly3DPass::create_frames()
         // The fill mask never leaves the GPU and never survives a frame. It is
         // N*native so it covers the scaled composite scope it attaches to.
         image.format = m_stencil_format;
-        image.extent = VkExtent3D{kWidth * m_render_scale, kHeight * m_render_scale, 1};
+        image.extent = VkExtent3D{frame_width(kWideColumns) * m_render_scale,
+                                  kHeight * m_render_scale, 1};
         image.usage  = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
         SM2_VK_TRY(vmaCreateImage(allocator, &image, &image_allocation, &target.stencil,
                                   &target.stencil_alloc, nullptr));
@@ -1162,7 +1163,7 @@ void Poly3DPass::draw_polygons()
 
     if (m_vertex_count != 0) {
         PolygonPush push{};
-        push.inv_raster[0]    = 1.0F / static_cast<float>(kWidth);
+        push.inv_raster[0]    = 1.0F / static_cast<float>(m_width);
         push.inv_raster[1]    = 1.0F / static_cast<float>(kHeight);
         push.render_scale     = m_render_scale;
         push.texture_quality  = m_texture_quality;

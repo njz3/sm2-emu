@@ -243,6 +243,11 @@ msgstr "Điểm ảnh vuông"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (màn hình rộng)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "Kéo giãn"
 

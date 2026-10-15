@@ -370,7 +370,7 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
 
     // Cache this frame's present placement so the crosshair and Sinden-border
     // helpers frame the same rectangle the backend presents into.
-    m_present_aspect = config.aspect_mode;
+    m_present_aspect = m_shown_aspect;
     m_present_method = config.scaling_method;
 
     // Shown regardless of F10 when enabled, so the counter is visible whether or
@@ -659,10 +659,10 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                                "Applies live."));
                 }
 
-                static constexpr std::array<const char*, 3> kAspectLabels = {
-                    N_("4:3 (arcade)"), N_("Square pixels"), N_("Stretch")};
+                static constexpr std::array<const char*, 4> kAspectLabels = {
+                    N_("4:3 (arcade)"), N_("Square pixels"), N_("16:9 (widescreen)"), N_("Stretch")};
                 int aspect_index =
-                    std::clamp(static_cast<int>(config.aspect_mode), 0, 2);
+                    std::clamp(static_cast<int>(config.aspect_mode), 0, 3);
                 ImGui::SetNextItemWidth(160);
                 if (ImGui::Combo(tr_id("Aspect"), &aspect_index, tr_all(kAspectLabels).data(),
                                  static_cast<int>(kAspectLabels.size()))) {
@@ -673,7 +673,9 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                 if (ImGui::IsItemHovered()) {
                     tooltip(tr("4:3 is the arcade monitor's shape (the default).\n"
                                "Square pixels shows the raw 496x384 (slightly narrow).\n"
-                               "Stretch fills the whole window. Applies live."));
+                               "16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+                               "Stretch fills the whole window.\n"
+                               "GPU renderers only. Applies live."));
                 }
             }
 
@@ -2659,7 +2661,7 @@ void Gui::draw_crosshairs(const Input* input)
     if (io.DisplaySize.x < 1.0f || io.DisplaySize.y < 1.0f) {
         return;
     }
-    const render::Letterbox box = render::compute_letterbox(
+    const render::Letterbox box = render::compute_game_rect(
         static_cast<u32>(io.DisplaySize.x), static_cast<u32>(io.DisplaySize.y),
         m_present_aspect, m_present_method);
 
@@ -2769,7 +2771,8 @@ void Gui::draw_sinden_border(const Config& config)
     }
 
     // Frame the letterboxed game image, not the raw window, so the border sits
-    // on the picture the gun's camera actually sees.
+    // on the picture the gun's camera actually sees. In widescreen that is the
+    // whole picture, side columns included, so a gun can aim into them.
     const render::Letterbox box = render::compute_letterbox(
         static_cast<u32>(io.DisplaySize.x), static_cast<u32>(io.DisplaySize.y),
         m_present_aspect, m_present_method);

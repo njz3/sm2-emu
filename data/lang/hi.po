@@ -248,6 +248,11 @@ msgstr "वर्गाकार पिक्सेल"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (वाइडस्क्रीन)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "खींचें"
 

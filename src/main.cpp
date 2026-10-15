@@ -2292,6 +2292,13 @@ int main(int argc, char** argv)
         // Fixed at launch by --graphics-backend software. There is no runtime
         // switch: the two renderers are a launch-time choice.
         const bool use_software_renderer = options.start_in_software_renderer;
+        // 16:9 widens the frame only on a GPU renderer; elsewhere it shows 4:3.
+        const bool can_widen = !use_software_renderer && backend->capabilities().widescreen;
+        const auto shown_aspect = [&]() {
+            return options.config.aspect_mode == AspectMode::Widescreen && !can_widen
+                       ? AspectMode::FourThree
+                       : options.config.aspect_mode;
+        };
         // Draw one frame behind on a second thread; off for captures, which
         // want the frame they asked for.
         const bool async_software = use_software_renderer && options.config.software_async
@@ -2553,8 +2560,7 @@ int main(int argc, char** argv)
                 input.set_pad_rumble(options.config.pad_rumble,
                                      options.config.pad_rumble_strength,
                                      options.config.pad_rumble_cornering);
-                input.set_present_placement(options.config.aspect_mode,
-                                            options.config.scaling_method);
+                input.set_present_placement(shown_aspect(), options.config.scaling_method);
                 input.set_sinden_border(options.config.sinden_border);
                 const auto drive_writes = machine_iface->take_drive_board_writes();
                 input.update_drive_board(loaded->game, drive_writes.view());
@@ -2613,6 +2619,31 @@ int main(int argc, char** argv)
 
                 telemetry_inputs_used = machine_iface->inputs();
                 machine_iface->set_draw_distance(options.config.extended_draw_distance);
+                {
+                    // The geometry engine and the backend must agree on the
+                    // width for the frame run_frame() builds.
+                    const u32 columns =
+                        shown_aspect() == AspectMode::Widescreen ? render::kWideColumns : 0;
+                    // A frame whose 3D stays inside the 4:3 screen is a 2D one
+                    // (a title, a menu with a model on it): plain side bars.
+                    const float right       = static_cast<float>(columns + render::kNativeWidth);
+                    const auto  reaches_side = [&](const hw::RenderPolygon& poly) {
+                        for (u32 v = 0; v < poly.num_vertices; ++v) {
+                            if (poly.v[v].x < static_cast<float>(columns) || poly.v[v].x > right) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    };
+                    const auto& polygons = machine_iface->render_list().polygons;
+                    machine_iface->set_widescreen(columns);
+                    input.set_widescreen(columns);
+                    const rom::SideFill side_fill = loaded->game.side_fill;
+                    const bool fill_sides  = columns != 0
+                                          && std::any_of(polygons.begin(), polygons.end(), reaches_side);
+                    backend->set_widescreen(columns, fill_sides && side_fill != rom::SideFill::Pillarbox
+                                                         ? 1u + static_cast<u32>(side_fill) : 0u);
+                }
                 {
                     auto scope = core::maybe_scope(stage_run_frame, profile_sample);
                     machine_iface->run_frame();
@@ -2874,7 +2905,7 @@ int main(int argc, char** argv)
             {
                 render::PresentOptions present;
                 present.scaling_method        = options.config.scaling_method;
-                present.aspect_mode           = options.config.aspect_mode;
+                present.aspect_mode           = shown_aspect();
                 present.crt_enabled           = options.config.crt_enabled;
                 present.crt_scanline_strength = options.config.crt_scanline_strength;
                 present.crt_mask_strength     = options.config.crt_mask_strength;
@@ -2948,6 +2979,7 @@ int main(int argc, char** argv)
             }
             gui.set_current_family(loaded.has_value() ? game_family(loaded->game)
                                                       : std::string());
+            gui.set_shown_aspect(shown_aspect());
             const bool gui_active =
                 gui.draw(options.config, gpu_names, pacer.measured_hz(),
                         use_software_renderer ? "Software" : gpu_backend_name, &input);

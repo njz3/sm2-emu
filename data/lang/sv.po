@@ -249,6 +249,11 @@ msgstr "Kvadratiska pixlar"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (bredbild)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr "Sträck ut"
 

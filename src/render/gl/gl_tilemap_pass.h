@@ -19,6 +19,7 @@
 // only the GL entry points that carry it out.
 #pragma once
 
+#include "render/panorama.h"
 #include "render/gl/gl_common.h"
 #include "render/geometry.h"
 
@@ -43,7 +44,16 @@ public:
     TilemapPass(const TilemapPass&)            = delete;
     TilemapPass& operator=(const TilemapPass&) = delete;
 
-    [[nodiscard]] bool init();
+    /// `columns` widens the surfaces on each side for widescreen.
+    [[nodiscard]] bool init(u32 columns = 0);
+
+    [[nodiscard]] u32 width() const { return render::frame_width(m_columns); }
+
+    /// Draw the layers behind the 3D across the widescreen side columns.
+    /// 0: plain side bars; 1: fill the sides, mirroring the edge as a last
+    /// resort; 2: fill the sides, black where only a mirror would do; 3: as 2,
+    /// but only for a menu panel (a row-scroll layer's foreground tile).
+    void set_wide_below(u32 mode) { m_wide_below = mode; }
     void shutdown();
 
     /// As render::vk::TilemapPass::compute(): dispatch the compose shader
@@ -93,6 +103,22 @@ private:
     u32 m_push_ubo = 0;  ///< backing buffer for the composite shader's Push block
 
     u32 m_upscale_2d = 0;  ///< 0 faithful, 1 xBR, 2 ScaleFX
+
+    u32  m_columns         = 0;
+    u32  m_wide_below      = 0;
+    u32  m_composed_wide   = 0;      ///< m_wide_below at the last dispatch
+    u32  m_compute_ubo     = 0;
+
+    /// Widescreen side columns for the layers behind the 3D; see PanoramaTracker.
+    PanoramaTracker        m_panorama;
+    PanoramaTracker::State m_panorama_state;
+    u32                    m_panorama_buffer = 0;
+    u64                    m_sky_generation  = 0;
+
+    [[nodiscard]] usize surface_bytes() const
+    {
+        return static_cast<usize>(width()) * kSourceHeight * sizeof(u32);
+    }
 
     // -- the compute path -----------------------------------------------------
 

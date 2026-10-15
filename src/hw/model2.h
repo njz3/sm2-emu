@@ -149,6 +149,11 @@ public:
     /// when the program has selected 30 Hz geometry.
     [[nodiscard]] const RenderList& render_list() const override { return m_render_list; }
 
+    void set_widescreen(u32 columns) override
+    {
+        m_geometry.set_widescreen(columns);
+        m_gun_columns = columns;
+    }
     [[nodiscard]] u64 geometry_stage_nanoseconds() const override
     {
         return m_geometry.last_run_nanoseconds();
@@ -416,6 +421,9 @@ private:
 
     rom::RomSet m_roms;
     rom::GameSpec m_game;
+
+    /// Widescreen columns each side; the guns' X travel grows to match.
+    u32 m_gun_columns = 0;
 
     std::span<const u8> m_rom_maincpu;
     std::span<const u8> m_rom_main_data;

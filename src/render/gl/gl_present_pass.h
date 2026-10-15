@@ -39,11 +39,11 @@ public:
     /// fill-mask stencil to N*native, and the viewport begin_frame() sets. The
     /// native frame the software renderer uploads and a screenshot reads back
     /// stay native, so N=1 is unchanged.
-    [[nodiscard]] bool init(u32 render_scale);
+    [[nodiscard]] bool init(u32 render_scale, u32 width = kWidth);
     void shutdown();
 
     /// Size of the composite target, N*native.
-    [[nodiscard]] u32 width() const { return scaled_width(m_render_scale); }
+    [[nodiscard]] u32 width() const { return m_native_width * m_render_scale; }
     [[nodiscard]] u32 height() const { return scaled_height(m_render_scale); }
 
     /// Claim this frame's native texture as the framebuffer other passes
@@ -53,7 +53,7 @@ public:
     /// The texture begin_frame() bound, for reading back a capture.
     [[nodiscard]] u32 native_texture() const { return m_native_texture; }
 
-    static constexpr u32 native_width()  { return kWidth; }
+    [[nodiscard]] u32 native_width() const { return m_native_width; }
     static constexpr u32 native_height() { return kHeight; }
 
     /// Replace the native frame with pixels rendered on the CPU, in place of
@@ -89,6 +89,7 @@ private:
 
     /// Internal 3D render scale; the composite target and stencil are N*native.
     u32 m_render_scale = 1;
+    u32 m_native_width = kWidth;
 
     /// Live present-stage options; present() reads these each frame.
     PresentOptions m_options;

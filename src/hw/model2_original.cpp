@@ -439,6 +439,9 @@ void Model2Original::run_frame()
     m_frame_start += kCyclesPerFrame;
     ++m_frames;
     m_in_frame = false;
+    if (m_widescreen_columns != 0) {
+        update_sky();
+    }
 }
 
 void Model2Original::step_copro(u32 host_cycles)
@@ -1482,10 +1485,7 @@ void Model2Original::wire_advanced_io_board()
     m_ioboard2.set_lightgun(1, [this] { return m_inputs.gun_p1x; });
     m_ioboard2.set_lightgun(2, [this] { return m_inputs.gun_p2y; });
     m_ioboard2.set_lightgun(3, [this] { return m_inputs.gun_p2x; });
-    m_ioboard2.set_lightgun_range(0, gun.p1y.minimum, gun.p1y.maximum);
-    m_ioboard2.set_lightgun_range(1, gun.p1x.minimum, gun.p1x.maximum);
-    m_ioboard2.set_lightgun_range(2, gun.p2y.minimum, gun.p2y.maximum);
-    m_ioboard2.set_lightgun_range(3, gun.p2x.minimum, gun.p2x.maximum);
+    set_widescreen(0);
 
     if (!gun.present) {
         SM2_WARN("model2o: %s fits the advanced I/O board but declares no lightgun "
@@ -1816,6 +1816,166 @@ void Model2Original::extend_track_cells()
     list[0] = static_cast<u8>(total);
     std::memcpy(m_work_ram.data() + (kDaytonaVisibleCells - kWorkRam), visible, sizeof(visible));
     std::memcpy(m_work_ram.data() + (kDaytonaPolyBudget - kWorkRam), &kDaytonaWideBudget, 4);
+}
+
+namespace {
+
+// Daytona USA's sky. A routine streams the columns entering view from a
+// 360-degree panorama of eight 32-cell pages into layer 2, starting at map row
+// 6; it begins by loading the sky's scroll and the one before it:
+//     ldos S, g4 / ldos S - 2, g5 / lda 0xffffff00, g7
+// and calls a routine that starts `ld D, g4`, D pointing to the page table.
+constexpr u32 kSkyLayer    = 2;
+constexpr u32 kSkyFirstRow = 6;
+constexpr u32 kLdosG4      = 0x88a03000;
+constexpr u32 kLdosG5      = 0x88a83000;
+constexpr u32 kLdaG7       = 0x8cb83000;
+constexpr u32 kLdG4        = 0x90a03000;
+
+}  // namespace
+
+void Model2Original::find_sky_streamer()
+{
+    m_sky_scanned = true;
+    if (m_game.name.rfind("daytona", 0) != 0) {
+        return;
+    }
+    const u32 end = static_cast<u32>(std::min<usize>(m_rom_maincpu.size(), 0x40000));
+    for (u32 address = 0; address + 24 <= end; address += 4) {
+        const u32 scroll = rom_word(m_rom_maincpu, address + 4);
+        if (rom_word(m_rom_maincpu, address) != kLdosG4 || scroll < kWorkRam
+            || rom_word(m_rom_maincpu, address + 8) != kLdosG5
+            || rom_word(m_rom_maincpu, address + 12) != scroll - 2
+            || rom_word(m_rom_maincpu, address + 16) != kLdaG7
+            || rom_word(m_rom_maincpu, address + 20) != 0xffffff00) {
+            continue;
+        }
+        for (u32 at = address + 24; at < address + 0x100 && at + 4 <= end; at += 4) {
+            const u32 word = rom_word(m_rom_maincpu, at);
+            if ((word >> 24) != 0x09) {
+                continue;
+            }
+            const s32 displacement = static_cast<s32>(word << 8) >> 8;
+            const u32 target       = at + static_cast<u32>(displacement & ~3);
+            if (rom_word(m_rom_maincpu, target) == kLdG4) {
+                m_sky_scroll     = scroll;
+                m_sky_descriptor = rom_word(m_rom_maincpu, target + 4);
+                SM2_INFO("widescreen: sky panorama at %08x, scroll %08x",
+                         m_sky_descriptor, m_sky_scroll);
+            }
+            return;
+        }
+    }
+}
+
+void Model2Original::update_sky()
+{
+    if (!m_sky_scanned) {
+        find_sky_streamer();
+    }
+    m_sky.rows = 0;
+    if (m_sky_descriptor == 0) {
+        return;
+    }
+    const auto work32 = [&](u32 address) -> u32 {
+        u32 value = 0;
+        if (address >= kWorkRam && address - kWorkRam + 4 <= m_work_ram.size()) {
+            std::memcpy(&value, m_work_ram.data() + (address - kWorkRam), 4);
+        }
+        return value;
+    };
+    const auto data32 = [&](u32 address) -> u32 {
+        return address >= kRomMainData ? rom_word(m_rom_main_data, address - kRomMainData) : 0;
+    };
+    const auto data16 = [&](u32 address) -> u16 {
+        u16 value = 0;
+        if (address >= kRomMainData && address - kRomMainData + 2 <= m_rom_main_data.size()) {
+            std::memcpy(&value, m_rom_main_data.data() + (address - kRomMainData), 2);
+        }
+        return value;
+    };
+
+    const u32 pointer = work32(m_sky_descriptor);
+    const u32 table   = pointer >= kRomMainData ? data32(pointer) : 0;
+    if (table == 0) {
+        return;
+    }
+    if (table != m_sky_table) {
+        std::array<u32, 8> pages{};
+        const u32 rows = data32(data32(table + 8) + 4);
+        bool usable = rows != 0 && rows <= SkyPanorama::kRows - kSkyFirstRow;
+        for (u32 page = 0; page < 8 && usable; ++page) {
+            pages[page] = data32(table + 8 + page * 4);
+            usable = pages[page] >= kRomMainData && data32(pages[page] + 4) == rows
+                  && data32(pages[page] + 8) >= 32;
+        }
+        m_sky_table = table;
+        m_sky.first_row = usable ? kSkyFirstRow : 0;
+        m_sky.layer     = kSkyLayer;
+        m_sky.generation++;
+        m_sky.names.fill(0);
+        for (u32 cell = 0; usable && cell < SkyPanorama::kCells; ++cell) {
+            const u32 page   = pages[cell >> 5];
+            const u32 stride = data32(page + 8);
+            for (u32 row = 0; row < rows; ++row) {
+                m_sky.names[row * SkyPanorama::kCells + cell] =
+                    data16(page + 0xc + (row * stride + (cell & 31)) * 2);
+            }
+        }
+        m_sky_rows_cached = usable ? rows : 0;
+    }
+    if (m_sky_rows_cached == 0) {
+        return;
+    }
+
+    // The map holds the panorama modulo 512 pixels; the game's scroll says
+    // which quarter of the 2048 the screen is in.
+    u16 hscroll = 0;
+    std::memcpy(&hscroll, tile_ram().data() + 0xa000 + kSkyLayer * 2, 2);
+    u16 scroll = 0;
+    std::memcpy(&scroll, m_work_ram.data() + (m_sky_scroll - kWorkRam), 2);
+    const u32 h      = (0u - hscroll) & 0x1ff;
+    const u32 target = (0u - (static_cast<u32>(scroll) >> 5)) & 2047;
+    const u32 origin = (((target - h + 256) & 2047) & ~511u) + h;
+
+    // Only while the map shows what the panorama says it should.
+    u32 matches = 0;
+    u32 samples = 0;
+    for (u32 row = 0; row < m_sky_rows_cached; row += 3) {
+        for (u32 x = 0; x < 496; x += 8) {
+            const u32 cell = ((origin + x) >> 3) & (SkyPanorama::kCells - 1);
+            const u32 map  = ((h + x) >> 3) & 63;
+            u16 name = 0;
+            std::memcpy(&name,
+                        tile_ram().data() + 0x4000 + ((kSkyFirstRow + row) * 64 + map) * 2, 2);
+            matches += name == m_sky.names[row * SkyPanorama::kCells + cell] ? 1 : 0;
+            ++samples;
+        }
+    }
+    if (matches * 10 < samples * 9) {
+        return;
+    }
+    m_sky.origin = origin & 2047;
+    m_sky.rows   = m_sky_rows_cached;
+}
+
+void Model2Original::set_widescreen(u32 columns)
+{
+    m_geometry.set_widescreen(columns);
+    m_widescreen_columns = columns;
+    if (columns == 0) {
+        m_sky.rows = 0;
+    }
+
+    // The guns' X travel grows with the picture, so an aim beside the 4:3
+    // screen is a position past its edge, not off screen.
+    const rom::LightgunSpec& gun = m_game.lightgun;
+    const rom::LightgunAxis  p1x = rom::widened_axis(gun.p1x, columns, Geometrizer::kRasterWidth);
+    const rom::LightgunAxis  p2x = rom::widened_axis(gun.p2x, columns, Geometrizer::kRasterWidth);
+    m_ioboard2.set_lightgun_range(0, gun.p1y.minimum, gun.p1y.maximum);
+    m_ioboard2.set_lightgun_range(1, p1x.minimum, p1x.maximum);
+    m_ioboard2.set_lightgun_range(2, gun.p2y.minimum, gun.p2y.maximum);
+    m_ioboard2.set_lightgun_range(3, p2x.minimum, p2x.maximum);
 }
 
 }  // namespace sm2::hw

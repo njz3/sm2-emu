@@ -168,6 +168,11 @@ public:
 
     [[nodiscard]] const RenderList& render_list() const override { return m_render_list; }
 
+    void set_widescreen(u32 columns) override;
+    [[nodiscard]] const SkyPanorama* sky_panorama() const override
+    {
+        return m_sky.rows != 0 ? &m_sky : nullptr;
+    }
     void set_draw_distance(bool extended) override;
     [[nodiscard]] u64 geometry_stage_nanoseconds() const override
     {
@@ -255,6 +260,16 @@ public:
 
 private:
     void extend_track_cells();
+    void find_sky_streamer();
+    void update_sky();
+
+    u32         m_widescreen_columns = 0;
+    bool        m_sky_scanned        = false;
+    u32         m_sky_scroll         = 0;  ///< work RAM: the sky's 16-bit scroll
+    u32         m_sky_descriptor     = 0;  ///< work RAM: pointer to its page table
+    u32         m_sky_table          = 0;
+    u32         m_sky_rows_cached    = 0;
+    SkyPanorama m_sky;
     bool m_draw_distance = false;
     u32  m_track_draw    = 0;
     enum class Notify : u8 { None, Palette, TileRam, CharRam };

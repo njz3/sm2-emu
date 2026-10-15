@@ -230,4 +230,12 @@ struct Letterbox {
                                           AspectMode    aspect = AspectMode::FourThree,
                                           ScalingMethod method = ScalingMethod::Bilinear);
 
+/// The part of compute_letterbox()'s rectangle the game's own 4:3 raster
+/// fills: all of it, except in widescreen, where the added columns flank it.
+/// Guns and crosshairs map onto this.
+[[nodiscard]] Letterbox compute_game_rect(u32           window_width,
+                                          u32           window_height,
+                                          AspectMode    aspect,
+                                          ScalingMethod method);
+
 }  // namespace sm2::render

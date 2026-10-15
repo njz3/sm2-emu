@@ -55,11 +55,11 @@ public:
     /// and the two 2D bands are drawn into an N*native image. The native frame
     /// the software renderer uploads and a screenshot reads back are still
     /// native (native_extent()), so N=1 is unchanged.
-    [[nodiscard]] bool init(Context& context, u32 render_scale);
+    [[nodiscard]] bool init(Context& context, u32 render_scale, u32 width = kWidth);
     void shutdown();
 
     /// Size of the composite target, N*native.
-    [[nodiscard]] u32 width() const { return scaled_width(m_render_scale); }
+    [[nodiscard]] u32 width() const { return m_native_width * m_render_scale; }
     [[nodiscard]] u32 height() const { return scaled_height(m_render_scale); }
 
     /// Claim this frame's native image and return the view to draw into.
@@ -83,7 +83,8 @@ public:
     /// Call after begin_frame() and before record().
     void upload_from_host(std::span<const u32> pixels);
 
-    static constexpr VkExtent2D native_extent() { return VkExtent2D{kWidth, kHeight}; }
+    [[nodiscard]] VkExtent2D native_extent() const { return VkExtent2D{m_native_width, kHeight}; }
+    [[nodiscard]] u32        native_width() const { return m_native_width; }
     static constexpr VkFormat   native_format() { return kNativeColourFormat; }
 
     /// Full size of the composite image, N*native -- what a screenshot reads so
@@ -149,6 +150,7 @@ private:
 
     /// Internal 3D render scale; the composite target is N*native.
     u32 m_render_scale = 1;
+    u32 m_native_width = kWidth;
 
     /// Live present-stage options; record()/letterbox() read these each frame.
     PresentOptions m_options;

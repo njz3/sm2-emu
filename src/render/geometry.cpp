@@ -282,7 +282,8 @@ Letterbox compute_letterbox(u32           window_width,
         const float ratio = aspect == AspectMode::SquarePixel
                                 ? static_cast<float>(kNativeWidth)
                                       / static_cast<float>(kNativeHeight)
-                                : kDisplayAspect;
+                            : aspect == AspectMode::Widescreen ? 16.0F / 9.0F
+                                                               : kDisplayAspect;
         target_width  = width;
         target_height = width / ratio;
         if (target_height > height) {
@@ -313,6 +314,19 @@ Letterbox compute_letterbox(u32           window_width,
     box.y      = (height - target_height) * 0.5F;
     box.width  = target_width;
     box.height = target_height;
+    return box;
+}
+
+Letterbox compute_game_rect(u32 window_width, u32 window_height, AspectMode aspect,
+                            ScalingMethod method)
+{
+    Letterbox box = compute_letterbox(window_width, window_height, aspect, method);
+    if (aspect == AspectMode::Widescreen) {
+        const float inner = box.width * static_cast<float>(kNativeWidth)
+                          / static_cast<float>(frame_width(kWideColumns));
+        box.x += (box.width - inner) * 0.5F;
+        box.width = inner;
+    }
     return box;
 }
 

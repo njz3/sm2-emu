@@ -127,6 +127,10 @@ public:
         m_families = std::move(families);
     }
 
+    /// The aspect the frame is shown at, which is 4:3 when 16:9 is chosen but
+    /// the renderer cannot widen the frame.
+    void set_shown_aspect(AspectMode aspect) { m_shown_aspect = aspect; }
+
     /// The running game's family, empty when none is loaded.
     void set_current_family(std::string key) { m_current_family = std::move(key); }
 
@@ -296,6 +300,7 @@ private:
     /// draw_sinden_border). Kept in step with the one config value; a mismatch
     /// would drift the aim from the picture.
     AspectMode    m_present_aspect = AspectMode::FourThree;
+    AspectMode    m_shown_aspect   = AspectMode::FourThree;
     ScalingMethod m_present_method = ScalingMethod::SharpBilinear;
 
     /// GPU capabilities for gating the enhancement options (set each frame).

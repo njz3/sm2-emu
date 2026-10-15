@@ -107,6 +107,42 @@ layout(std430, set = 0, binding = 2) readonly buffer Pens { uint uPens[]; };
 layout(std430, set = 0, binding = 3) writeonly buffer Below { uint uBelow[]; };
 layout(std430, set = 0, binding = 4) writeonly buffer Above { uint uAbove[]; };
 
+#ifdef SM2_TARGET_GL
+layout(binding = 0) uniform Push {
+#else
+layout(push_constant) uniform Push {
+#endif
+    // Output width: the screen plus `columns` on each side in widescreen.
+    uint width;
+    uint columns;
+    // 0: plain side bars. Otherwise draw the layers behind the 3D across the
+    // side columns too, mirroring the screen edge as a last resort (1),
+    // leaving black where only a mirror would do (2), or only where that
+    // mirror is of a menu panel, a row-scroll layer's foreground tile (3). The layers in front stay on the
+    // 4:3 screen: they are the HUD.
+    uint wideBelow;
+    // Per layer (see render::PanoramaTracker): whether the panorama applies,
+    // the world column of the screen's left edge, and the live epoch.
+    uint  cacheable;
+    uvec4 offset;
+    uvec4 offsetY;
+    uvec4 epoch;
+    // A game's own 360-degree panorama for one layer (see
+    // Model2MachineBase::SkyPanorama): layer + 1 (0 for none), the panorama
+    // pixel at screen x = 0, the map row of its first row, and its row count.
+    uvec4 sky;
+    // Per layer, a bit per map row that loops without being rewritten.
+    uvec4 wrapLow;
+    uvec4 wrapHigh;
+} pc;
+
+/// What each layer has shown, by layer, world column and world row, as pairs:
+/// pen in bits 11:0, category in bit 12, opaque texel in bit 13 and epoch in
+/// bits 31:16; then the full world column and row, since slots alias.
+layout(std430, set = 0, binding = 5) buffer Panorama { uint uPanorama[]; };
+
+const uint kPanoramaWidth = 1024u;
+
 // ---------------------------------------------------------------------------
 // Constants mirrored from segaic24.h / segaic24.cpp
 // ---------------------------------------------------------------------------
@@ -246,8 +282,19 @@ void resolveSplit(uint evenLayer, uint mode, uint dx, uint dy, out uint chosen, 
 /// pen. `opaqueMode` draws unconditionally (subject to blanking and the
 /// window mask); otherwise a hit additionally needs an opaque texel whose
 /// category matches `requireCategory`.
+bool evalLayerAt(uint layer, uint requireCategory, bool opaqueMode, uint maskDx, uint dx,
+                 uint dy, out uint pen);
+
 bool evalLayer(uint layer, uint requireCategory, bool opaqueMode, uint dx, uint dy,
               out uint pen)
+{
+    return evalLayerAt(layer, requireCategory, opaqueMode, dx, dx, dy, pen);
+}
+
+/// evalLayer() sampling the map at screen column `dx` (which may lie off the
+/// screen, modulo the map) with the window mask taken at `maskDx`.
+bool evalLayerAt(uint layer, uint requireCategory, bool opaqueMode, uint maskDx, uint dx,
+                 uint dy, out uint pen)
 {
     // Blanking is this layer's own vertical-scroll register, bit 15 -- for an
     // even layer that register is the same one the split-mode bits below come
@@ -275,7 +322,7 @@ bool evalLayer(uint layer, uint requireCategory, bool opaqueMode, uint dx, uint 
         resolveSplit(evenLayer, mode, dx, dy, chosen, sx, sy);
         sampleTileAt(chosen, sx, sy, pen, category, opaqueTexel);
     } else {
-        if (!maskVisible(layer, dx, dy)) {
+        if (!maskVisible(layer, maskDx, dy)) {
             return false;
         }
         plainSource(layer, dx, dy, sx, sy);
@@ -283,6 +330,160 @@ bool evalLayer(uint layer, uint requireCategory, bool opaqueMode, uint dx, uint 
     }
 
     return opaqueMode || (opaqueTexel && category == requireCategory);
+}
+
+// ---------------------------------------------------------------------------
+// Widescreen panorama
+// ---------------------------------------------------------------------------
+
+uint panoramaTag(uint layer, uint dx, uint dy)
+{
+    return ((pc.offset[layer] + dx) & 0xffffu) | (((pc.offsetY[layer] + dy) & 0xffffu) << 16u);
+}
+
+uint panoramaIndex(uint layer, uint dx, uint dy)
+{
+    uint column = (pc.offset[layer] + dx) & (kPanoramaWidth - 1u);
+    uint row    = (pc.offsetY[layer] + dy) & 511u;
+    return ((layer * kPanoramaWidth + column) * 512u + row) * 2u;
+}
+
+void recordPanorama(uint dx, uint dy)
+{
+    for (uint layer = 0u; layer < 4u; ++layer) {
+        if (((pc.cacheable >> layer) & 1u) == 0u) {
+            continue;
+        }
+        uint sx, sy, pen, category;
+        bool opaqueTexel;
+        uint chosen = layer;
+        if (((tileWord(kVerticalScroll + (layer & ~1u)) >> 13u) & 3u) != 0u) {
+            resolveSplit(layer, 1u, dx, dy, chosen, sx, sy);
+        } else {
+            plainSource(layer, dx, dy, sx, sy);
+        }
+        sampleTileAt(chosen, sx, sy, pen, category, opaqueTexel);
+        uint index = panoramaIndex(layer, dx, dy);
+        uPanorama[index] =
+            pen | (category << 12u) | (opaqueTexel ? (1u << 13u) : 0u) | (pc.epoch[layer] << 16u);
+        uPanorama[index + 1u] = panoramaTag(layer, dx, dy);
+    }
+}
+
+/// The sky panorama's names follow the cache, 256 cells by 64 rows, two to a
+/// word.
+const uint kSkyNames = 4u * kPanoramaWidth * 512u * 2u;
+
+/// Side column `sx` of the sky layer, from the game's own panorama: 1 draws,
+/// 0 does not, -1 leaves it to the cache (another layer, a row it lacks).
+int skySide(uint layer, uint requireCategory, bool opaqueMode, int sx, uint dy, out uint pen)
+{
+    pen = 0u;
+    if (pc.sky.w == 0u || (layer & ~1u) != ((pc.sky.x - 1u) & ~1u)
+        || (tileWord(kVerticalScroll + layer) & 0x8000u) != 0u) {
+        return -1;
+    }
+    uint chosen = layer;
+    uint sx0, sy;
+    uint mode = (tileWord(kVerticalScroll + (layer & ~1u)) >> 13u) & 3u;
+    if (mode == 1u) {
+        if ((layer & 1u) != 0u) {
+            return 0;
+        }
+        resolveSplit(layer, mode, 0u, dy, chosen, sx0, sy);
+    } else if (mode == 0u) {
+        plainSource(layer, 0u, dy, sx0, sy);
+    } else {
+        return -1;
+    }
+    uint row = sy >> 3u;
+    if (chosen != pc.sky.x - 1u || row < pc.sky.z || row >= pc.sky.z + pc.sky.w) {
+        return -1;
+    }
+    uint px    = (pc.sky.y + uint(sx)) & 2047u;
+    uint index = (row - pc.sky.z) * 256u + (px >> 3u);
+    uint word  = uPanorama[kSkyNames + (index >> 1u)];
+    uint value = ((index & 1u) != 0u) ? (word >> 16u) : (word & 0xffffu);
+    uint nibble = tilePixel(value & kTileMask, px & 7u, sy & 7u);
+    pen = ((value >> 7u) & 0xffu) * 16u + nibble;
+    uint category = ((value & 0x8000u) != 0u) ? 1u : 0u;
+    return (opaqueMode || (nibble != 0u && category == requireCategory)) ? 1 : 0;
+}
+
+/// Whether the map row `layer` shows on screen row `dy` loops without being
+/// rewritten, so the side columns can read it directly.
+bool wrapsAt(uint layer, uint dy)
+{
+    uint row  = (((tileWord(kVerticalScroll + layer) & 0x1ffu) + dy) & 0x1ffu) >> 3u;
+    uint bits = row < 32u ? pc.wrapLow[layer] : pc.wrapHigh[layer];
+    return ((bits >> (row & 31u)) & 1u) != 0u;
+}
+
+/// evalLayer() for a side column `sx` (off the screen): the game's panorama
+/// where it has one, else the map where its row loops, else the cache where
+/// it has seen that column, else the screen mirrored at `mirrorDx`, which
+/// `mirrored` reports so the caller can refuse it.
+bool evalLayerSide(uint layer, uint requireCategory, bool opaqueMode, uint mirrorDx, int sx,
+                   uint dy, out uint pen, out bool mirrored)
+{
+    mirrored = false;
+    int sky  = skySide(layer, requireCategory, opaqueMode, sx, dy, pen);
+    if (sky >= 0) {
+        return sky != 0;
+    }
+    if (((pc.cacheable >> layer) & 1u) != 0u && wrapsAt(layer, dy)) {
+        return evalLayerAt(layer, requireCategory, opaqueMode, mirrorDx, uint(sx), dy, pen);
+    }
+    bool split = ((tileWord(kVerticalScroll + (layer & ~1u)) >> 13u) & 3u) != 0u;
+    if (((pc.cacheable >> layer) & 1u) != 0u && (split || maskVisible(layer, mirrorDx, dy))) {
+        uint index = panoramaIndex(layer, uint(sx), dy);
+        uint entry = uPanorama[index];
+        if ((entry >> 16u) == pc.epoch[layer]
+            && uPanorama[index + 1u] == panoramaTag(layer, uint(sx), dy)) {
+            pen = entry & 0xfffu;
+            return opaqueMode
+                || ((entry & (1u << 13u)) != 0u && ((entry >> 12u) & 1u) == requireCategory);
+        }
+    }
+    mirrored = evalLayer(layer, requireCategory, opaqueMode, mirrorDx, dy, pen);
+    return mirrored;
+}
+
+/// A foreground-category tile on a row-scroll layer at screen (dx, dy): how
+/// a menu panel is built, where a scene's backdrop is background category.
+bool menuTile(uint layer, uint dx, uint dy)
+{
+    if ((tileWord(kHorizontalScroll + layer) & 0x8000u) == 0u
+        || ((tileWord(kVerticalScroll + (layer & ~1u)) >> 13u) & 3u) != 0u) {
+        return false;
+    }
+    uint sx, sy, pen, category;
+    bool opaqueTexel;
+    plainSource(layer, dx, dy, sx, sy);
+    sampleTileAt(layer, sx, sy, pen, category, opaqueTexel);
+    return category == 1u;
+}
+
+/// The colour behind the 3D at side column `sx`. `refused` is set when it
+/// would only be a mirror this game wants left black.
+uint compositeSide(uint mirrorDx, int sx, uint dy, out bool refused)
+{
+    uint pen;
+    bool mirrored;
+    refused = false;
+    for (uint layer = 0u; layer < 4u; ++layer) {
+        if (evalLayerSide(layer, 0u, layer >= 2u, mirrorDx, sx, dy, pen, mirrored)) {
+            refused = mirrored && (pc.wideBelow == 2u || (pc.wideBelow == 3u && menuTile(layer, mirrorDx, dy)));
+            return uPens[pen];
+        }
+    }
+    return 0u;
+}
+
+/// The screen column a side column `sx` mirrors.
+uint mirrorOf(int sx)
+{
+    return uint(sx < 0 ? -1 - sx : min(sx, 2 * int(kScreenWidth) - 1 - sx));
 }
 
 // ---------------------------------------------------------------------------
@@ -306,13 +507,58 @@ uint composite(uint category, uint dx, uint dy)
     return 0u;
 }
 
+/// The front layers' colour at the screen's edge on row `dy` if the row is one
+/// colour for the first few pixels in, else 0.
+uint solidEdge(bool left, uint dy)
+{
+    uint edge   = left ? 0u : kScreenWidth - 1u;
+    uint colour = composite(1u, edge, dy);
+    if ((colour >> 24u) == 0u) {
+        return 0u;
+    }
+    const uint kInward[3] = uint[3](2u, 4u, 6u);
+    for (uint i = 0u; i < 3u; ++i) {
+        if (composite(1u, left ? kInward[i] : edge - kInward[i], dy) != colour) {
+            return 0u;
+        }
+    }
+    return colour;
+}
+
+/// A front-layer bar (a letterbox, a panel) that reaches the screen's edge
+/// carries on into the side columns; anything else, the HUD's text and art,
+/// stays on the screen. A bar is solid on the rows around it too, which a
+/// textured row (brushed metal, a gradient) is not.
+uint aboveSide(bool left, uint dy)
+{
+    uint colour = solidEdge(left, dy);
+    if (colour == 0u) {
+        return 0u;
+    }
+    uint same = 0u;
+    for (int step = -2; step <= 2; ++step) {
+        int row = int(dy) + step;
+        if (step != 0 && row >= 0 && row < int(kScreenHeight)
+            && solidEdge(left, uint(row)) == colour) {
+            ++same;
+        }
+    }
+    return same >= 2u ? colour : 0u;
+}
+
 void main()
 {
-    uint dx = gl_GlobalInvocationID.x;
+    uint ox = gl_GlobalInvocationID.x;
     uint dy = gl_GlobalInvocationID.y;
-    if (dx >= kScreenWidth || dy >= kScreenHeight) {
+    if (ox >= pc.width || dy >= kScreenHeight) {
         return;
     }
+
+    // Off the screen the map holds nothing current (games rewrite it as they
+    // scroll), so the side columns come from the panorama or a mirror.
+    int  sx       = int(ox) - int(pc.columns);
+    bool onScreen = sx >= 0 && sx < int(kScreenWidth);
+    uint dx       = mirrorOf(sx);
 
     // Under OpenGL the buffer will be uploaded to a texture via PBO, and GL
     // places buffer row 0 at the bottom of the texture (V=0). The pixel
@@ -320,10 +566,28 @@ void main()
     // write index here avoids a CPU-side copy and keeps the PBO upload a
     // pure GPU-side transfer.
 #ifdef SM2_TARGET_GL
-    uint index = (kScreenHeight - 1u - dy) * kScreenWidth + dx;
+    uint index = (kScreenHeight - 1u - dy) * pc.width + ox;
 #else
-    uint index = dy * kScreenWidth + dx;
+    uint index = dy * pc.width + ox;
 #endif
-    uBelow[index] = composite(0u, dx, dy);
-    uAbove[index] = composite(1u, dx, dy);
+    // Without 3D to widen, the side columns are plain black bars.
+    const uint kOpaqueBlack = 0xff000000u;
+    if (onScreen) {
+        if (pc.columns != 0u) {
+            recordPanorama(dx, dy);
+        }
+        uBelow[index] = composite(0u, dx, dy);
+        uAbove[index] = composite(1u, dx, dy);
+    } else {
+        uint below = kOpaqueBlack;
+        if (pc.wideBelow != 0u) {
+            bool refused;
+            below = compositeSide(dx, sx, dy, refused);
+            if (refused) {
+                below = kOpaqueBlack;
+            }
+        }
+        uBelow[index] = below;
+        uAbove[index] = pc.wideBelow != 0u ? aboveSide(sx < 0, dy) : 0u;
+    }
 }

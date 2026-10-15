@@ -233,6 +233,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Stretch"
 msgstr ""
 

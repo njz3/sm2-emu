@@ -186,9 +186,11 @@ void Geometrizer::set_z_clip(u8 value)
     model2_3d_zclip_w(value);
 }
 
+// What the game reads back is the 4:3 screen's count, so a wider picture does
+// not change its own load balancing.
 u32 Geometrizer::polygon_count() const
 {
-    return m_raster->poly_list_index;
+    return m_wide_columns > 0 ? m_raster->narrow_count : m_raster->poly_list_index;
 }
 
 void Geometrizer::run(RenderList* out)
@@ -222,13 +224,14 @@ void Geometrizer::screen_scissor(const Polygon* poly, s16* out) const
     // the vertices: the hardware's y axis points up, the raster's points down, and
     // both are shifted by the CRTC sync registers.
     const s32 raster_height = static_cast<s32>(kRasterHeight);
-    const s32 left   = poly->viewport[0] + m_crtc_xoffset;
-    const s32 right  = poly->viewport[2] + m_crtc_xoffset;
+    const s32 left   = poly->viewport[0] + m_crtc_xoffset + m_wide_columns;
+    const s32 right  = poly->viewport[2] + m_crtc_xoffset + m_wide_columns;
     const s32 top    = (raster_height - poly->viewport[3]) + m_crtc_yoffset;
     const s32 bottom = (raster_height - poly->viewport[1]) + m_crtc_yoffset;
 
-    const auto clamp_x = [](s32 value) {
-        return static_cast<s16>(std::clamp<s32>(value, 0, static_cast<s32>(kRasterWidth)));
+    const s32  raster_width = static_cast<s32>(kRasterWidth) + 2 * m_wide_columns;
+    const auto clamp_x      = [raster_width](s32 value) {
+        return static_cast<s16>(std::clamp<s32>(value, 0, raster_width));
     };
     const auto clamp_y = [raster_height](s32 value) {
         return static_cast<s16>(std::clamp<s32>(value, 0, raster_height));
@@ -293,6 +296,7 @@ void Geometrizer::build_render_list(RenderList* out)
             while (poly != nullptr) {
                 if (poly->window == window) {
                     model2_3d_project(poly);
+                    widen_screen_overlay(poly);
 
                     RenderPolygon& target = out->polygons.emplace_back();
                     target.num_vertices   = poly->num_vertices;
@@ -704,6 +708,29 @@ void Geometrizer::model2_3d_process_polygon(RasterState *raster, u32 attr)
 			/* get our list read to add the polygons */
 			zpoly = raster->poly_sorted_list[object.z];
 
+			// Would it have been kept in the window as the game set it?
+			if (!raster->widened)
+			{
+				++raster->narrow_count;
+			}
+			else
+			{
+				PolyVertex narrow_in[10];
+				PolyVertex narrow_out[10];
+				s32 narrow_verts = clipped_verts;
+				for (int i = 0; i < clipped_verts; i++)
+					narrow_in[i] = verts_out[i];
+				for (int i = 0; i < 2 && narrow_verts > 2; i++)
+				{
+					narrow_verts = clip_polygon(narrow_in, narrow_verts, narrow_out,
+					                            raster->narrow_plane[raster->center_sel][i]);
+					for (int j = 0; j < narrow_verts; j++)
+						narrow_in[j] = narrow_out[j];
+				}
+				if (narrow_verts > 2)
+					++raster->narrow_count;
+			}
+
 			/* go through the clipped vertex list, adding polygons */
 			Polygon *poly = &raster->poly_list[raster->poly_list_index++];
 
@@ -780,8 +807,35 @@ inline void Geometrizer::model2_3d_project(Polygon *poly)
 	for (int i = 0; i < poly->num_vertices; i++)
 	{
 		/* project the vertices */
-		poly->v[i].x = m_crtc_xoffset + poly->center[0] + (poly->v[i].x / (poly->v[i].pz + std::numeric_limits<float>::min()));
+		poly->v[i].x = m_wide_columns + m_crtc_xoffset + poly->center[0] + (poly->v[i].x / (poly->v[i].pz + std::numeric_limits<float>::min()));
 		poly->v[i].y = ((384 - poly->center[1])+m_crtc_yoffset) - (poly->v[i].y / (poly->v[i].pz + std::numeric_limits<float>::min()));
+	}
+}
+
+// Widescreen: geometry crossing the screen is clipped at the wider raster's
+// edges, so a polygon ending exactly on both 4:3 edges was sized to the
+// screen by the game (a letterbox bar) and is stretched to the wider one.
+void Geometrizer::widen_screen_overlay(Polygon* poly) const
+{
+	if (m_wide_columns <= 0 || !m_widen)
+		return;
+	const float left  = static_cast<float>(m_wide_columns);
+	const float right = left + static_cast<float>(kRasterWidth);
+	float min_x = poly->v[0].x;
+	float max_x = poly->v[0].x;
+	for (int i = 1; i < poly->num_vertices; i++)
+	{
+		min_x = std::min(min_x, poly->v[i].x);
+		max_x = std::max(max_x, poly->v[i].x);
+	}
+	if (std::abs(min_x - left) > 1.0f || std::abs(max_x - right) > 1.0f)
+		return;
+	for (int i = 0; i < poly->num_vertices; i++)
+	{
+		if (std::abs(poly->v[i].x - left) <= 1.0f)
+			poly->v[i].x = 0.0f;
+		else if (std::abs(poly->v[i].x - right) <= 1.0f)
+			poly->v[i].x = right + left;
 	}
 }
 
@@ -792,6 +846,7 @@ void Geometrizer::render_frame_start()
 
 	/* reset the polygon list index */
 	raster->poly_list_index = 0;
+	raster->narrow_count    = 0;
 
 	/* reset the sorted z list */
 	std::fill(std::begin(raster->poly_sorted_list), std::end(raster->poly_sorted_list), nullptr);
@@ -902,6 +957,18 @@ void Geometrizer::model2_3d_push(RasterState *raster, u32 input)
 				if (raster->viewport[3] & 0x800)
 					raster->viewport[3] = -(0x800 - (raster->viewport[3] & 0x7ff));
 
+				// Widescreen: a window spanning the raster spans the wider one.
+				const s16 narrow_left  = raster->viewport[0];
+				const s16 narrow_right = raster->viewport[2];
+				raster->widened = m_wide_columns > 0 && m_widen
+				    && raster->viewport[0] + m_crtc_xoffset <= 2
+				    && raster->viewport[2] + m_crtc_xoffset >= static_cast<s32>(kRasterWidth) - 2;
+				if (raster->widened)
+				{
+					raster->viewport[0] = static_cast<s16>(raster->viewport[0] - m_wide_columns);
+					raster->viewport[2] = static_cast<s16>(raster->viewport[2] + m_wide_columns);
+				}
+
 				/* extract the centers */
 				for (i = 0; i < 4; i++)
 				{
@@ -930,6 +997,15 @@ void Geometrizer::model2_3d_push(RasterState *raster, u32 input)
 					raster->clip_plane[i][1].normal.x = -1.0f / std::hypot(-1.0f, right_plane);
 					raster->clip_plane[i][1].normal.y = 0.0f;
 					raster->clip_plane[i][1].normal.pz = right_plane / std::hypot(-1.0f, right_plane);
+
+					const float narrow_l = float(raster->center[i][0] - narrow_left);
+					const float narrow_r = float(narrow_right - raster->center[i][0]);
+					raster->narrow_plane[i][0] = raster->clip_plane[i][0];
+					raster->narrow_plane[i][0].normal.x  = 1.0f / std::hypot(1.0f, narrow_l);
+					raster->narrow_plane[i][0].normal.pz = narrow_l / std::hypot(1.0f, narrow_l);
+					raster->narrow_plane[i][1] = raster->clip_plane[i][1];
+					raster->narrow_plane[i][1].normal.x  = -1.0f / std::hypot(-1.0f, narrow_r);
+					raster->narrow_plane[i][1].normal.pz = narrow_r / std::hypot(-1.0f, narrow_r);
 
 					raster->clip_plane[i][2].normal.x = 0.0f;
 					raster->clip_plane[i][2].normal.y = -1.0f / std::hypot(-1.0f, top_plane);
