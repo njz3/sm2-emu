@@ -1,205 +1,148 @@
 # Widescreen: tracking
 
-Tracks a 16:9 option for the 3D and the 2D of the Model 2 picture, beside the present
-stage's aspect setting.
+Tracks a 16:9 picture for Model 2: the plan written here on 7 October 2026, set
+against what upstream built since, and what is left.
 
-## Where things stand (2026-10-07)
+## Where things stand (2026-10-15)
 
-- A plan only: nothing is implemented. This file holds the design, the steps and what
-  to check.
-- Prior art: Supermodel's `WideScreen` (the 3D viewport widened to 16:9) and
-  `WideBackground` (the 2D layers stretched to it); ElSemi's Model 2 Emulator's
-  `WideScreenWindow`. Both show the same side effect on some games: things the game
-  culled for its own 4:3 view are missing at the edges.
+- **Upstream built it**: an experimental 16:9 in v0.9.47 (`338ce10`, Daniel Martin,
+  14 October 2026, "add an experimental 16:9 widescreen aspect mode"). Its own
+  design, close to the plan's core but not the same in its settings and its 2D.
+- **Left**: the 2D stretch, the Lua scripts per scene, the software renderer, the
+  edge culling outside Model 2B, a game-by-game check, and the README. See
+  [What is left](#what-is-left).
+- Prior art, still worth a look: Supermodel's `WideScreen` and `WideBackground`;
+  ElSemi's Model 2 Emulator's `WideScreenWindow` and its per-game Lua scripts.
 
-## Goal
+## What upstream built (v0.9.47)
 
-Two settings, plus the aspect setting already there:
-
-| Setting | Values | What it does |
+| The plan's piece | Upstream | |
 |:--|:--|:--|
-| 3D render | **4:3** (default) / **16:9 wide** | 16:9 widens the 3D view horizontally: more of the scene on each side, the vertical view unchanged |
-| 2D render | **4:3 centred** (default) / **16:9 stretched** | The 2D layers (HUD, text, title screens) kept 4:3 in the middle, or stretched to the wide frame. Only offered while the 3D is 16:9 |
-| Aspect (exists) | 4:3 (arcade) / square pixels / stretch | How the finished frame fits the window, see below. Its three values keep their meaning; "4:3 (arcade)" gives 16:9 when the 3D is wide |
+| A 3D setting, 4:3 or 16:9 | A fourth value of the aspect setting, **16:9 (widescreen)**, marked experimental, applied live | different: one setting, not two |
+| A 2D setting, centred or stretched | The 2D is never stretched. The layers in front of the 3D (the HUD) stay 4:3 in the middle; the layers behind it fill the sides (below) | different, and the stretch not built |
+| The aspect "4:3 (arcade)" giving 16:9 when wide | Not needed: 16:9 is its own aspect value | different |
+| The wide frame, 662 x 384 | `render::kWideColumns` = 83 a side, `frame_width()` = 662 | **done** |
+| The geometrizer: full-width windows widened, the projection offset | `Geometrizer::set_widescreen()`: a window whose edges are within 2 pixels of the raster's (the CRTC offset included) grows by 83 a side; x moves by 83; the scissor clamps to the wider raster | **done** |
+| Windows that nearly span the width | The 2-pixel margin | **done** |
+| The render scale's device limit at the wide width | `clamp_scale_to_max_dimension` uses `frame_width(kWideColumns)` | **done** |
+| Vulkan | 3D into the wide target, the 2D composed with the side fill, presented at 16:9 | **done** |
+| OpenGL | The same (`gl_tilemap_pass`, `gl_present_pass`, `gl_poly3d_pass`) | **done** |
+| The software renderer | Not wide: 16:9 shows 4:3 there ("GPU renderers only") | not done |
+| A per-game `widescreen="false"` | A per-game `side_fill`: `mirror` (default), `black`, `menu`, `pillarbox` (the whole game 4:3, black side bars) | different, see below |
+| Light guns kept 4:3 | Guns shoot into the sides: each gun's X travel widened (`rom::widened_axis`), the Sinden border framing the wide picture, Behind Enemy Lines recalibrated and kept 4:3 (`pillarbox`) | different: better |
+| Edge culling (scenery missing at the sides) | Model 2B: the AM2 library's outcode test in the SHARC program (`lda -248.0 ... lda 248.0`) found by its shape and its limits rewritten to the wide ones | **done on Model 2B**, not elsewhere |
+| Emulation, timing, save states unchanged | The polygon count the game reads back is still the 4:3 screen's (`narrow_count`), so its load balancing does not change | **done**, more than planned |
+| Lua scripts per scene | None | not done |
+| A survey and a test of each game | Not in the commit | not done here |
+| README | No mention of 16:9 | not done |
 
-The aspect setting, as it is today:
+## How it is built (upstream)
 
-- **4:3 (arcade)**: the arcade monitor's picture. Model 2's 496x384 raster was shown
-  on a 4:3 tube, so its pixels are not square: each is 1.032 times as wide as it is
-  tall ((4/3) / (496/384)). This keeps that pixel shape.
-- **Square pixels**: the raster with square pixels, 496x384, 1.29:1: a little narrower
-  than the arcade picture.
-- **Stretch**: the picture fills the whole window, whatever its shape. The setting
-  for a CRT driven at a super-resolution, 2560x384p for instance: the 384 lines go
-  one to one, the width is stretched to fill the 2560 columns, and the tube shows it
-  as 4:3.
+- **The setting**: `AspectMode::Widescreen` ([src/core/config.h](src/core/config.h)),
+  "16:9 (widescreen)" in the Video tab. main.cpp shows 4:3 when the renderer cannot
+  widen (`backend->capabilities().widescreen`, false for the software renderer) and
+  otherwise passes 83 columns to the machine (`set_widescreen`), the input layer and
+  the backend.
+- **The 3D**: the geometrizer ([src/hw/geometrizer.cpp](src/hw/geometrizer.cpp))
+  widens a full-width window's viewport by 83 a side and offsets every projected x by
+  83. It keeps the window's planes as the game set them (`narrow_plane`) to count the
+  polygons the 4:3 screen would have kept (`narrow_count`), which is what the game
+  reads back. A polygon ending exactly on both 4:3 edges (a letterbox bar the game
+  sized to its screen) is stretched to the wide frame (`widen_screen_overlay`).
+- **The culling, Model 2B**: the games cull objects whose projected points all fall
+  off one side of the 4:3 screen; [src/hw/model2b.cpp](src/hw/model2b.cpp) finds that
+  test in the uploaded SHARC program by its shape (a loaded state may already hold
+  the widened values) and rewrites its two immediates.
+- **The 2D**: the compose shader
+  ([shaders/tilemap_compose.comp](shaders/tilemap_compose.comp)) draws the layers in
+  front of the 3D (the HUD) on the 4:3 screen only, and the layers behind it across
+  the sides, from, in order:
+  - a game's own **360-degree panorama** when the machine knows one
+    (`Model2MachineBase::sky_panorama()`): Daytona USA's sky, which a routine streams
+    into layer 2 a column at a time from eight 32-cell pages, found by that
+    routine's code ([src/hw/model2_original.cpp](src/hw/model2_original.cpp));
+  - a **panorama cache** ([src/render/panorama.cpp](src/render/panorama.cpp),
+    `PanoramaTracker`): every on-screen pixel of a plainly scrolling layer recorded
+    by world column, so the sides show what the camera has already seen; a new
+    epoch empties it when the layer's content changes under it;
+  - **map rows that loop** (a row scrolled a long way without a cell changing),
+    read directly;
+  - else the game's `side_fill`: **mirror** the screen edge (the default),
+    **black** (Pilot Kids, Rail Chase 2), black for **menu** panels only (a
+    row-scroll layer's foreground tiles: Sonic the Fighters), or **pillarbox**, the
+    game kept 4:3 (Behind Enemy Lines, a 2D cockpit frame around the 3D).
+- **The guns**: the X axis's travel grows by the side columns' share
+  (`rom::widened_axis`, [src/rom/game.h](src/rom/game.h)), so an aim beside the 4:3
+  screen reads as a position past its edge; the input layer lets an aim reach
+  1 + 83/496 of the screen on each side.
 
-With the 3D widened to 662x384, each value keeps its meaning: **4:3 (arcade)** keeps
-the arcade's pixel shape, so the frame becomes 16:9 (662 x 1.032 / 384 = 1.78); **square
-pixels** gives 662x384, 1.72:1; **stretch** still fills the window. Its label could
-become "Arcade (4:3, 16:9 when wide)".
+## What is left
 
-The cases that matter:
+1. **The game-by-game check** (the plan's steps 0 and 6): a race or a fight of each
+   game in 16:9, screenshots side by side, and per game what pops in at the sides,
+   what the side fill shows, and whether `side_fill` needs setting: Daytona USA, Sega
+   Rally, Indy 500, Touring Car, Over Rev, Super GT 24h, Virtua Fighter 2, the gun
+   games. Upstream set it for four games only.
+2. **The edge culling outside Model 2B**: the original Model 2 (TGP: Daytona USA,
+   Virtua Fighter 2...), 2A and 2C games have no culling patch, so scenery may be
+   missing at the sides. Their culling tests have to be found in their own programs,
+   as upstream did for the SHARC's.
+3. **The 2D stretch**, if wanted: the HUD stretched to the wide frame (the plan's
+   second setting). Upstream's way, the HUD in the middle and the backdrop filling
+   the sides, may be enough; to be judged on the games of step 1.
+4. **Per-scene control by Lua scripts** (the plan's step 10, kept as it was below):
+   a script per game reading the i960's RAM to switch the widescreen, the side fill
+   or the stretch per scene (race, attract, menus). Now that 16:9 exists, its first
+   use would be the scenes that look wrong in 16:9 (menus, title screens).
+5. **The software renderer**: wide too, or kept 4:3 (as now, silently).
+6. **The CRT super-resolution case** (2560x384p and the like): 4:3 and Stretch with
+   each scaling method, unaffected by the new value but never checked.
+7. **README**: the 16:9 value, what it does, and its limits.
+8. **Our WIDESCREEN.md for upstream**: the check of step 1 may be worth a PR of
+   `side_fill` values, or an issue per game, to dmanlfc.
 
-- **The arcade picture**: 3D 4:3, 2D 4:3, aspect 4:3 (arcade). Today's default,
-  unchanged.
-- **A 16:9 screen**: 3D 16:9, 2D centred or stretched, aspect 4:3 (arcade), which
-  then gives 16:9.
-- **CRT super-resolutions** (2560x384p and the like, a 4:3 tube driven at a very wide
-  width): 3D 4:3, 2D 4:3, aspect **Stretch**, so the 4:3 picture fills the
-  super-wide mode. This already works today: nothing to do but check it with the
-  integer scaling method, which must not fight the stretch.
+## Per-scene control: a Lua script (not built)
 
-A 2D stretched over a 4:3 3D is not offered: the HUD would no longer line up with the
-3D under it. Stretching the whole picture is the aspect setting's job.
-
-## How the picture is built today
-
-- **The geometrizer** ([src/hw/geometrizer.cpp](src/hw/geometrizer.cpp), the MAME
-  port) clips each polygon against four planes taken from its window: when a window is
-  set (`model2_3d_push`, the code near "left_plane"), each plane is the distance from
-  the window's vanishing point (`center`) to the viewport's edge (`viewport[0..3]`).
-  Projection then puts a vertex at `crtc_xoffset + center.x + x / z`.
-  `screen_scissor()` clamps each polygon's viewport to the 496x384 raster
-  (`kRasterWidth`), the scissor the renderers clip to. A window smaller than the
-  screen (a mirror, an inset) has its own viewport.
-- **The renderers** draw the polygon list into a 496x384 target times the render
-  scale: Vulkan [src/render/vk/poly3d_pass.cpp](src/render/vk/poly3d_pass.cpp), OpenGL
-  [src/render/gl/gl_poly3d_pass.cpp](src/render/gl/gl_poly3d_pass.cpp), and the
-  software renderer [src/hw/model2_softrender.cpp](src/hw/model2_softrender.cpp).
-- **The 2D** is the Sega 315-5292 tilemaps ([src/hw/segaic24.h](src/hw/segaic24.h),
-  496 wide), drawn by the tilemap passes (`vk/tilemap_pass`, `gl/gl_tilemap_pass`) and
-  mixed with the 3D by priority.
-- **The present pass** (`vk/present_pass`, `gl/gl_present_pass`) fits the frame into
-  the window with the scaling method and `AspectMode` (`FourThree`, `SquarePixel`,
-  `Stretch`, [src/core/config.h](src/core/config.h)).
-- **The 496 is written in many places**: `kRasterWidth` (geometrizer), `kNativeWidth`
-  ([src/render/backend.h](src/render/backend.h)), `kWidth` (poly3d passes, software
-  renderer, model2_video), `kVisibleWidth` (model2.h, model2b.h, model2c.h,
-  model2_original.h), `kScreenWidth` (segaic24.h), and the texture dumps.
-
-## Design
-
-- **The wide frame**: 496 x (16/9) / (4/3) = 661.3, so **662 x 384**: 83 columns
-  added on each side. The original raster sits at x = 83..578.
-- **Which windows widen**: only those whose viewport spans the whole raster width
-  (left edge at or before 0, right edge at or after 495). Their `viewport[0]` moves 83
-  left and `viewport[2]` 83 right, so the left and right clip planes open and the
-  scissor follows. The vanishing point and the focal length stay: the picture keeps
-  its scale and only gains sides. Smaller windows (mirrors, insets) keep their size
-  and position, shifted by the 83 columns like everything else.
-- **Projection**: every x gains the 83-column offset, so the 4:3 part lands where it
-  was, inside the wide target.
-- **The 2D, 4:3 centred**: the tilemap layers drawn at x = 83..578. The two side bands
-  get the 3D where there is some, and the backdrop colour (black) elsewhere: a title
-  screen in 2D keeps black bars.
-- **The 2D, 16:9 stretched**: the tilemap layers scaled by 662/496 horizontally when
-  mixed. Nearest sampling keeps the text sharp but uneven; the 2D upscale filters
-  (xBR, ScaleFX) run before the stretch.
-- **The present stage**: "4:3 (arcade)" computes the frame's shape from the arcade
-  pixel shape (1.032:1) and the frame's width, instead of a fixed 4:3: 4:3 at 496
-  columns, 16:9 at 662. "Square pixels" becomes 662x384. "Stretch" unchanged.
-- **Where it can be turned off**: a per-game attribute in games.xml
-  (`widescreen="false"`) for the games it breaks, and always off for the light-gun
-  games: their aim is mapped onto the 4:3 picture.
-- **Unchanged**: emulation and timing (only presentation moves), save states, the
-  network outputs, the drive boards.
-
-## Per-scene control: a Lua script
-
-One setting cannot suit every scene of a game: the HUD of a race reads well stretched
-to 16:9, while the attract mode's title screens and the menus are better left 4:3, or
-the other way round. Which scene is on screen is in the game's own state, in the i960's
-work RAM (1 MB at `0x00500000`, already exposed by the machine as `work_ram()`,
+One setting cannot suit every scene of a game: the HUD of a race reads well in 16:9,
+while the attract mode's title screens and the menus may be better left 4:3. Which
+scene is on screen is in the game's own state, in the i960's work RAM (1 MB at
+`0x00500000`, exposed by the machine as `work_ram()`,
 [src/hw/model2_machine_base.h](src/hw/model2_machine_base.h)).
 
 Model 2 Emulator (ElSemi) answers this with a Lua script per game, in its `scripts`
 folder: run every frame, it reads the game's RAM and switches the widescreen and the
 stretch of the 2D layers [to check against its scripts: the names of its calls, for
 instance `Model2_SetWideScreen` and `Model2_SetStretchALow`, and their granularity].
-The same here needs:
+The same here would need:
 
 - **Lua embedded**: the Lua 5.4 interpreter (MIT licence, compatible with BSD-3) in
   `3rdparty`, built like the other vendored libraries. One script per game,
   `scripts/<game>.lua` next to games.xml (or in the config directory), loaded with the
-  game. Only the base, string, math and table libraries: no `io`, `os` or `package`,
-  so a script cannot touch files or start programs.
+  game. Only the base, string, math and table libraries: no `io`, `os` or `package`.
 - **The calls a script gets**: read the i960's RAM (byte, word, double word at an
-  address); the frame number; set the 2D stretch, for all of the 2D or per tilemap
-  layer (the 315-5292 has four: two pairs of a "screen" and a "window" layer, each
-  drawn before or after the 3D); and possibly the 3D widening itself, for the scenes
-  it breaks.
-- **When it runs**: once a frame, after the frame's emulation and before the mixing,
-  so a switch applies to the very frame that shows the scene.
-- **The settings still decide**: a script only refines within what the user chose. A
-  2D stretch turned off in the settings stays off whatever the script says.
+  address); the frame number; set the widescreen (the 83 columns or none, through
+  `set_widescreen`), the side fill, and the 2D stretch if it is built, for all of the
+  2D or per tilemap layer.
+- **When it runs**: once a frame, after the frame's emulation and before the
+  composing, so a switch applies to the very frame that shows the scene.
+- **The settings still decide**: a script only refines within what the user chose.
 - **What the scripts must know**: the RAM addresses of each game's state (attract,
-  race, menus, results). Model 2 Emulator's scripts hold many and can guide the
-  search, but their code and its licence are not ours: the addresses are found and
-  checked here, game by game, with a RAM search between scenes.
-- **Beyond widescreen** (not this plan's job): a script engine is also what Model 2
-  Emulator uses for input patches, per-game fixes and extra outputs; the same engine
-  would serve them later.
-
-## What will go wrong, and what to watch
-
-- **Missing geometry at the edges**: the games cull objects against their own 4:3
-  view before sending them, so cars, trees and scenery pop in and out in the side
-  bands. How badly depends on the game: the main reason for the per-game attribute.
-- **HUD and 2D**: placed for 496 columns. Centred, they stay right; stretched, they
-  are wider.
-- **2D that is part of the scene** (a sky or a backdrop drawn as a tilemap): centred,
-  it stops short of the sides.
-- **Windows that nearly span the width** (a viewport of 0..494, say) must still count
-  as full-width: compare against the raster with a small margin.
-- **Render scale**: the target is a third wider, so the device limit that lowers the
-  scale (`clamp_scale_to_max_dimension`, through `scaled_width`, in
-  [src/render/backend.h](src/render/backend.h)) has to use the wide width.
-- **Light guns**: the pointer is mapped onto the frame letterboxed to 4:3 (the comment
-  near "letterboxed to 4:3" in [src/osd/input.cpp](src/osd/input.cpp)). Kept 4:3 for
-  the gun games, as above; if that ever changes, this mapping has to follow.
-- **Screenshots and texture dumps**: at the wide size.
-
-## Plan
-
-0. **Survey**: log the windows each game sets (viewports, vanishing points) in a race
-   or a fight: Daytona USA, Sega Rally, Indy 500, Virtua Fighter 2, Sega Touring Car,
-   Virtua Cop (gun). Which windows span the width, which are insets.
-1. **Settings**: `render3d_wide` (bool), `render2d_stretch` (bool), the GUI in the
-   Video tab next to the aspect, the 2D one greyed out while the 3D is 4:3, and the
-   aspect's "4:3 (arcade)" label saying it gives 16:9 when wide. No change in
-   behaviour yet.
-2. **The width as a value**: replace the 496 constants that size the 3D target, the
-   scissor and the present stage by one runtime frame width, still 496. Check the
-   pictures are bit-identical before and after (screenshots of a few games at fixed
-   frames).
-3. **The geometrizer**: widen the full-width windows and offset the projection when
-   the 3D is wide.
-4. **Vulkan**: draw the 3D into the 662-wide target, mix the 2D centred, present at
-   the frame's aspect.
-5. **The 2D stretch** in the mixing pass.
-6. **Test**: the games of step 0 in 16:9, screenshots side by side, the side effects
-   listed per game; `widescreen="false"` where it does not hold. The CRT
-   super-resolution case: 4:3 and Stretch, with each scaling method.
-7. **OpenGL**: the same as step 4 and 5.
-8. **The software renderer**: wide too, or kept 4:3 with a log line saying so.
-9. **README**, and a `pr/` branch for upstream.
-10. **Lua scripts** (after step 6, when the stretch works as a setting): embed Lua,
-    give scripts the calls above, then a first script for Daytona USA (the HUD
-    stretched in a race, not in attract) and one for Sega Rally, with the RAM
-    addresses of their scenes found and noted in this file.
+  race, menus, results), found and checked here game by game with a RAM search
+  between scenes (Model 2 Emulator's scripts can guide the search; their code and its
+  licence are not ours). The telemetry's work has some already: Super GT 24h's game
+  state at `0x00510948` (AUTOPILOT.md).
+- **Beyond widescreen**: the same engine would serve input patches, per-game fixes and
+  extra outputs, as in Model 2 Emulator.
 
 ## Open questions
 
 - Does any game draw its 3D across the full width with several side-by-side windows
-  rather than one? Then "full-width window" needs another test.
-- Do the CRTC offsets (`m_crtc_xoffset`), which some games set for their own centring,
-  interact with the added columns?
-- 16:10 or 21:9 later: the design takes any width; only the settings would change.
-- The script calls: take Model 2 Emulator's names, so its users and its scripts'
-  logic carry over, or our own?
-- Does stretching only some of the four tilemap layers (the HUD's pair, not the
-  backdrop's) hold up in each game, or must it be all or nothing?
+  rather than one? Then upstream's full-width test misses them.
+- The CRTC offsets (`m_crtc_xoffset`): upstream counts them in the full-width test;
+  to check on a game that sets one for its own centring.
+- 16:10 or 21:9: `kWideColumns` is a constant; the design takes any width.
+- The script calls: Model 2 Emulator's names, so its users and its scripts' logic
+  carry over, or our own?
 
 ## Log
 
@@ -207,3 +150,8 @@ The same here needs:
   the present stage. Nothing built or measured yet.
 - 2026-10-07: per-scene control by Lua scripts reading the i960's RAM added to the
   plan, after Model 2 Emulator's scripts.
+- 2026-10-15: upstream's v0.9.47 has an experimental 16:9 (`338ce10`, 14 October):
+  the plan's frame, geometrizer and renderers, with its own setting, side fill
+  (panorama cache, looping rows, Daytona's sky, mirror or black per game), guns
+  aiming into the sides and Model 2B's culling widened. This file now tracks what is
+  left beside it.
