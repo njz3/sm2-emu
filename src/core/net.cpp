@@ -453,14 +453,28 @@ void TcpServer::broadcast(std::string_view text)
     }
 }
 
-usize TcpServer::take_lines()
+std::vector<TcpServer::Line> TcpServer::take_lines()
 {
-    usize n = 0;
+    std::vector<Line> lines;
     for (Client& c : m_clients) {
-        n += c.lines;
-        c.lines = 0;
+        usize start = 0;
+        for (usize nl = c.inbox.find('\n'); nl != std::string::npos; nl = c.inbox.find('\n', start)) {
+            lines.push_back({c.id, c.inbox.substr(start, nl - start)});
+            start = nl + 1;
+        }
+        c.inbox.erase(0, start);
     }
-    return n;
+    return lines;
+}
+
+bool TcpServer::has_client(u64 id) const
+{
+    for (const Client& c : m_clients) {
+        if (c.id == id) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void TcpServer::flush()
@@ -474,14 +488,17 @@ void TcpServer::flush()
         Client& c    = m_clients[i];
         bool    dead = false;
 
-        // What clients send is only counted in lines (an acknowledgement, see
-        // take_lines()); reading is also how a closed connection shows up.
+        // What clients send is kept for take_lines() (a telemetry client's
+        // commands and acknowledgements); reading is also how a closed
+        // connection shows up. A client sending without newlines is dropped.
         char scratch[256];
         for (;;) {
             const auto got = ::recv(c.fd, scratch, sizeof scratch, 0);
             if (got > 0) {
-                for (int k = 0; k < static_cast<int>(got); ++k) {
-                    c.lines += scratch[k] == '\n' ? 1 : 0;
+                c.inbox.append(scratch, static_cast<usize>(got));
+                if (c.inbox.size() > kMaxPending) {
+                    dead = true;
+                    break;
                 }
                 continue;
             }

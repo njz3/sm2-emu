@@ -44,12 +44,13 @@ struct Course {
     int          cars;
     int          sectors;
     float        start[8];
+    float        length;  ///< Metres, the autopilot's map of the racing line.
 };
 
 constexpr Course kCourses[] = {
-    {"Bay Side Street", 3, 28, 8, {0.0f, 0.131f, 0.264f, 0.396f, 0.528f, 0.661f, 0.795f, 0.927f}},
-    {"Indy 500", 4, 33, 7, {0.0f, 0.16f, 0.321f, 0.482f, 0.643f, 0.802f, 0.963f}},
-    {"Highland Raceway", 3, 28, 8, {0.0f, 0.141f, 0.281f, 0.423f, 0.564f, 0.704f, 0.843f, 0.985f}},
+    {"Bay Side Street", 3, 28, 8, {0.0f, 0.131f, 0.264f, 0.396f, 0.528f, 0.661f, 0.795f, 0.927f}, 4909.6f},
+    {"Indy 500", 4, 33, 7, {0.0f, 0.16f, 0.321f, 0.482f, 0.643f, 0.802f, 0.963f}, 4052.6f},
+    {"Highland Raceway", 3, 28, 8, {0.0f, 0.141f, 0.281f, 0.423f, 0.564f, 0.704f, 0.843f, 0.985f}, 4609.6f},
 };
 
 template <typename T>
@@ -80,6 +81,7 @@ bool Indy500Telemetry::decode(const Memory& memory, u64 frame, Frame& out)
     out.game         = "indy500";
     out.track        = course != nullptr ? course->name : "";
     out.laps         = course != nullptr ? course->laps : 0;
+    out.lap_length   = course != nullptr ? course->length : NAN;
     out.transmission = read<u8>(ram, kTransmission) == 0 ? "MT" : "AT";
     const int cars = course != nullptr ? course->cars : kCarCount;
     out.others.resize(static_cast<usize>(cars - 1));
@@ -125,6 +127,7 @@ bool Indy500Telemetry::decode(const Memory& memory, u64 frame, Frame& out)
         out.camera[static_cast<usize>(i)] = read<float>(ram, kCamera + static_cast<u32>(4 * i));
     }
     p.gear        = static_cast<int>(read<u8>(ram, kGear)) + 1;
+    p.gears       = out.transmission == "MT" ? 6 : kUnknown;
     p.rpm         = read<float>(ram, kRpm);
     out.time_left = static_cast<float>(read<u16>(ram, kTimeLeft)) / kFps;
     out.lap_time  = static_cast<float>(read<u32>(ram, kLapTime)) / kFps;

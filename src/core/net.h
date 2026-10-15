@@ -120,9 +120,17 @@ public:
     void send(u64 client, std::string_view text);
     void broadcast(std::string_view text);
 
-    /// Lines the clients sent since the last call (complete, newline ended),
-    /// counted and forgotten. poll() reads them.
-    [[nodiscard]] usize take_lines();
+    /// A line a client sent, its newline removed.
+    struct Line {
+        u64         client = 0;
+        std::string text;
+    };
+
+    /// The complete lines the clients sent since the last call, in order.
+    /// poll() reads them.
+    [[nodiscard]] std::vector<Line> take_lines();
+
+    [[nodiscard]] bool has_client(u64 id) const;
 
     [[nodiscard]] usize client_count() const { return m_clients.size(); }
     [[nodiscard]] const std::string& last_error() const { return m_last_error; }
@@ -143,7 +151,7 @@ private:
         u64         id = 0;
         Fd          fd = kInvalid;
         std::string pending;
-        usize       lines = 0;  ///< Newlines received, for take_lines().
+        std::string inbox;  ///< Received, up to its last newline, for take_lines().
     };
 
     std::optional<u64> accept_one();

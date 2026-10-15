@@ -41,7 +41,10 @@ and the telemetry (`src/agent.cpp`, `src/telemetry/`) and this log. Below,
   three laps.
 - **Telemetry** for Indy 500, Touring Car, Sega Rally, Daytona, Super GT 24h
   and Over Rev, served over TCP by sm2-emu (`--telemetry`) and to agent mode
-  (`tel`); the last two checked against the screen in a race of each.
+  (`tel`); the last two checked against the screen in a race of each. Since
+  15 October the keys Supermodel shares, for motion simulators and
+  dashboards (Forza Data Out too), and Motor Raid, Wave Runner and Desert
+  Tank: TELEMETRY.md.
 - **Agent mode for force feedback benches**, in the protocol of Supermodel's
   agent mode, so one client drives both emulators: inputs held by name
   (`set Steering 1` fully left, trigonometrically, as a real wheel and

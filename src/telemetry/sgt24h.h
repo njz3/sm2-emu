@@ -24,7 +24,9 @@
 //             +34 heading (s32, 65536 a turn, -atan2(dx, dz))
 //             +84C speed (float, metres a frame)
 //             the player only: +C8 gear (u8, 0 first), +220 revs (u16),
-//             +764 its orientation (3x3 floats, world from car, row-major)
+//             +764 its orientation (3x3 floats, world from car, row-major;
+//             column 0 the car's right: its roll, + leaning right, is
+//             atan2(-m10, m11))
 //   00510948  game state (u32): 1 attract mode, 7 coin, 2 car select, 3 race
 //             (its countdown too), 4 game over
 //   00510F2C  lap time (u16, frames)

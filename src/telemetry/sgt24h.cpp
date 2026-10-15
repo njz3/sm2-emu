@@ -58,11 +58,20 @@ bool Sgt24hTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
         return false;
     }
     const u32 state = read<u32>(ram, kState);
-    if (state != kStateRace && state != kStateOver) {
-        return false;
-    }
     out.frame = frame;
     out.game  = "sgt24h";
+    switch (state) {
+        case 1: out.state = State::Attract; break;
+        case 2:
+        case 7: out.state = State::Select; break;
+        case kStateRace: out.state = State::Race; break;
+        case kStateOver: out.state = State::Over; break;
+        default: break;
+    }
+    if (state != kStateRace && state != kStateOver) {
+        return true;  // the state alone: the cars are not set up
+    }
+    out.lap_length = kLap;
     out.laps  = read<u8>(ram, kLaps);
     out.others.resize(kCarCount - 1);
     for (int k = 0; k < kCarCount; ++k) {
@@ -91,7 +100,8 @@ bool Sgt24hTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
     const auto& r = p.rotation;
     p.heading     = std::atan2(r[2], r[8]);
     p.pitch       = std::asin(std::clamp(r[5], -1.0f, 1.0f));
-    p.roll        = std::atan2(r[3], r[4]);
+    // The right side's height: lower, leaning right.
+    p.roll        = std::atan2(-r[3], r[4]);
     p.gear        = read<u8>(ram, base + 0xC8) + 1;
     p.rpm         = read<u16>(ram, base + 0x220);
 
@@ -100,6 +110,9 @@ bool Sgt24hTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
     out.lap_time       = static_cast<float>(lap_time) / kGameFps;
     out.finished       = out.laps > 0 && p.lap > out.laps;
     out.racing         = state == kStateRace && lap_time > 0 && out.time_left > 0 && !out.finished;
+    if (state == kStateRace && !out.racing && !out.finished) {
+        out.state = lap_time == 0 ? State::Select : State::Over;  // the countdown, or time up
+    }
     kinematics(out);
     return true;
 }

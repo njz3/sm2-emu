@@ -727,6 +727,8 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->telemetry_port)) {
                 bad_value();
             }
+        } else if (key == "telemetry_forza") {
+            out->telemetry_forza = value;
         } else if (key == "outputs_network_udp_port" || key == "net_outputs_udp_port") {
             if (!parse_u32(value, &out->outputs_network_udp_port)) {
                 bad_value();
@@ -1154,6 +1156,9 @@ bool save_config(const std::string& path, const Config& config)
         << "# The racing games' telemetry (cars, race), one JSON line a frame to\n"
         << "# every TCP client on this port; 0 serves nothing.\n"
         << "telemetry_port = " << config.telemetry_port << "\n"
+        << "# The same as Forza Motorsport 7's Data Out datagrams (motion and\n"
+        << "# dashboard programs: SimHub, FlyPT Mover...), to HOST:PORT; empty sends none.\n"
+        << "telemetry_forza = " << config.telemetry_forza << "\n"
         << "outputs_windows = " << bool_text(config.outputs_windows) << "\n"
         << "# Your wheel's own physical rotation range (a G-series PC wheel is\n"
         << "# ~900). The cabinet's ~240 of lock is mapped onto it, so matching\n"

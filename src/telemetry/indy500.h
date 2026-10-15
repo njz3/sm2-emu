@@ -17,8 +17,9 @@
 //   0053C7AC  33 cars of 0x1E4 bytes, the player first (28 raced on Bay Side
 //             Street and Highland Raceway):
 //             +000 x, +004 y, +008 z (floats, metres)
-//             +00C roll, +010 yaw (negated), +014 pitch [guess]: i32, a turn
-//                  is 65536
+//             +00C roll (+ leaning right: negative in the oval's banked
+//                  left turns), +010 yaw (negated), +014 pitch (+ nose up,
+//                  with the slope): i32, a turn is 65536
 //             +030 speed (float, metres a frame)
 //             +0E4 progress: lap << 20 | sector << 16 | the sector's fraction
 //                  (lap 0: the grid and the rolling start; laps + 1: done)

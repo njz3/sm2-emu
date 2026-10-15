@@ -366,6 +366,16 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
     u64              frames = 0;
     std::unique_ptr<telemetry::GameTelemetry> decoder = telemetry::make_telemetry(game);
     telemetry::Frame tel;
+    // The telemetry follows every frame run, so that its rates and
+    // accelerations are right whenever `tel` asks.
+    bool tel_ok = false;
+    u64  tel_at = ~0ull;
+    const auto telemetry_update = [&] {
+        const hw::Inputs& used = machine.inputs();
+        tel_ok = decoder && decoder->update({machine.work_ram(), machine.scratch_ram()}, frames, used.analog,
+                                            used.in0, used.in1, tel);
+        tel_at = frames;
+    };
 
     std::vector<Control> controls = game_controls(game);
     const auto find = [&controls](const char* name) -> Control* {
@@ -530,6 +540,9 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                 }
                 machine.run_frame();
                 ++frames;
+                if (decoder) {
+                    telemetry_update();
+                }
                 if (sound != nullptr) {
                     sound->clear_pending_samples();
                 }
@@ -718,13 +731,10 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
             std::printf("mem %u\n", length);
             std::fwrite(region.data() + offset, 1, length, stdout);
         } else if (std::strcmp(command, "tel") == 0) {
-            if (decoder && decoder->decode({machine.work_ram(), machine.scratch_ram()}, frames, tel)) {
-                const hw::Inputs& used = machine.inputs();
-                for (usize i = 0; i < tel.analog.size(); ++i) {
-                    tel.analog[i] = used.analog[i];
-                }
-                tel.in0 = used.in0;
-                tel.in1 = used.in1;
+            if (tel_at != frames) {
+                telemetry_update();  // no frame run since a load
+            }
+            if (tel_ok) {
                 const std::string json = telemetry::to_json(tel);
                 std::fwrite(json.data(), 1, json.size(), stdout);
             } else {
@@ -736,6 +746,9 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                 std::printf("err\n");
             } else {
                 const bool ok = command[0] == 's' ? machine.save_state(path) : machine.load_state(path);
+                if (command[0] == 'l') {
+                    tel_at = ~0ull;  // another race: the telemetry from it
+                }
                 std::printf(ok ? "ok\n" : "err\n");
             }
         } else {

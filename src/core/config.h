@@ -400,6 +400,10 @@ struct Config {
     /// line a frame; 0 serves nothing.
     u32 telemetry_port = 0;
 
+    /// HOST:PORT getting the telemetry as Forza Motorsport 7's "Data Out"
+    /// datagrams (motion and dashboard programs); empty sends none.
+    std::string telemetry_forza;
+
     /// UDP port for Supermodel's announcement of a starting game, which
     /// BackForceFeeder waits for before it connects; 8001 is Supermodel's.
     /// 0 sends none.

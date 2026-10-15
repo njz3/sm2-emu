@@ -454,6 +454,31 @@ Note that these are separate instances of the emulator with independent frame
 clocks, not a rollback-netplay implementation; it links the emulated comms
 board the way real cabinets were linked on a shared LAN.
 
+## Telemetry (motion simulators, dashboards)
+
+The racing games' state, read out of their RAM: the car's position, speed,
+orientation and accelerations, gear and revs, the laps and clocks, the
+controls and the other cars. Daytona USA, Sega Rally, Indy 500, Touring Car,
+Over Rev, Super GT 24h, Motor Raid, Wave Runner and Desert Tank are decoded.
+Two outputs, either or both:
+
+| Setting | Command line | What |
+|---------|--------------|------|
+| `telemetry_forza = HOST:PORT` | `--telemetry-forza HOST:PORT` | Forza Motorsport 7's "Data Out" datagrams (the Dash format), which SimHub, FlyPT Mover, SimTools, Sim Racing Studio and most dashboards read: pick Forza Motorsport 7 there and give it this port. |
+| `telemetry_port = PORT` | `--telemetry PORT` | One JSON line a frame to every TCP client: every value, for your own tools. |
+
+A client of the TCP server can send lines: `fields player.speed,player.rpm`
+(only those keys; `fields all` again), `others 3` (the three nearest cars;
+`others all`), `every 2` (one frame in two), `udp forza HOST:PORT` or
+`udp off`, and `list` (the keys the game fills); each gets a one-line JSON
+answer. `--telemetry-sync` makes each frame wait for a client's empty line,
+for a driver in lockstep.
+
+The `state` key says what the game is doing (`attract`, `select`, `race`,
+`pause`, `over`, `unknown`), and Forza's `IsRaceOn` is set only during a race:
+a motion platform should rest otherwise, and when the datagrams stop.
+TELEMETRY.md lists the keys and what each game provides.
+
 ## Frame pacing
 
 The machine runs at 57.5245 Hz — 434600 cycles of a 25 MHz clock — which

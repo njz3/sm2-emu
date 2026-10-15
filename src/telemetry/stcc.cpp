@@ -25,7 +25,12 @@ constexpr u32   kCars     = 0x0020A900;
 constexpr u32   kCarSize  = 0x58;
 constexpr int   kCarCount = 8;
 constexpr u32   kTimeLeft = 0x002022EC;
+constexpr u32   kLapTime  = 0x002022D0;
+constexpr u32   kGear     = 0x0020462C;
+constexpr u32   kRpm      = 0x00208914;
 constexpr float kFps      = 57.5f;
+constexpr float kClock    = 64.0f;    ///< Frames a second, on the game's clock.
+constexpr float kLapLength = 2434.2f; ///< Country Circuit, in units (autopilot's map).
 
 template <typename T>
 T read(std::span<const u8> ram, u32 address)
@@ -69,10 +74,15 @@ bool StccTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
         v.lap            = static_cast<int>(std::floor(v.progress)) + 1;
         orient(v);
     }
-    out.sectors   = m_segments;
-    out.time_left = static_cast<float>(read<u32>(ram, kTimeLeft)) / kFps;
-    out.racing    = out.time_left > 0;
-    Vehicle& p    = out.player;
+    out.sectors    = m_segments;
+    out.time_left  = static_cast<float>(read<u32>(ram, kTimeLeft)) / kClock;
+    out.racing     = out.time_left > 0;
+    out.lap_length = kLapLength;
+    out.lap_time   = read<float>(ram, kLapTime);
+    Vehicle& p     = out.player;
+    p.gear         = read<u8>(ram, kGear);
+    p.gears        = 6;
+    p.rpm          = read<float>(ram, kRpm);
     p.position    = 1;
     for (const Vehicle& o : out.others) {
         if (o.progress > p.progress) {

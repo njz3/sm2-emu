@@ -21,7 +21,8 @@
 //             +0E0 speed (float, half-metres a frame)
 //             +100 x, +104 y, +108 z (floats, y up)
 //             +1F0 distance from the start line (float, negative on the grid)
-//   00590DE4  the player's roll; its pitch at +10, its heading at +14
+//   00590DE4  the player's roll, negated (+ leaning right: out of a turn);
+//             its pitch at +10 (+ nose up), its heading at +14, negated
 //             (s32, 65536 a turn)
 //   00595A5C  the player's gear (u8, 1 first)
 //   00595A7C  its revs (float)

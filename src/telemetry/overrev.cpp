@@ -77,17 +77,19 @@ bool OverRevTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
     if (!(lap > 500.0f && lap < 50000.0f)) {
         lap = kDefaultLap;
     }
-    out.frame = frame;
-    out.game  = "overrev";
-    out.laps  = read<u8>(ram, kLaps);
+    out.frame      = frame;
+    out.game       = "overrev";
+    out.laps       = read<u8>(ram, kLaps);
+    out.lap_length = lap * kMetre;
+    out.race_time  = static_cast<float>(race_time) / kGameFps;
     out.others.resize(kAiCount);
 
     Vehicle& p = out.player;
     p.x        = read<float>(ram, kPosition) * kMetre;
     p.y        = read<float>(ram, kPosition + 4) * kMetre;
     p.z        = read<float>(ram, kPosition + 8) * kMetre;
-    p.roll     = -angle(ram, kAngles);
-    p.pitch    = angle(ram, kAngles + 0x10);
+    p.roll     = wrap(-angle(ram, kAngles));
+    p.pitch    = wrap(angle(ram, kAngles + 0x10));
     p.heading  = wrap(-angle(ram, kAngles + 0x14));
     p.speed    = read<float>(ram, kSpeed);
     p.gear     = read<u8>(ram, kGear);

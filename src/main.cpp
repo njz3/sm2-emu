@@ -262,6 +262,9 @@ struct Options {
     /// --telemetry PORT: serve the telemetry there, over the settings' port.
     sm2::u32 telemetry_port = 0;
 
+    /// --telemetry-forza HOST:PORT: the telemetry as Forza Data Out datagrams.
+    std::string telemetry_forza;
+
     /// Each published telemetry frame waits for a client's line before the
     /// next frame runs, so a driver's controls land on the frame they were
     /// computed for.
@@ -329,6 +332,8 @@ void print_usage()
         "                      to TCP clients, one JSON line a frame\n"
         "      --telemetry-sync  After each telemetry frame, wait (250 ms at most)\n"
         "                      for a client's line before running the next one\n"
+        "      --telemetry-forza <host:port>  Send the telemetry there as Forza\n"
+        "                      Motorsport 7 Data Out datagrams (SimHub, motion rigs)\n"
         "      --list-games    List the games in the ROM database\n"
         "      --list-gpus     List the Vulkan devices that could be used\n"
         "      --log-level <l> trace, debug, info, warning or error\n"
@@ -443,6 +448,12 @@ void print_usage()
             out->telemetry_port = static_cast<sm2::u32>(std::strtoul(argv[++index], nullptr, 10));
         } else if (std::strcmp(arg, "--telemetry-sync") == 0) {
             out->telemetry_sync = true;
+        } else if (std::strcmp(arg, "--telemetry-forza") == 0) {
+            if (index + 1 >= argc) {
+                SM2_ERROR("--telemetry-forza requires HOST:PORT");
+                return false;
+            }
+            out->telemetry_forza = argv[++index];
         } else if (std::strcmp(arg, "--no-vsync") == 0) {
             out->config.vsync = false;
             out->given.vsync  = true;
@@ -1048,6 +1059,8 @@ int main(int argc, char** argv)
     options.config.outputs_network_port     = from_file.outputs_network_port;
     options.config.telemetry_port =
         options.telemetry_port != 0 ? options.telemetry_port : from_file.telemetry_port;
+    options.config.telemetry_forza =
+        !options.telemetry_forza.empty() ? options.telemetry_forza : from_file.telemetry_forza;
     options.config.outputs_network_udp_port = from_file.outputs_network_udp_port;
     options.config.outputs_windows          = from_file.outputs_windows;
 
@@ -2167,10 +2180,17 @@ int main(int argc, char** argv)
         hw::Inputs                                telemetry_inputs_used;  ///< the last frame's, for telemetry
         std::unique_ptr<telemetry::GameTelemetry> telemetry_decoder;
         telemetry::Frame                          telemetry_frame;
-        u64                                       telemetry_frames = 0;
+        u64                                       telemetry_frames    = 0;
+        bool                                      telemetry_published = false;
+        u64                                       telemetry_paused_ns = 0;
         if (options.config.telemetry_port != 0) {
             static_cast<void>(
                 telemetry_server.open(static_cast<u16>(options.config.telemetry_port)));
+        }
+        if (!options.config.telemetry_forza.empty()
+            && !telemetry_server.set_forza(options.config.telemetry_forza)) {
+            SM2_WARN("telemetry: telemetry_forza '%s' is not HOST:PORT",
+                     options.config.telemetry_forza.c_str());
         }
         if (loaded.has_value()) {
             telemetry_decoder = telemetry::make_telemetry(loaded->game);
@@ -2573,15 +2593,13 @@ int main(int argc, char** argv)
                     telemetry_sync_waited = true;
                     telemetry_server.wait_client(15000);
                 }
-                if (telemetry_decoder && telemetry_server.clients() != 0
-                    && telemetry_decoder->decode({machine_iface->work_ram(), machine_iface->scratch_ram()}, telemetry_frames,
+                if (telemetry_decoder && telemetry_server.wanted()
+                    && telemetry_decoder->update({machine_iface->work_ram(), machine_iface->scratch_ram()},
+                                                 telemetry_frames, telemetry_inputs_used.analog,
+                                                 telemetry_inputs_used.in0, telemetry_inputs_used.in1,
                                                  telemetry_frame)) {
-                    for (usize i = 0; i < telemetry_frame.analog.size(); ++i) {
-                        telemetry_frame.analog[i] = telemetry_inputs_used.analog[i];
-                    }
-                    telemetry_frame.in0 = telemetry_inputs_used.in0;
-                    telemetry_frame.in1 = telemetry_inputs_used.in1;
                     telemetry_server.publish(telemetry_frame);
+                    telemetry_published = true;
                     // The first frame waits longer: the driver's first answer comes slower.
                     if (options.telemetry_sync
                         && telemetry_server.wait_ack(telemetry_sync_acked ? 250 : 5000)) {
@@ -3019,6 +3037,16 @@ int main(int argc, char** argv)
             outputs.poll();
             if (telemetry_server.valid()) {
                 telemetry_server.poll();
+            }
+            // Paused (the P key, the overlay): the last frame again, its state
+            // pause, at the game's rate, so a motion platform parks.
+            if (effective_pause && telemetry_published && telemetry_server.wanted()) {
+                const u64 now_ns = SDL_GetTicksNS();
+                if (now_ns - telemetry_paused_ns >= hw::Model2::kFrameNanoseconds) {
+                    telemetry_paused_ns   = now_ns;
+                    telemetry_frame.state = telemetry::State::Pause;
+                    telemetry_server.publish(telemetry_frame);
+                }
             }
 
             // Esc asked to unload the game and return to the picker. Handled
