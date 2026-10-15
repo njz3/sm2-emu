@@ -12,7 +12,14 @@ Since 14 October that branch is upstream's main (v0.9.46, `cec4404`) and only
 its own commits on top, rebuilt from the merged branch (whose last state is
 kept locally as `backup/dev-ffbedition-e9d9d76`).
 
-## Where it stands (2026-10-14, night)
+Since 15 October the autopilot's scripts, with their data, are in
+BackForceFeeder (`BackForceFeeder_master`, `autopilot/sm2emu/`), beside
+Supermodel's (`autopilot/supermodel/`) and the force feedback analysis both
+emulators share (`autopilot/analyze_ffb.py`). sm2-emu keeps the agent mode
+and the telemetry (`src/agent.cpp`, `src/telemetry/`) and this log. Below,
+`sm2emu/` is that folder of BackForceFeeder.
+
+## Where it stands (2026-10-15)
 
 - **Indy 500 is won** by the autopilot: from 33rd on the grid of the oval, 1st
   at the flag, 2'31"069, best lap 36"518 (the cabinet's record 37"248). The
@@ -51,6 +58,17 @@ kept locally as `backup/dev-ffbedition-e9d9d76`).
   steeper than the board (a torque curve of mine): **corrected**, the torque
   now in proportion to the board's power, the pushes exactly the board's;
   Daytona's springs and pushes stronger than the board's formula.
+- **A force feedback bench in agent mode** (15 October, below): each game
+  from power-up to its race, the autopilot driving three ways, every link
+  logged and checked (`ffb_campaign.py`, `analyze_ffb.py`, in the files of
+  Supermodel's bench). In 12 races: no command lost, the force sent is the
+  board model's output replayed (25 046 records in 25 046), the Indy
+  family's pushes are the board's formula to the unit and its power out of
+  63, Sega Rally's linear. Daytona's model follows its formula; Daytona and
+  Sega Rally have the same board and the same panel (an AC motor and a power
+  clutch, the same motor byte), and sm2-emu gives both the same scale, a
+  power of 32 the wheel's maximum (Sega Rally's strongest torque). The 1.5 to
+  2 times of the vJoy comparison was that formula read out of 63.
 - Touring Car: the autopilot finishes 4th from 8th (the three leaders lap at
   its pace). Sega Rally and Daytona: driven around their first course.
 - **Force feedback of Indy 500's family, done in the code**: the torque in
@@ -73,23 +91,22 @@ kept locally as `backup/dev-ffbedition-e9d9d76`).
   GT 24h races with its force feedback; Over Rev sends nothing until its
   HARDWARE TYPE is set.
 - **Published**: committed and pushed on `dev/ffbedition`; the last Windows
-  release zip made like the CI's, `build\bin\sm2-emu-v0.9.45-67-g826c72c-njz3-windows-x86_64.zip`
-  (SHA-256 `427B3A8881EC1446699D15CA56B8860BB515F259A937359F95CBCDCBB46302A8`),
-  predates the blank backup RAM fix, the two new telemetries and the agent
-  mode's benches.
+  release zip made like the CI's, `build\bin\sm2-emu-v0.9.47-32-ga568878-njz3-windows-x86_64.zip`
+  (SHA-256 `8AA40FE8EA35C27E892F7581B5FA77A1D593C9EE48FF13948229F1B3B4B15057`),
+  upstream's v0.9.47 and this branch's work.
 
 What is left:
 
-- the user's own test of Indy 500 and Touring Car on the wheel;
+- the user's own test of Indy 500, Touring Car, Over Rev and Super GT 24h on
+  the wheel;
+- the bench: Super GT 24h and Over Rev in it (their lines and drivers are in
+  the scratchpad tools), a model of Sega Rally's board (EPR-17891) for its
+  outputs, the wheel's position at each interrupt in the models, the
+  analysis shared with Supermodel's;
 - the PR left for dmanlfc: `pr/wheel-panel-spring` (the panel spring and the
-  DIP strength settings, its PR message written), up to date with upstream's
-  v0.9.46 (`0b00319`, merged, pushed);
-- a force feedback bench run with the agent mode on each board, and one
-  analysis script for sm2-emu's and Supermodel's journals (sm2-emu's board
-  models run each interrupt with the frame's wheel position; Sega Rally's
-  board has no model: its commands only);
-- the autopilot: a win in Touring Car, races in Sega Rally and Daytona;
-- a release zip with the current branch.
+  DIP strength settings, its PR message written), one commit rebased on
+  v0.9.47 (`19d413b`, pushed), to open;
+- the autopilot: a win in Touring Car, races in Sega Rally and Daytona.
 
 ## Pieces
 
@@ -103,32 +120,35 @@ What is left:
 | Over Rev / Super GT 24h board settings | README, `data/games.xml` | documented |
 | Super GT 24h's pedals by its I/O TYPE | `Model2B::analog_value`, `repair_sgt24h_io_type` | done, upstream too (PR #23); a blank backup RAM's I/O TYPE becomes A |
 | `--agent` mode: headless, driven over stdin/stdout | `src/agent.cpp` | done; `tel` answers the telemetry; named holds (`set`/`get`), the force feedback's commands (`ffb`) and the board's ports (`servo`) as in Supermodel's agent mode; `--agent-device` reads vJoy and drives its FFB |
-| Python client of the agent mode | `autopilot/sm2agent.py` | done |
+| Python client of the agent mode | `sm2emu/sm2agent.py` | done |
 | Telemetry: per-game RAM decoding, TCP server | `src/telemetry/`, `--telemetry PORT` | done for Indy 500 |
 | Indy 500 RAM map | below | done for what driving needs |
-| Track maps (the AI cars' laps, averaged) | `autopilot/record_laps.py`, `track_map.py` | the three Indy 500 courses |
-| Race start states (coins, course, gearbox) | `autopilot/to_race.py` | the three courses, AT or 6MT |
-| Drivers: pure pursuit, curvature driver, optimised line | `autopilot/pursuit.py`, `line_opt.py` | pursuit laps the oval; CMA-ES running |
-| Reinforcement learning (PPO, PyTorch, CUDA) | `autopilot/train_ppo.py`, `env_indy.py`, `ppo_model.py` | two runs, no progress in places (see the log) |
-| Planner: look-ahead with the emulator itself | `autopilot/plan_race.py`, `plan_beam.py` | **wins the oval from 33rd**; its races are the learning's data |
-| Learning from the planner: cloning, candidate scores | `autopilot/bc_train.py`, `q_train.py`, `policy_q.py` | written; data being made |
-| Picture-only driver | `autopilot/visual_driver.py`, `bc_train.py --visual`, `q_train.py --visual` | written |
-| Autopilot through vJoy, standalone | `autopilot/run_vjoy.py`, `vjoy.py` | done: drives a race, logs drive bytes and FFB |
-| Autopilot through BackForceFeeder | `autopilot/bff/autopilot.lua`, `run_vjoy.py --bff` | written, not tested (it needs BFF on the cabinet) |
-| Touring Car telemetry | `src/telemetry/stcc.cpp`, `autopilot/stcc_telemetry.py` | cars, speed, heading, segment, time left; course and laps to find |
-| Touring Car start, map | `autopilot/stcc_to_race.py`, `runs/stcc_country_line.npz` | automatic (6MT wants shifts), qualifying, race start states; Country Circuit mapped; planner 4th from 8th |
-| Sega Rally telemetry, map, vJoy | `src/telemetry/srally.cpp`, `autopilot/srally_telemetry.py` | positions, headings, progress; the Desert mapped; FFB compared |
-| Daytona telemetry, map, vJoy | `src/telemetry/daytona.cpp`, `autopilot/daytona_telemetry.py` | positions, headings, progress; the beginner course mapped; FFB compared |
-| FFB comparison, all four boards | `autopilot/ffb_compare.py` | done: the tables below |
+| Track maps (the AI cars' laps, averaged) | `sm2emu/record_laps.py`, `track_map.py` | the three Indy 500 courses |
+| Race start states (coins, course, gearbox) | `sm2emu/to_race.py` | the three courses, AT or 6MT |
+| Drivers: pure pursuit, curvature driver, optimised line | `sm2emu/pursuit.py`, `line_opt.py` | pursuit laps the oval; CMA-ES running |
+| Reinforcement learning (PPO, PyTorch, CUDA) | `sm2emu/train_ppo.py`, `env_indy.py`, `ppo_model.py` | two runs, no progress in places (see the log) |
+| Planner: look-ahead with the emulator itself | `sm2emu/plan_race.py`, `plan_beam.py` | **wins the oval from 33rd**; its races are the learning's data |
+| Learning from the planner: cloning, candidate scores | `sm2emu/bc_train.py`, `q_train.py`, `policy_q.py` | written; data being made |
+| Picture-only driver | `sm2emu/visual_driver.py`, `bc_train.py --visual`, `q_train.py --visual` | written |
+| Autopilot through vJoy, standalone | `sm2emu/run_vjoy.py`, `vjoy.py` | done: drives a race, logs drive bytes and FFB |
+| Autopilot through BackForceFeeder | `sm2emu/bff/autopilot.lua`, `run_vjoy.py --bff` | written, not tested (it needs BFF on the cabinet) |
+| Touring Car telemetry | `src/telemetry/stcc.cpp`, `sm2emu/stcc_telemetry.py` | cars, speed, heading, segment, time left; course and laps to find |
+| Touring Car start, map | `sm2emu/stcc_to_race.py`, `runs/stcc_country_line.npz` | automatic (6MT wants shifts), qualifying, race start states; Country Circuit mapped; planner 4th from 8th |
+| Sega Rally telemetry, map, vJoy | `src/telemetry/srally.cpp`, `sm2emu/srally_telemetry.py` | positions, headings, progress; the Desert mapped; FFB compared |
+| Daytona telemetry, map, vJoy | `src/telemetry/daytona.cpp`, `sm2emu/daytona_telemetry.py` | positions, headings, progress; the beginner course mapped; FFB compared |
+| FFB comparison, all four boards | `sm2emu/ffb_compare.py` | done: the tables below |
+| FFB bench in agent mode: power-up to race, three ways of driving, the whole chain checked | `sm2emu/ffb_race.py`, `ffb_campaign.py`, `analyze_ffb.py` | done for the four boards: below |
 | Super GT 24h telemetry | `src/telemetry/sgt24h.cpp` | all 14 cars, the player's orientation, gear, revs, positions, laps, clocks; checked against the screen |
 | Over Rev telemetry | `src/telemetry/overrev.cpp` | all 8 cars, the player's angles, gear, revs, laps, clocks, positions counted from progress; checked against the screen, the Model 2B sets too |
 
 ## Running it
 
 Python 3 with numpy, Pillow, PyTorch (CUDA when there is one) and cma; vJoy
-2.1.9 for the cabinet's controls. The tools run from `autopilot/`; the
-emulator they drive is `autopilot/bin/sm2-emu.exe` when there is one (a copy,
-so that `build\bin` can be relinked), else `build\bin\sm2-emu.exe`.
+2.1.9 for the cabinet's controls. The tools run from `sm2emu/`; the
+emulator they drive is `sm2emu/bin/sm2-emu.exe` when there is one (a copy,
+so that `build\bin` can be relinked), else sm2-emu's `build\bin\sm2-emu.exe`,
+in the checkout `SM2_EMU_REPO` names (by default
+`Racecab\emulateurs\git_sm2-emu_njz3`, beside BackForceFeeder).
 
 The autopilot on its own, in the emulator's window, through vJoy, logging
 the drive board's bytes and the force feedback sent to vJoy (BackForceFeeder
@@ -146,6 +166,20 @@ Logs in `runs/vjoy/`: `race.csv` (each frame: the car, the controls, the
 drive bytes, the FFB packets), `summary.txt`. `ffb_compare.py
 runs/vjoy/race.csv` sets the board's commands against the forces sent.
 
+The force feedback bench, headless in agent mode with its virtual wheel
+(vJoy and BackForceFeeder left alone; several at once), the emulator
+sm2-emu's `build\bin\sm2-emu.exe` unless `SM2_AGENT_EXE` names another:
+
+```
+python ffb_campaign.py runs/bench --jobs 6       # 4 games x 3 races, then analysis.md
+python ffb_race.py daytona runs/bench/day1 --weave 0.35 3
+python ../analyze_ffb.py runs/bench              # the analysis shared with Supermodel's bench
+```
+
+Each race: `drive.tsv`, `servo.tsv`, `ffb.tsv`, `telemetry.tsv`, `summary.txt`,
+`bench.json` (the settings): the race format both emulators' benches write
+(BackForceFeeder's `autopilot/README.md`).
+
 `run_autopilot.bat [indy500|stcc|srallyc|daytona]` does the same with each
 game's best driver (Indy 500: the learnt network `runs/q_win1.pt` from the
 race's start, in lockstep: the winning race in the emulator's window).
@@ -156,7 +190,7 @@ Scripts folder and load it (see its header); it starts
 drives it through the script, BFF keeping vJoy and the motor; unloading the
 script stops it. Not tested yet.
 
-The Indy 500 win, again (agent mode, headless; from `autopilot/`):
+The Indy 500 win, again (agent mode, headless; from `sm2emu/`):
 
 ```
 python eval_race.py states/indy_oval_mt.state indy_oval_line.npz q:runs/q_win1.pt
@@ -263,7 +297,7 @@ the AI cars: position +9C/+A0/+A4, the four wheels from +178, heading +C8
 done +F0 (also `005010E0` for the player), progress +1AC (16.16, a segment
 every 8.3 units, 196 a lap of the beginner course, back to 0 at the line). Map:
 `runs/daytona_beginner_line.npz` (1572 units). Decoders: `src/telemetry/daytona.cpp`,
-`autopilot/daytona_telemetry.py`. The clock is still to find. The game: coins held a second, CIRCUIT SELECT, MISSION SELECT
+`sm2emu/daytona_telemetry.py`. The clock is still to find. The game: coins held a second, CIRCUIT SELECT, MISSION SELECT
 (automatic, manual 4), 40 cars, 8 laps of the beginner course from 40th.
 
 ## Sega Rally: first look
@@ -280,7 +314,7 @@ number at +88 (also +E4), a segment every 10.3 units; the player, a 16.16 at
 (no counter going down a frame or a second in u16/u32/float/BCD in 17 s of
 recording). Map of the Desert: `runs/srally_desert_line.npz` (a loop of 300
 AI segments, 3145 units); decoders `src/telemetry/srally.cpp`,
-`autopilot/srally_telemetry.py`; the pure pursuit drives it (60 s on the
+`sm2emu/srally_telemetry.py`; the pure pursuit drives it (60 s on the
 clock: the first checkpoint is not reached yet).
 
 ## Super GT 24h: the work RAM
@@ -383,7 +417,9 @@ Tested: 1791 frames in 75 s of the attract demo on Bay Side Street.
 
 Indy 500, headless, one instance: about 71 frames a second (1.2 x real time)
 at boot, about 2.2 x real time in a race. 16 logical CPUs: 12 instances in
-parallel run at about real time each. A scaled picture costs 4 ms, the
+parallel run at about real time each. No vsync and no pacing in agent mode:
+a step runs as fast as the host goes (the bench, with the telemetry and the
+steering read every frame: Daytona 132 frames a second alone, 2.3 x). A scaled picture costs 4 ms, the
 telemetry window (34 KB of RAM) 0.2 ms.
 
 ### Indy 500, drive board commands in a race (autopilot, 15 minutes, 7 games, 3 courses)
@@ -520,7 +556,67 @@ The springs come out 1.5 to 2 times the board's formula (whose breakaway
 would add to it on the cabinet), the short pushes much stronger; pushes of
 a few frames carry the ramps and springs around them in this count. The
 player found Daytona faithful at 100 %: to measure on the cabinet before
-changing anything.
+changing anything. (15 October: the board's percentages here are out of 63,
+but Daytona's board and panel are Sega Rally's and sm2-emu gives both the
+wheel's maximum at a power of 32; the bench below.)
+
+### Force feedback bench in agent mode (`ffb_campaign.py`, 15 October, `runs/bench1`)
+
+Each game from power-up with a fresh NVRAM (the board gets the game's
+start-up commands: Indy 500's base 3 from its `73`), its menus passed, then
+150 s of racing or up to the game over (Sega Rally: about 70 s), three times:
+the pursuit alone, a weave over it (0.35 of full lock, 3 s: the springs
+through their travel), hard turns at random (slides, walls). Agent mode's
+virtual wheel: strength 100 %, DIP 0, panel spring 20 %, a 270-degree wheel
+for a lock of 240. 12 races, 26 minutes, six at once. The whole tables:
+`runs/bench1/analysis.md`.
+
+| Game | Commands written / lost | Frames with 2+ writes | Force records = the model's outputs replayed |
+|:--|--:|--:|--:|
+| Indy 500 | 40 218 / 0 | 3 (each a repeat) | 9 891 / 9 891 |
+| Touring Car | 34 509 / 0 | 0 | 8 113 / 8 113 |
+| Sega Rally | 20 477 / 0 | 0 | (no model) |
+| Daytona | 34 911 / 0 | 3 (each a repeat) | 7 042 / 7 042 |
+
+The games write one byte a frame: the model takes each, in order, so
+nothing needs queueing as Supermodel's Z80 does (it runs after the frame).
+The replay works the model's last outputs of each frame into a force as
+`src/osd/input.cpp` does (the clutch's braking and the panel spring
+included) and finds every record sent, value and frame.
+
+- **EPR-18261** (Indy 500 base 3; Touring Car base 1: it sends `00`, an idle
+  centring, and never `7x`): every push is the formula's power to the unit
+  (Touring Car `51`-`57` 6 to 30, Indy 500 `50`-`54` 6 to 22), sent as that
+  power out of 63. The springs: Indy 500's `35` (its cap 26) gives 3 % at the
+  centre (0-3 counts), 11 % at 4-7, 26 % at 8-15, 35 to 39 % from 16 (15 degrees of
+  the wheel); Touring Car's `34` (cap 18) 29 % from 16 counts on, its soft
+  `38` 2 to 13 %.
+- **Daytona**: the model's power is the formula plus its distance term
+  (`52` 16 -> 16.7, `57` 26 -> 30.5, `62` 16 -> 17.4), the breakaway 0 at the
+  panel spring's 20 %. Its board and panel are Sega Rally's (the BackForceFeeder
+  analyses of EPR-16488A and EPR-17891: the same motor byte on port `46`, an
+  AC motor and a power clutch), so it has Sega Rally's scale, a power of 32
+  the wheel's maximum: the pushes give 81 to 94 % of that rate (`57` 81 %,
+  `62` 62 %, `52` 50 % sent), the springs about 116 %, the light panel spring
+  adding to or taking from them by the wheel's side: `38`-`3F` nothing within
+  7 counts, then 19 % at 8-15, 32 % at 16-31, 44 % at 32-63, 63 % at 64-127.
+- **Sega Rally**: linear, the command's power out of 32 (4: 10 %, 16: 53 %,
+  32: 97 %); the chopping lowers the mean.
+
+The force over the races' time (|constant force|, every frame):
+
+| Game | Median | 95th percentile | Time above 50 % |
+|:--|--:|--:|--:|
+| Indy 500 | 29 % | 43 % | 0.5 % |
+| Touring Car | 29 % | 48 % | 0.3 % |
+| Sega Rally | 20 % | 67 % | 12.2 % |
+| Daytona | 27 % | 67 % | 16.0 % |
+
+The chain from the game to the wheel is exact. Daytona and Sega Rally, one
+board and one panel, have one scale and come out alike: 16 % and 12 % of
+their races' time above half the wheel's force, where the Indy family's
+direct-drive panel, its own board and scale, stays below 1 %. The player found
+both faithful at 100 %.
 
 ### Clean laps on the oval (no traffic: `indy_oval_solo.state`, the pack 10 s ahead)
 
@@ -766,3 +862,14 @@ network makes of it afterwards, a policy iteration).
   `settle` wait before a step, measured with BackForceFeeder off: 1 ms and
   more, 100 in 100, and 300 in 300 at the default 2 ms. Through vJoy the
   records have its sign: +1.0 gave +10000, -0.127 gave -1269.
+- 2026-10-15: the force feedback bench in agent mode (`ffb_race.py`,
+  `ffb_campaign.py`, `analyze_ffb.py`): four games from power-up, three races
+  each, the files of Supermodel's bench. No command lost, the force sent the
+  model's outputs to the record; the Indy family and Sega Rally linear,
+  Daytona on Sega Rally's scale (the same board and panel: a power of 32 the
+  wheel's maximum).
+- 2026-10-15: the autopilot's scripts and data moved to BackForceFeeder's
+  `autopilot/sm2emu/`, at the user's decision: one folder for both
+  emulators' autopilots and benches, and one analysis of their races
+  (`autopilot/analyze_ffb.py`, merged by the Supermodel session). The scripts
+  find sm2-emu's checkout by `SM2_EMU_REPO`.
