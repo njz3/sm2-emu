@@ -24,8 +24,8 @@ and the telemetry (`src/agent.cpp`, `src/telemetry/`) and this log. Below,
 - **Every course of Daytona USA, Sega Rally and Indy 500 finished** by the
   autopilot in agent mode, frame by frame, with the manual gearbox
   (BackForceFeeder's `autopilot/sm2emu/rl/`, the section "Reinforcement
-  learning, again" below): **all three Indy 500 courses won**, **Daytona's
-  beginner and expert courses won** (advanced 3rd), **Sega Rally's
+  learning, again" below): **all three Indy 500 courses won**, **all three
+  of Daytona's courses won** (beginner, advanced, expert), **Sega Rally's
   championship in 3'28"53, the best time** (first of the records table,
   ahead of 3'30"00; the race 3rd), **Touring Car's round 1 won** (its
   qualifying lap and its race planned in one go, on an optimised line).
@@ -826,7 +826,7 @@ Rally's stage ends when its clock stops with the player's progress past
 | Course | Base driver alone | Learnt (PPO) | Planner (`plan_drive.py`) |
 |:--|:--|:--|:--|
 | Daytona beginner (8 laps, from 40th) | out of time at lap 7, 28th (19-20 s laps, crashes in traffic) | finished 10th (update 80), 15th (update 100) | 4th (leading laps 7 and 8, then a crash 5 s from the line); the last 10 s planned again, 6 s ahead, a decision every 0.5 s: **WON, 1st**, 8.1 s left |
-| Daytona advanced (4 laps, from 20th) | out of time at lap 3 | no better than the base | **finished 3rd**, 2.0 s left |
+| Daytona advanced (4 laps, from 20th) | out of time at lap 3 | no better than the base | 3rd, 2.0 s left; with the tuned base driver and an optimised line 1st into the last lap, 8th at the line (the last hairpin); with the hairpin's ceiling, from lap 3 planned again (`--prefix`, 6 s ahead, every 0.5 s, a place worth 60 units): **WON, 1st** ("POSITION 1/20"), 10.6 s left, laps 55"85, 46"98, 45"93, 45"46 |
 | Daytona expert (2 laps, from 30th) | out of time at lap 2 (lap 1: 128 s) | | 2nd (the leader 1 s ahead for the last 90 s); its last 55 s planned again unbroken (`--prefix`, 6 s ahead, every 0.5 s, a place worth 60 units): **WON, 1st**, 14.1 s left |
 | Sega Rally Desert | cleared, 63.7 s | 0.4 s more left than the base | cleared, 0'58"38 |
 | Sega Rally Forest | cleared, 90.9 s, 1.9 s left | as the base | cleared, 1'18"52 |
@@ -907,6 +907,76 @@ warmed emulator): the Forest's finishes its stage from its start in 87.4 s,
 where the mapped line has 130 units still to go at 88 s (`courses.py` takes
 it: `driver=dict(offsets=...)`); the Desert's first optimisation gained
 nothing once measured fairly.
+
+Daytona's advanced course, won (16 October, afternoon). The base driver's
+settings searched (`tune_base.py`: a_lat 97, a_brake 17, gain 2.68, look-ahead
+8.1 + 0.48 v, up at 7431 rpm: 1 % more distance), then its line
+(`line_opt.py`, 32 knots, from a flying lap 3: 10 % more distance on that
+lap, 9 % from another state, 2 % over the race). `line_opt.py` saved the
+pace as searched, not as driven: its workers clip the speed plan's scale to
+0.8..1.4, the file kept the unclipped value (Daytona advanced's 0.15, the car
+then crawled; Sega Rally Forest's 1.64, driven so in the championship, where
+the search had driven 1.4). Fixed: the file now holds the clipped pace.
+
+The race planned on that line led into the last lap and finished 8th: the
+hairpin before the line (3200 to 3520 along the lap), every lap the same.
+The car does not brake there, runs wide by 16 to 20 units with the wheel
+full over, and hits the wall at the exit, where the road narrows; the cars
+behind go by on the straight. The AI's speeds there (`ai_speed.py`: every
+car's speed along the line, its 90th percentile) are 62 to 69 units a
+second; a ceiling at the AI's speed is not enough (the car runs wide at 255
+km/h; it makes it at 240): the base driver takes ceilings over stretches of
+the line (`caps`), the hairpin's at 60. With it, the race planned again from
+lap 3 (the first part driven as it was, `--prefix`) takes the lead back and
+keeps it, the 4-2-4 at the last hairpin. Replayed frame by frame from the
+start: 1st.
+
+### Contacts with the other cars: the force feedback (`contact_bench.py`)
+
+The replays now record the nearest car (`replay.py`: its distance, ahead and
+to the right); `ffb_events.py` sorts a hit with a car within 5 units apart
+from a hit on the scenery, and the cars rubbing. In the won races, a car
+hit (Daytona, three nose-into-the-car-ahead) gives one jolt: the force steps
+1.1 to 1.4 (of -1..1) from one update to the next, turning round, where on a
+clean road its largest step in 0.8 s is 0.13 to 0.23 (above 1.0 in 1 % of
+the windows); rubbing side by side makes the force change 2 to 3 times as
+much per update (0.26 to 0.29 against 0.10 to 0.16).
+
+Made on purpose: from the planned races' states, the car driven into the
+car ahead (rear), alongside then into it (side), or across the road (wall),
+the same state driven by the base driver alone as the baseline; a touch is
+the cars within 5.5 units and their closing speed falling 15 km/h at once.
+The force sm2-emu sends in the 0.5 s after the touch:
+
+| Game (board) | Rear | Side | Wall |
+|:--|:--|:--|:--|
+| Daytona (EPR-16488A), 22 touches, 3 courses | the push `52` for 0.3 to 0.5 s; a jolt of 1.0 to 1.3 (expert), 0.4 to 0.55 (beginner) | a jolt every time: 1.0 to 1.65, turning round 1 to 6 times (the baseline 0.04 to 0.2); `52`, `62`, `42` among the usual `3A`-`3C` | `53` every time (and `39`), a jolt of 0.15 to 1.2 |
+| Indy 500 (EPR-18261), 13 | a shake rather than a jolt: the force turning round 1 to 10 times in 0.5 s (0 to 2), `54`/`55`/`56` and `62` among `35`, `A0`, `B0`; steps 0.4 to 0.7 | jolts of 0.7 to 2.0, `56`, `61`, `62`, `64` | `54`, `30`: weak (0.2 to 0.7) |
+| Touring Car (EPR-18261), 1 | a jolt of 1.5, `57`, `53`, `55`, `51` | | |
+| Sega Rally (EPR-17891), 1 | | | the strongest torques `D5`, `9F`, a jolt of 0.86 |
+
+The games give the cars' contacts: Daytona a jolt (side) or its push (rear),
+Indy 500 a shake. Touring Car and Sega Rally have too few touches yet (the
+saved states seldom have a car within reach; Sega Rally races one car).
+
+### A won race's force feedback in the cabinet's wheel (`replay.py --device`)
+
+The won races are records (`replay.py PLAN --record DIR`, in the form shared
+with Supermodel's `ap_replay.py`: controls.npz with frame, steer +1 left,
+accel, brake, gear, shift, step; result.json; the start state beside them):
+Daytona's three courses, Indy 500's three, Touring Car's round 1 and Sega
+Rally's championship record, each replayed from its record to the same end.
+`replay.py RECORD --device` runs the agent with the controllers
+(`--agent-device`): every control of the race (steering, pedals, gear,
+buttons) held over the wheel and the pedals, the game's force feedback sent
+to the wheel (vJoy, BackForceFeeder), in real time (`--live`: the client keeps
+57.52 frames a second; a 216 s race took 222 s here with another emulator
+running). The record's SCSP core is imposed (`--scsp-core`: a state does not
+load under the other); `--exe`, `--roms`, `--config` take a cabinet's
+emulator, ROM folder and ini. Checked with the cabinet's build (v0.9.47-32)
+and an ini on the other core: the race comes out the same. Not tried with
+a device here (BackForceFeeder and vJoy are the owner's). The game does not
+know where the wheel is: its centring follows the recorded steering.
 
 ### What the force feedback does at the race's events (`ffb_events.py`)
 
