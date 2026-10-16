@@ -978,6 +978,19 @@ and an ini on the other core: the race comes out the same. Not tried with
 a device here (BackForceFeeder and vJoy are the owner's). The game does not
 know where the wheel is: its centring follows the recorded steering.
 
+`--agent-show` (sm2-emu) shows the agent's game: the same emulation and
+protocol, every frame drawn by the soft renderer (the one `obs` uses) into a
+window (each pixel twice; any other window size stretched 4:3, through the
+window's surface: SDL's 2D renderer is not built here), the sound board's
+samples played, the frames held to 57.5245 a second by the frame pacer
+(`--no-throttle`: as fast as they go), a picture skipped while the frames run
+late. `replay.py RECORD --show` watches a won race; with `--device` the race
+is seen and heard with its torques in the wheel. Measured beside six
+Supermodel autopilots (the CPU at 80 %): drawing a race's frame costs 1.1 ms
+to compose, 8.5 ms to render on four threads, 2.1 ms to show; the Daytona
+advanced win (216 s) replayed in 217 s at normal priority (240 s below
+normal), 1st as recorded: the window changes nothing in the race.
+
 ### What the force feedback does at the race's events (`ffb_events.py`)
 
 The planned races driven again with `replay.py --ffb`: the frames sorted into
