@@ -95,6 +95,8 @@
 #include "hw/model2_softrender.h"
 #include "hw/save_state_io.h"
 #include "hw/sound_board.h"
+#include "osd/audio.h"
+#include "osd/frame_pacer.h"
 #include "osd/input.h"
 #include "rom/game.h"
 #include "telemetry/telemetry.h"
@@ -122,6 +124,173 @@ namespace sm2 {
 namespace {
 
 constexpr double kMachineHz = 57.5245;
+
+/// --agent-show: the game in a window, its sound, at its own pace. It only
+/// looks on: the emulation is the agent's, each frame it runs drawn (the soft
+/// renderer `obs` draws with; skipped while the frames run late) and shown,
+/// the sound board's samples played, the frame then held to the machine's
+/// rate.
+class Show {
+public:
+    Show() = default;
+    Show(const Show&)            = delete;
+    Show& operator=(const Show&) = delete;
+
+    ~Show()
+    {
+        if (m_window != nullptr) {
+            SDL_DestroyWindow(m_window);
+        }
+    }
+
+    [[nodiscard]] bool open(const std::string& title, hw::SoundBoard* sound, bool throttle, u32 volume)
+    {
+        if (!SDL_InitSubSystem(SDL_INIT_VIDEO)) {
+            SM2_ERROR("--agent-show: no video: %s", SDL_GetError());
+            return false;
+        }
+        // The window's own surface, blitted to: SDL's 2D renderer is not built
+        // here (the GPU backends present the windowed emulator).
+        m_window = SDL_CreateWindow(title.c_str(), kWidth * 2, kHeight * 2, SDL_WINDOW_RESIZABLE);
+        if (m_window == nullptr || SDL_GetWindowSurface(m_window) == nullptr) {
+            SM2_ERROR("--agent-show: no window: %s", SDL_GetError());
+            return false;
+        }
+        if (sound != nullptr && !m_audio.init(sound->sample_rate())) {
+            SM2_WARN("--agent-show: no sound");
+        }
+        m_volume = volume;
+        m_pacer.set_throttled(throttle);
+        m_pacer.start(static_cast<u64>(1e9 / kMachineHz));
+        return true;
+    }
+
+    /// A frame's sound, before the board's samples are cleared.
+    void sound(std::span<const s16> samples)
+    {
+        if (m_volume == 100) {
+            m_audio.submit(samples);
+            return;
+        }
+        m_scaled.resize(samples.size());
+        for (usize i = 0; i < samples.size(); ++i) {
+            const s32 v = static_cast<s32>(samples[i]) * static_cast<s32>(m_volume) / 100;
+            m_scaled[i] = static_cast<s16>(std::clamp(v, -32768, 32767));
+        }
+        m_audio.submit(m_scaled);
+    }
+
+    /// Whether to draw this frame: always when unthrottled; at the machine's
+    /// pace, not after a frame the pacer found late (it had nothing left to
+    /// wait), so that the picture skips while the game and its sound keep time.
+    [[nodiscard]] bool drawing() const { return !m_pacer.throttled() || !m_late; }
+
+    /// A frame's picture shown: each pixel k times where the window holds k
+    /// times the machine's picture, else stretched 4:3.
+    void picture(std::span<const u32> pixels)
+    {
+        // The surface changes with the window's size: asked for every frame.
+        SDL_Surface* window = SDL_GetWindowSurface(m_window);
+        if (window != nullptr) {
+            if (window != m_surface || window->w != m_surface_w || window->h != m_surface_h) {
+                SDL_FillSurfaceRect(window, nullptr, 0);  // the borders, once a size
+                m_surface   = window;
+                m_surface_w = window->w;
+                m_surface_h = window->h;
+            }
+            const int  k    = std::min(window->w / kWidth, window->h / kHeight);
+            const bool xrgb = window->format == SDL_PIXELFORMAT_XRGB8888 || window->format == SDL_PIXELFORMAT_ARGB8888;
+            if (k >= 1 && xrgb && !SDL_MUSTLOCK(window)) {
+                // Each pixel k times, red and blue swapped on the way: the
+                // machine's pixels as they are, at a fraction of a filtered
+                // blit's cost.
+                const int x0 = (window->w - kWidth * k) / 2, y0 = (window->h - kHeight * k) / 2;
+                m_row.resize(static_cast<usize>(kWidth) * k);
+                for (int y = 0; y < kHeight; ++y) {
+                    const u32* in = pixels.data() + static_cast<usize>(y) * kWidth;
+                    for (int x = 0; x < kWidth; ++x) {
+                        const u32 p = in[x];
+                        const u32 q = ((p & 0xff) << 16) | (p & 0xff00) | ((p >> 16) & 0xff);
+                        for (int i = 0; i < k; ++i) {
+                            m_row[static_cast<usize>(x) * k + i] = q;
+                        }
+                    }
+                    for (int i = 0; i < k; ++i) {
+                        u8* out = static_cast<u8*>(window->pixels)
+                                + static_cast<usize>(y0 + y * k + i) * static_cast<usize>(window->pitch);
+                        std::memcpy(reinterpret_cast<u32*>(out) + x0, m_row.data(), m_row.size() * sizeof(u32));
+                    }
+                }
+            } else {
+                // Smaller than the machine's picture, or another format: SDL's
+                // stretch, 4:3, from the picture in the window's format.
+                m_converted.resize(pixels.size());
+                SDL_ConvertPixels(kWidth, kHeight, SDL_PIXELFORMAT_XBGR8888, pixels.data(), kWidth * 4,
+                                  window->format, m_converted.data(), kWidth * 4);
+                SDL_Surface* frame =
+                    SDL_CreateSurfaceFrom(kWidth, kHeight, window->format, m_converted.data(), kWidth * 4);
+                if (frame != nullptr) {
+                    int w = window->w, h = w * 3 / 4;
+                    if (h > window->h) {
+                        h = window->h;
+                        w = h * 4 / 3;
+                    }
+                    const SDL_Rect at = {(window->w - w) / 2, (window->h - h) / 2, w, h};
+                    SDL_BlitSurfaceScaled(frame, nullptr, window, &at, SDL_SCALEMODE_NEAREST);
+                    SDL_DestroySurface(frame);
+                }
+            }
+            SDL_UpdateWindowSurface(m_window);
+        }
+    }
+
+    /// The frame held to the machine's rate.
+    void pace()
+    {
+        const auto before = std::chrono::steady_clock::now();
+        static_cast<void>(m_pacer.wait());
+        m_late = std::chrono::steady_clock::now() - before < std::chrono::microseconds(500);
+    }
+
+    /// An event of the window's (closing it ends the agent).
+    void event(const SDL_Event& e)
+    {
+        if (e.type == SDL_EVENT_QUIT || e.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+            m_closed = true;
+        }
+    }
+
+    /// The window's events, where no device's loop reads them.
+    void pump()
+    {
+        SDL_Event e;
+        while (SDL_PollEvent(&e)) {
+            event(e);
+        }
+    }
+
+    /// After a load or a pause of the agent's: the pace from now.
+    void resync() { m_pacer.resync(); }
+
+    [[nodiscard]] bool closed() const { return m_closed; }
+
+private:
+    static constexpr int kWidth  = static_cast<int>(hw::SoftRenderer::kWidth);
+    static constexpr int kHeight = static_cast<int>(hw::SoftRenderer::kHeight);
+
+    SDL_Window*      m_window = nullptr;
+    osd::Audio       m_audio;
+    osd::FramePacer  m_pacer;
+    std::vector<s16> m_scaled;
+    std::vector<u32> m_converted;
+    std::vector<u32> m_row;
+    SDL_Surface*     m_surface   = nullptr;
+    int              m_surface_w = 0;
+    int              m_surface_h = 0;
+    bool             m_late      = false;
+    u32              m_volume = 100;
+    bool             m_closed = false;
+};
 
 /// A command the force feedback gives the wheel.
 struct FfbRecord {
@@ -427,6 +596,14 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
     osd::Input::WheelSettings wheel = options.wheel;
     wheel.ffb = wheel.ffb || !options.device;
     input.set_wheel_settings(wheel);
+    // --agent-show: the window and the sound.
+    std::unique_ptr<Show> show;
+    if (options.show) {
+        show = std::make_unique<Show>();
+        if (!show->open("sm2-emu agent: " + game.name, sound, options.throttle, options.volume)) {
+            return 1;
+        }
+    }
     std::vector<FfbRecord>   ffb_log;
     std::vector<BoardRecord> board_log;
     bool                     servo   = false;
@@ -491,6 +668,9 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
 
     char line[1024];
     while (std::fgets(line, sizeof(line), stdin) != nullptr) {
+        if (show && show->closed()) {
+            break;  // the window closed: the agent with it
+        }
         char command[16] = {};
         if (std::sscanf(line, "%15s", command) != 1) {
             continue;
@@ -537,6 +717,9 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                     SDL_Event event;
                     while (SDL_PollEvent(&event)) {
                         input.handle_event(event);
+                        if (show) {
+                            show->event(event);
+                        }
                     }
                     input.poll(&inputs, game);
                 } else {
@@ -554,6 +737,9 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                     telemetry_update();
                 }
                 if (sound != nullptr) {
+                    if (show) {
+                        show->sound(sound->pending_samples());
+                    }
                     sound->clear_pending_samples();
                 }
                 // Kept in a local: a range-for over the view of the temporary
@@ -575,6 +761,17 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                     nmi_acc += 1000.0 / kMachineHz;
                     nmis += static_cast<u64>(nmi_acc);
                     nmi_acc -= static_cast<double>(static_cast<u64>(nmi_acc));
+                }
+                if (show) {
+                    if (!options.device) {
+                        show->pump();
+                    }
+                    if (show->drawing()) {
+                        machine.compose_video();
+                        renderer.render(machine, machine.render_list(), frame);
+                        show->picture(frame);
+                    }
+                    show->pace();
                 }
             }
             std::printf("ok %llu%s\n", static_cast<unsigned long long>(frames), drive.c_str());
@@ -796,6 +993,9 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                     tel_at = ~0ull;  // another race: the telemetry from it
                     if (decoder) {
                         decoder->forget();
+                    }
+                    if (show) {
+                        show->resync();
                     }
                 }
                 std::printf(ok ? "ok\n" : "err\n");

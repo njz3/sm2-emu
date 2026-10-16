@@ -258,6 +258,7 @@ struct Options {
     /// Serve an agent's commands over stdin/stdout instead of running (see agent.h).
     bool agent = false;
     bool agent_device = false;  ///< --agent-device: the agent with the controllers.
+    bool agent_show   = false;  ///< --agent-show: the agent in a window, with the sound.
 
     /// --telemetry PORT: serve the telemetry there, over the settings' port.
     sm2::u32 telemetry_port = 0;
@@ -328,6 +329,9 @@ void print_usage()
         "                      stdout, headless (see src/agent.h)\n"
         "      --agent-device  The same, with the controllers and the wheel's force\n"
         "                      feedback (a wheel, vJoy)\n"
+        "      --agent-show    The agent's game in a window, with its sound, at\n"
+        "                      its own pace (--no-throttle: as fast as it goes);\n"
+        "                      with --agent-device or alone\n"
         "      --telemetry <port>  Serve the racing games' telemetry (cars, race)\n"
         "                      to TCP clients, one JSON line a frame\n"
         "      --telemetry-sync  After each telemetry frame, wait (250 ms at most)\n"
@@ -440,6 +444,9 @@ void print_usage()
         } else if (std::strcmp(arg, "--agent-device") == 0) {
             out->agent        = true;
             out->agent_device = true;
+        } else if (std::strcmp(arg, "--agent-show") == 0) {
+            out->agent      = true;
+            out->agent_show = true;
         } else if (std::strcmp(arg, "--telemetry") == 0) {
             if (index + 1 >= argc) {
                 SM2_ERROR("--telemetry requires a TCP port");
@@ -1532,14 +1539,17 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    // An agent drives the machine, headless, as fast as the host allows.
+    // An agent drives the machine, headless, as fast as the host allows (or in
+    // a window, at the game's pace, with --agent-show).
     if (options.agent) {
         if (machine_iface == nullptr) {
             SM2_ERROR("--agent needs a ROM");
             return 1;
         }
         return sm2::run_agent(*machine_iface, sound_board, loaded->game,
-                              {options.agent_device, wheel_settings_from(options.config)});
+                              {options.agent_device, wheel_settings_from(options.config),
+                               options.agent_show, options.config.throttle,
+                               options.config.volume_for(game_family(loaded->game))});
     }
 
     // No window, no Vulkan: just run the machine and report where it got to.
