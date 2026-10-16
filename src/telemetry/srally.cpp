@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <iterator>
 
 namespace sm2::telemetry {
 namespace {
@@ -23,11 +24,20 @@ constexpr u32   kWorkRam   = 0x00500000;
 constexpr u32   kScratch   = 0x00200000;
 constexpr u32   kEntrySize = 0x100;
 constexpr int   kCars      = 8;
-constexpr u32   kMode      = 0x00202098;
-constexpr u32   kTotalTime = 0x002020B8;
-constexpr u32   kTimeLeft  = 0x0020B0B0;
 constexpr float kGameFps   = 60.0f;
 constexpr float kKmh       = 64.875f;  ///< The speed's unit, in km/h.
+
+/// Where a version keeps its mode and clocks.
+struct Layout {
+    const char* set;
+    u32         mode, total_time, time_left;
+};
+
+constexpr Layout kLayouts[] = {
+    {"srallyc", 0x00202098, 0x002020B8, 0x0020B0B0},
+    {"srallycc", 0x00202098, 0x002020B8, 0x0020B0D0},
+    {"srallycdxa", 0x00202088, 0x002020A4, 0x0020C990},
+};
 
 template <typename T>
 T read(std::span<const u8> ram, u32 address)
@@ -38,6 +48,15 @@ T read(std::span<const u8> ram, u32 address)
 }
 
 }  // namespace
+
+SrallyTelemetry::SrallyTelemetry(const std::string& set)
+{
+    for (usize i = 0; i < std::size(kLayouts); ++i) {
+        if (set == kLayouts[i].set) {
+            m_layout = i;
+        }
+    }
+}
 
 bool SrallyTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
 {
@@ -76,15 +95,16 @@ bool SrallyTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
 
     // The clocks and the game's mode are in the scratch RAM.
     const std::span<const u8> scratch = memory.scratch;
-    if (scratch.size() > kTimeLeft + 2 - kScratch) {
+    const Layout&             l       = kLayouts[m_layout];
+    if (scratch.size() > l.time_left + 2 - kScratch) {
         const auto at = [&scratch](u32 address) {
             u16 v = 0;
             std::memcpy(&v, scratch.data() + (address - kScratch), sizeof(v));
             return v;
         };
-        const u8  mode  = scratch[kMode - kScratch];
-        const u16 total = at(kTotalTime);
-        const u16 left  = at(kTimeLeft);
+        const u8  mode  = scratch[l.mode - kScratch];
+        const u16 total = at(l.total_time);
+        const u16 left  = at(l.time_left);
         out.time_left   = static_cast<float>(left) / kGameFps;
         out.race_time   = static_cast<float>(total) / kGameFps;
         out.lap_time    = out.race_time;

@@ -13,13 +13,20 @@ own code (GPL v3 against this project's licence): its tracking file is
 - **Built** in `src/telemetry`: the agreed keys, what is worked out from them,
   the client commands, the Forza Data Out datagrams, the paused state; the
   agent's `tel` follows every frame. README, "Telemetry".
-- **Nine games decoded**: Daytona USA, Sega Rally, Indy 500, Touring Car, Over
-  Rev, Super GT 24h, and now Motor Raid, Wave Runner and Desert Tank.
-- **Checked** in agent mode on all nine (a race from a state or from
+- **Ten games decoded**: Daytona USA, Sega Rally, Indy 500, Touring Car, Over
+  Rev, Super GT 24h, Motor Raid, Wave Runner, Desert Tank and Manx TT.
+- **Checked** in agent mode on all ten (a race from a state or from
   power-up, the keys printed), and end to end in the window (TCP commands,
   311-byte datagrams). Not yet with a commercial program (SimHub).
-- **Left**: Manx TT (preliminary in sm2-emu: it stops at its motion slider's
-  check); what the table below marks unknown.
+- **The clones** (each from power-up, driven 20 s): all give the parent's
+  keys. daytonas, daytonase, daytonam, srallycb, srallycdx, overrevb,
+  overrevba and manxttc read as their parents; daytona93, srallycc, srallycdxa, stcca, stccb,
+  stcco, indy500to and indy500d have their own addresses (below). manxttdx
+  runs a race but its RAM differs (no telemetry yet); motoraiddx stops at
+  "DRIVEBOARD NOT RESPONSE ERROR!!".
+- **Left**: motoraiddx (it wants the DX cabinet's motion board), manxttdx's
+  addresses, daytona93's AI cars, indy500d's lap time; what the table below
+  marks unknown.
 
 ## The keys (agreed with the Supermodel session)
 
@@ -84,12 +91,13 @@ other way before). `orient()` built its matrix leaning the other way too
 | Daytona USA | yes, speedometer | pitch, heading, roll | 1..4, rpm, red 8000 | time left, race, lap, last, best (64 a second) | yes | 39 | 1569 (beginner) |
 | Sega Rally | yes, speedometer | pitch, heading, roll | 1..4, rpm, red 8200 | time left, total (1/60 s) | yes (mode + clocks) | 7 | unknown |
 | Indy 500 | yes | pitch, heading, roll | 1..6 (6 MT), rpm | time left, lap | race only | 32 / 27 | 4053 / 4610 / 4910 |
-| Touring Car | yes | heading | 0..6, rpm (probable) | time left (64 a second, fixed), lap | race only | 7 | 2434 (Country) |
+| Touring Car | yes | heading | 0..6, rpm (probable) | time left (64 a second, fixed), lap | race only | 7 | 2047 (Country) |
 | Super GT 24h | yes | matrix | gear, rpm | time left, lap | yes | 13 | 3000 |
 | Over Rev | yes | pitch, heading, roll | gear, rpm | time left, race, lap | race only | 7 | from the game |
 | Motor Raid | yes, speedometer | pitch, heading, lean | | time left, race | race / over | 9 | |
 | Wave Runner | yes, speedometer | heading (attitude unknown: level) | | race | race / over | | |
 | Desert Tank | yes | heading, pitch, roll from its corners | | mission timer | race | | |
+| Manx TT | yes, speedometer | pitch, heading, lean | gear | time left (56 a second) | race (its clock running) | | |
 
 Units: the games' own, about metres (Daytona's is 1.11 m by its
 speedometer, Sega Rally's 1.03 m; Indy 500's oval measures 4053 against
@@ -119,6 +127,24 @@ by the steering weave, its travel and its speed). The decoders' headers
   `005AD874` race time.
 - **Desert Tank**: `005003D4` centre, `00500404` four corners; `00521040`
   mission timer.
+- **Manx TT**: the bike at `00578A20` (x/y/z in decimetres, `+0C` pitch,
+  `+10` heading, `+14` lean, floats), `00578B64` gear, `005009D0`
+  speedometer, `005334F0` time left. Revision D's EEPROM ships set to the DX
+  cabinet, whose motion slider is not emulated, and its self-test waits on
+  the slider forever; `Model2::load_nvram` turns it to Twin (word 5, word 13,
+  the CRC-16 in word 0), which is then revision C's Twin image byte for byte
+  (manxtt and manxttc only: the DX-only set plays on without its slider).
+- **The clones** (`kLayouts` in each decoder, picked by the set's name):
+  daytona93 keeps the player at `00504D80` (from `+1A8` on, 4 bytes lower;
+  the AI cars not found); srallycc its time left at `0020B0D0`, srallycdxa
+  its mode, total time and time left at `00202088`, `002020A4`, `0020C990`;
+  stcca, stccb and stcco their cars at `0020A830`, gear `002045BC`, rpm
+  `00208864`, stcco its clocks 0x10 higher; indy500to everything 0x10 to 0x30
+  lower; indy500d its cars at `0054C714` of `0x1EC` bytes (angles `+14`,
+  progress `+E8`), time left `0054C2D2`, course `0054C2F0`, gear `0054C4A4`,
+  rpm `0054C600`, camera `00554C80`. The two Indy clones keep their gearbox
+  byte four before the gear, not three (where they hold a 3); read in
+  automatic only so far.
 
 ## Next
 
@@ -128,8 +154,8 @@ by the steering weave, its travel and its speed). The decoders' headers
 2. What the table leaves: Sega Rally's place and stage, Touring Car's
    orientation and state, Indy 500's and Over Rev's states outside the race,
    the last and best laps beyond Daytona, the wheels everywhere.
-3. Manx TT once it runs past its motion slider check; Sega Ski Super G and
-   Top Skater (riding games) if wanted.
+3. motoraiddx once its motion board answers; manxttdx's addresses; Sega
+   Ski Super G and Top Skater (riding games) if wanted.
 
 ## Log
 
@@ -142,3 +168,7 @@ by the steering weave, its travel and its speed). The decoders' headers
   clock fixed (64 a second); Motor Raid, Wave Runner and Desert Tank
   decoded. Supermodel's implementation follows the same rules (the jump,
   angle and pause guards from here; its wheels' `{}` placeholders here).
+- 2026-10-15: Manx TT runs (revision D's EEPROM turned to Twin) and is
+  decoded; the clones checked, their addresses per set (daytona93, srallycc,
+  srallycdxa, stcca, stccb, stcco, indy500to, indy500d); Touring Car's time
+  left read signed (it went to 4 billion at the time up).

@@ -16,14 +16,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <iterator>
 
 namespace sm2::telemetry {
 namespace {
 
 constexpr u32   kWorkRam   = 0x00500000;
-constexpr u32   kCars      = 0x00505100;
 constexpr u32   kCarSize   = 0x300;
-constexpr int   kCarCount  = 40;
 constexpr u32   kState     = 0x005010A0;
 constexpr u32   kRaceTime  = 0x005010CC;
 constexpr u32   kTimeLeft  = 0x005010D0;
@@ -35,6 +34,19 @@ constexpr float kAngle16   = 2 * kPi / 65536;
 constexpr float kSegments  = 196.0f;    ///< A lap of the beginner course.
 constexpr float kLapLength = 1569.4f;   ///< The beginner course, in units (autopilot's map).
 constexpr float kClock     = 64.0f;     ///< Frames a second, on the game's clocks.
+
+/// Where a version keeps the cars.
+struct Layout {
+    const char* set;
+    u32         cars;
+    int         count;     ///< 1: the AI cars not found.
+    u32         progress, gear, rpm;
+};
+
+constexpr Layout kLayouts[] = {
+    {"daytona", 0x00505100, 40, 0x1AC, 0x1CC, 0x1D4},
+    {"daytona93", 0x00504D80, 1, 0x1A8, 0x1C8, 0x1D0},
+};
 
 State state_of(u8 s)
 {
@@ -63,18 +75,28 @@ T read(std::span<const u8> ram, u32 address)
 
 }  // namespace
 
+DaytonaTelemetry::DaytonaTelemetry(const std::string& set)
+{
+    for (usize i = 0; i < std::size(kLayouts); ++i) {
+        if (set == kLayouts[i].set) {
+            m_layout = i;
+        }
+    }
+}
+
 bool DaytonaTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
 {
     const std::span<const u8> ram = memory.work;
-    if (ram.size() < kCars + kCarSize * kCarCount - kWorkRam) {
+    const Layout&             l   = kLayouts[m_layout];
+    if (ram.size() < l.cars + kCarSize * static_cast<u32>(l.count) - kWorkRam) {
         return false;
     }
     out.frame = frame;
     out.game  = "daytona";
     out.track = "";
-    out.others.resize(kCarCount - 1);
-    for (int k = 0; k < kCarCount; ++k) {
-        const u32 base = kCars + static_cast<u32>(k) * kCarSize;
+    out.others.resize(static_cast<usize>(l.count - 1));
+    for (int k = 0; k < l.count; ++k) {
+        const u32 base = l.cars + static_cast<u32>(k) * kCarSize;
         Vehicle&  v    = k == 0 ? out.player : out.others[static_cast<usize>(k - 1)];
         v.x            = read<float>(ram, base + 0x9C);
         v.y            = read<float>(ram, base + 0xA0);
@@ -84,18 +106,19 @@ bool DaytonaTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
         float h        = -static_cast<float>(read<s32>(ram, base + 0xC8)) * 2 * kPi / 65536.0f;
         h              = std::fmod(h + kPi, 2 * kPi);
         v.heading      = (h < 0 ? h + 2 * kPi : h) - kPi;
-        const int done = read<u8>(ram, base + 0xF0);
+        // -1 on the grid, before the line
+        const int done = l.count > 1 ? read<s8>(ram, base + 0xF0) : read<s8>(ram, kLapsDone);
         v.lap          = done + 1;
         v.progress     = static_cast<float>(done)
-                   + static_cast<float>(read<s32>(ram, base + 0x1AC)) / 65536.0f / kSegments;
-        v.position     = read<u8>(ram, base + 0xEC) + 1;
+                   + static_cast<float>(read<s32>(ram, base + l.progress)) / 65536.0f / kSegments;
+        v.position     = l.count > 1 ? read<u8>(ram, base + 0xEC) + 1 : kUnknown;
         orient(v);
     }
     Vehicle&  p    = out.player;
-    const u32 base = kCars;
-    p.gear         = read<u8>(ram, base + 0x1CC) + 1;
+    const u32 base = l.cars;
+    p.gear         = read<u8>(ram, base + l.gear) + 1;
     p.gears        = 4;
-    p.rpm          = static_cast<float>(read<u32>(ram, base + 0x1D4));
+    p.rpm          = static_cast<float>(read<u32>(ram, base + l.rpm));
     p.rpm_max      = 8000.0f;  // the dial's red zone
 
     out.laps       = read<u8>(ram, kLaps);
@@ -107,7 +130,7 @@ bool DaytonaTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
     out.time_left  = static_cast<float>(read<u16>(ram, kTimeLeft)) / kClock;
     out.race_time  = static_cast<float>(race) / kClock;
     // The laps done are in the table; the current one is the rest of the race.
-    const int done = std::min<int>(read<u8>(ram, kLapsDone), 16);
+    const int done = std::clamp<int>(read<s8>(ram, kLapsDone), 0, 16);
     u32       sum  = 0;
     u32       best = 0;
     for (int i = 0; i < done; ++i) {

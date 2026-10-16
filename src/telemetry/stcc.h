@@ -23,12 +23,15 @@
 //             +50 the track segment the car is on (u16, 0 at the line)
 //             +52 segments driven since the line (i16, negative on the grid)
 //   002022D0  lap time (float, seconds, as shown)
-//   002022EC  time left (u32, frames; the screen shows it divided by 64)
+//   002022EC  time left (s32, frames; the screen shows it divided by 64;
+//             below 0 at the time up)
 //   0020462C  gear (u8, 1..6, 0 standing)
 //   00208914  probably the rpm (float, up to about 10 000)
 //
 // Country Circuit has 300 segments a lap; on the other courses the count is
-// the highest segment seen, plus one.
+// the highest segment seen, plus one. stcca, stccb and stcco keep the cars,
+// the gear and the rpm 0x50 to 0xD0 bytes lower, stcco its clocks 0x10 higher
+// (kLayouts in stcc.cpp).
 #pragma once
 
 #include "telemetry/telemetry.h"
@@ -37,11 +40,13 @@ namespace sm2::telemetry {
 
 class StccTelemetry final : public GameTelemetry {
 public:
+    explicit StccTelemetry(const std::string& set);
     [[nodiscard]] const char* name() const override { return "Sega Touring Car Championship"; }
     bool decode(const Memory& ram, u64 frame, Frame& out) override;
 
 private:
-    int m_segments = 300;  ///< Segments a lap: Country Circuit's, or the highest seen plus one.
+    int   m_segments = 300;  ///< Segments a lap: Country Circuit's, or the highest seen plus one.
+    usize m_layout   = 0;    ///< The version's addresses, in kLayouts.
 };
 
 }  // namespace sm2::telemetry

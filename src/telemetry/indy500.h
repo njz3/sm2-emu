@@ -32,6 +32,10 @@
 //   005441E4  the player's time in the lap (u32, frames)
 //   005449A0  the player's camera: 3x3 floats, world from camera, then its
 //             position (a chase camera, late in the turns)
+//
+// indy500to keeps all this 0x10 to 0x30 bytes lower, its gearbox one byte
+// before; indy500d elsewhere, its cars 8 bytes longer (the angles at +014,
+// the progress at +0E8), its lap time not found (kLayouts in indy500.cpp).
 #pragma once
 
 #include "telemetry/telemetry.h"
@@ -40,11 +44,13 @@ namespace sm2::telemetry {
 
 class Indy500Telemetry final : public GameTelemetry {
 public:
+    explicit Indy500Telemetry(const std::string& set);
     [[nodiscard]] const char* name() const override { return "Indy 500"; }
     bool decode(const Memory& ram, u64 frame, Frame& out) override;
 
 private:
-    int m_sectors = 1;  ///< On a course not in the tables: the highest sector seen, plus one.
+    int   m_sectors = 1;  ///< On a course not in the tables: the highest sector seen, plus one.
+    usize m_layout  = 0;  ///< The version's addresses, in kLayouts.
 };
 
 }  // namespace sm2::telemetry

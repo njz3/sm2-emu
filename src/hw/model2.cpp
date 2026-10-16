@@ -141,6 +141,41 @@ constexpr u32 kLumaRam         = 0x12800000;  // byte-wide on lane 0, 0x8000 ent
     return folded >= base && folded < base + size;
 }
 
+/// Manx TT's cabinet type, in its EEPROM: the DX cabinet's motion slider is not
+/// emulated, and in DX mode revision D waits on the slider's self-test
+/// forever (the DX-only set, left as it is, gives up and plays on). Twin mode
+/// needs nothing more. Word 5 is the type (0 DX, 1 Twin), word 13 goes with
+/// it, word 0 is a CRC-16 (CCITT, 0xFFFF in and out) of words 1 to 27;
+/// turned, revision D's shipped DX image is revision C's Twin image byte for
+/// byte.
+void manxtt_twin(std::span<u8> eeprom)
+{
+    constexpr usize kCrcEnd = 56;
+    if (eeprom.size() < kCrcEnd) {
+        return;
+    }
+    const auto crc = [&eeprom] {
+        u16 c = 0xffff;
+        for (usize i = 2; i < kCrcEnd; ++i) {
+            c = static_cast<u16>(c ^ (eeprom[i] << 8));
+            for (int bit = 0; bit < 8; ++bit) {
+                c = static_cast<u16>((c & 0x8000) != 0 ? (c << 1) ^ 0x1021 : c << 1);
+            }
+        }
+        return static_cast<u16>(c ^ 0xffff);
+    };
+    const u16 stored = static_cast<u16>(eeprom[0] | (eeprom[1] << 8));
+    if (stored != crc() || eeprom[10] != 0x00 || eeprom[11] != 0x00) {
+        return;  // Twin already, or not an image of this layout
+    }
+    eeprom[10]     = 0x01;
+    eeprom[26]     = 0x00;
+    const u16 sum  = crc();
+    eeprom[0]      = static_cast<u8>(sum);
+    eeprom[1]      = static_cast<u8>(sum >> 8);
+    SM2_INFO("manxtt: CABINET TYPE was DELUXE, whose motion slider is not emulated; set to TWIN");
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -1710,6 +1745,9 @@ void Model2::load_nvram()
     }
 
     (void)m_eeprom.load((base / (m_game.name + ".eeprom")).string());
+    if (m_game.name == "manxtt" || m_game.name == "manxttc") {
+        manxtt_twin(m_eeprom.bytes());
+    }
 }
 
 void Model2::save_nvram() const

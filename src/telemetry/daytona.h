@@ -22,7 +22,7 @@
 //             +A8 pitch, +AC roll (s16, a turn is 65536; + nose up, + right)
 //             +C8 heading (i32, a turn is 65536, negated)
 //             +EC the place in the race, from 0
-//             +F0 laps done
+//             +F0 laps done (s8: -1 on the grid, before the line)
 //             +1AC progress along the course (16.16, a segment every 8.3
 //                  units; 196 a lap of the beginner course)
 //             +1CC gear, 0..3; +1D4 rpm (u32)
@@ -33,6 +33,10 @@
 //   00502A00  the player's lap times (u32 each, frames)
 //
 // The AI cars' speeds come from successive positions (kinematics).
+//
+// daytona93 keeps the player's entry at 00504D80, from +1A8 on 4 bytes lower
+// (progress +1A8, gear +1C8, rpm +1D0); its AI cars, place and laps are not
+// found, the laps done are 005010E0's.
 #pragma once
 
 #include "telemetry/telemetry.h"
@@ -41,8 +45,12 @@ namespace sm2::telemetry {
 
 class DaytonaTelemetry final : public GameTelemetry {
 public:
+    explicit DaytonaTelemetry(const std::string& set);
     [[nodiscard]] const char* name() const override { return "Daytona USA"; }
     bool decode(const Memory& ram, u64 frame, Frame& out) override;
+
+private:
+    usize m_layout = 0;  ///< The version's addresses, in kLayouts.
 };
 
 }  // namespace sm2::telemetry

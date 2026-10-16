@@ -30,6 +30,9 @@
 //   00202098  game mode: 2 attract, 3 from the coin to the game over
 //   002020B8  total time, 0020B0B0 time left (u16, 1/60 s)
 //
+// srallycc keeps its time left at 0020B0D0; srallycdxa its mode at 00202088,
+// its total time at 002020A4, its time left at 0020C990.
+//
 // The AI cars' speeds come from successive positions (kinematics).
 #pragma once
 
@@ -39,8 +42,12 @@ namespace sm2::telemetry {
 
 class SrallyTelemetry final : public GameTelemetry {
 public:
+    explicit SrallyTelemetry(const std::string& set);
     [[nodiscard]] const char* name() const override { return "Sega Rally Championship"; }
     bool decode(const Memory& ram, u64 frame, Frame& out) override;
+
+private:
+    usize m_layout = 0;  ///< The version's clocks, in kLayouts.
 };
 
 }  // namespace sm2::telemetry

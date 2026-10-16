@@ -370,6 +370,7 @@ add_executable(sm2-emu
     telemetry/motoraid.cpp
     telemetry/waverunr.cpp
     telemetry/desert.cpp
+    telemetry/manxtt.cpp
 )
 
 # On macOS build a proper .app bundle so the Finder/Dock show the icon and the

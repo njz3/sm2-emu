@@ -16,21 +16,30 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <iterator>
 
 namespace sm2::telemetry {
 namespace {
 
 constexpr u32   kScratch  = 0x00200000;
-constexpr u32   kCars     = 0x0020A900;
 constexpr u32   kCarSize  = 0x58;
 constexpr int   kCarCount = 8;
-constexpr u32   kTimeLeft = 0x002022EC;
-constexpr u32   kLapTime  = 0x002022D0;
-constexpr u32   kGear     = 0x0020462C;
-constexpr u32   kRpm      = 0x00208914;
 constexpr float kFps      = 57.5f;
 constexpr float kClock    = 64.0f;    ///< Frames a second, on the game's clock.
-constexpr float kLapLength = 2434.2f; ///< Country Circuit, in units (autopilot's map).
+constexpr float kLapLength = 2047.0f; ///< Country Circuit, in units (the AI cars' whole laps).
+
+/// Where a version keeps the race.
+struct Layout {
+    const char* set;
+    u32         cars, lap_time, time_left, gear, rpm;
+};
+
+constexpr Layout kLayouts[] = {
+    {"stcc", 0x0020A900, 0x002022D0, 0x002022EC, 0x0020462C, 0x00208914},
+    {"stcca", 0x0020A830, 0x002022D0, 0x002022EC, 0x002045BC, 0x00208864},
+    {"stccb", 0x0020A830, 0x002022D0, 0x002022EC, 0x002045BC, 0x00208864},
+    {"stcco", 0x0020A830, 0x002022E0, 0x002022FC, 0x002045BC, 0x00208864},
+};
 
 template <typename T>
 T read(std::span<const u8> ram, u32 address)
@@ -42,21 +51,31 @@ T read(std::span<const u8> ram, u32 address)
 
 }  // namespace
 
+StccTelemetry::StccTelemetry(const std::string& set)
+{
+    for (usize i = 0; i < std::size(kLayouts); ++i) {
+        if (set == kLayouts[i].set) {
+            m_layout = i;
+        }
+    }
+}
+
 bool StccTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
 {
     const std::span<const u8> ram = memory.scratch;
-    if (ram.size() < kCars + kCarSize * kCarCount - kScratch) {
+    const Layout&             l   = kLayouts[m_layout];
+    if (ram.size() < l.cars + kCarSize * kCarCount - kScratch) {
         return false;
     }
     out.frame = frame;
     out.game  = "stcc";
     out.others.resize(kCarCount - 1);
     for (int k = 0; k < kCarCount; ++k) {
-        const u32 base = kCars + static_cast<u32>(k) * kCarSize;
+        const u32 base = l.cars + static_cast<u32>(k) * kCarSize;
         m_segments     = std::max(m_segments, static_cast<int>(read<u16>(ram, base + 0x50)) + 1);
     }
     for (int k = 0; k < kCarCount; ++k) {
-        const u32 base   = kCars + static_cast<u32>(k) * kCarSize;
+        const u32 base   = l.cars + static_cast<u32>(k) * kCarSize;
         Vehicle&  v      = k == 0 ? out.player : out.others[static_cast<usize>(k - 1)];
         v.x              = read<float>(ram, base + 0x00);
         v.y              = read<float>(ram, base + 0x04);
@@ -75,14 +94,14 @@ bool StccTelemetry::decode(const Memory& memory, u64 frame, Frame& out)
         orient(v);
     }
     out.sectors    = m_segments;
-    out.time_left  = static_cast<float>(read<u32>(ram, kTimeLeft)) / kClock;
+    out.time_left  = static_cast<float>(std::max(read<s32>(ram, l.time_left), 0)) / kClock;
     out.racing     = out.time_left > 0;
     out.lap_length = kLapLength;
-    out.lap_time   = read<float>(ram, kLapTime);
+    out.lap_time   = read<float>(ram, l.lap_time);
     Vehicle& p     = out.player;
-    p.gear         = read<u8>(ram, kGear);
+    p.gear         = read<u8>(ram, l.gear);
     p.gears        = 6;
-    p.rpm          = read<float>(ram, kRpm);
+    p.rpm          = read<float>(ram, l.rpm);
     p.position    = 1;
     for (const Vehicle& o : out.others) {
         if (o.progress > p.progress) {

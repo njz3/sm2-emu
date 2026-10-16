@@ -18,6 +18,7 @@
 #include "telemetry/daytona.h"
 #include "telemetry/desert.h"
 #include "telemetry/indy500.h"
+#include "telemetry/manxtt.h"
 #include "telemetry/motoraid.h"
 #include "telemetry/overrev.h"
 #include "telemetry/sgt24h.h"
@@ -673,13 +674,13 @@ std::unique_ptr<GameTelemetry> make_telemetry(const rom::GameSpec& game)
     const std::string& family = game.parent.empty() ? game.name : game.parent;
     std::unique_ptr<GameTelemetry> t;
     if (family == "indy500") {
-        t = std::make_unique<Indy500Telemetry>();
+        t = std::make_unique<Indy500Telemetry>(game.name);
     } else if (family == "stcc") {
-        t = std::make_unique<StccTelemetry>();
+        t = std::make_unique<StccTelemetry>(game.name);
     } else if (family == "srallyc") {
-        t = std::make_unique<SrallyTelemetry>();
+        t = std::make_unique<SrallyTelemetry>(game.name);
     } else if (family == "daytona") {
-        t = std::make_unique<DaytonaTelemetry>();
+        t = std::make_unique<DaytonaTelemetry>(game.name);
     } else if (family == "sgt24h") {
         t = std::make_unique<Sgt24hTelemetry>();
     } else if (family == "overrev") {
@@ -690,6 +691,8 @@ std::unique_ptr<GameTelemetry> make_telemetry(const rom::GameSpec& game)
         t = std::make_unique<WaveRunnerTelemetry>();
     } else if (family == "desert") {
         t = std::make_unique<DesertTankTelemetry>();
+    } else if (family == "manxtt" && game.name != "manxttdx") {  // the DX set's RAM differs, not found yet
+        t = std::make_unique<ManxTtTelemetry>();
     }
     if (t) {
         t->set_controls(game);
