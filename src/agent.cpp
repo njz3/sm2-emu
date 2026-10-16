@@ -65,6 +65,12 @@
 //   obs W H
 //       The picture, scaled to W x H. Answer: "obs W H", a new line, then
 //       W * H * 3 bytes, RGB, row by row.
+//   bands N
+//       The picture drawn in N bands of rows, a thread each (up to 4 unless
+//       set): 1 when many agents run at once. Answer: "ok".
+//   perf [N]
+//       Run N frames (600) with the holds, timing the cores. Answer: "perf
+//       frames N wall MS i960 MS copro MS sound MS ms/frame".
 //   shot PATH
 //       The picture as a BMP, full size. Answer: "ok" or "err".
 //   ram OFFSET LENGTH
@@ -73,8 +79,10 @@
 //   mem ADDRESS LENGTH
 //       The same by the i960's address (hex): the work RAM at 00500000 or the
 //       scratch RAM at 00200000. Answer: "mem LENGTH" (0 elsewhere), the bytes.
-//   tel
-//       The telemetry, one JSON line (see src/telemetry), or "tel none".
+//   tel [PATH,PATH...]
+//       The telemetry, one JSON line (see src/telemetry), or "tel none". With
+//       PATHs, only those keys (dotted, "player.speed", "others.x"), as the
+//       telemetry server's `fields`.
 //   save PATH / load PATH
 //       A save state, the drive board model included. Answer: "ok" or "err".
 //   quit
@@ -94,6 +102,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -101,6 +110,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #ifdef _WIN32
@@ -661,6 +671,29 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                 settle = std::clamp(ms, 0, 100);
             }
             std::printf("settle %d\n", settle);
+        } else if (std::strcmp(command, "perf") == 0) {
+            unsigned n = 600;
+            std::sscanf(line, "%*s %u", &n);
+            machine.set_core_profiling(true);
+            u64        i960 = 0, copro = 0, sound_ns = 0;
+            const auto t0   = std::chrono::steady_clock::now();
+            for (unsigned k = 0; k < n; ++k) {
+                machine.run_frame();
+                ++frames;
+                i960 += machine.i960_stage_nanoseconds();
+                copro += machine.copro_stage_nanoseconds();
+                sound_ns += machine.sound_stage_nanoseconds();
+            }
+            const auto wall = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                  std::chrono::steady_clock::now() - t0).count();
+            machine.set_core_profiling(false);
+            std::printf("perf frames %u wall %.3f i960 %.3f copro %.3f sound %.3f ms/frame\n", n,
+                        wall / 1e6 / n, i960 / 1e6 / n, copro / 1e6 / n, sound_ns / 1e6 / n);
+        } else if (std::strcmp(command, "bands") == 0) {
+            unsigned bands = 1;
+            std::sscanf(line, "%*s %u", &bands);
+            renderer.set_bands(std::clamp(bands, 1u, 8u));
+            std::printf("ok\n");
         } else if (std::strcmp(command, "frame") == 0) {
             std::printf("frame %llu\n", static_cast<unsigned long long>(frames));
         } else if (std::strcmp(command, "obs") == 0) {
@@ -735,7 +768,20 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                 telemetry_update();  // no frame run since a load
             }
             if (tel_ok) {
-                const std::string json = telemetry::to_json(tel);
+                telemetry::Selection selection;
+                char                 fields[2048] = {};
+                if (std::sscanf(line, "%*s %2047s", fields) == 1) {
+                    const std::string_view all(fields);
+                    usize                  start = 0;
+                    while (start < all.size()) {
+                        const usize comma = std::min(all.find(',', start), all.size());
+                        if (comma > start) {
+                            selection.fields.emplace_back(all.substr(start, comma - start));
+                        }
+                        start = comma + 1;
+                    }
+                }
+                const std::string json = telemetry::to_json(tel, selection);
                 std::fwrite(json.data(), 1, json.size(), stdout);
             } else {
                 std::printf("tel none\n");
@@ -748,6 +794,9 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                 const bool ok = command[0] == 's' ? machine.save_state(path) : machine.load_state(path);
                 if (command[0] == 'l') {
                     tel_at = ~0ull;  // another race: the telemetry from it
+                    if (decoder) {
+                        decoder->forget();
+                    }
                 }
                 std::printf(ok ? "ok\n" : "err\n");
             }

@@ -142,6 +142,15 @@ public:
     /// Where the game's controls are, for throttle, brake and steer.
     void set_controls(const rom::GameSpec& game);
 
+    /// Forget the frames seen so far: after a save state's load the next
+    /// frame is not the one after them (a speed from them would be held as a
+    /// jump's).
+    void forget()
+    {
+        m_last.clear();
+        m_angles.clear();
+    }
+
 protected:
     /// Read one frame from the host CPU's RAMs.
     virtual bool decode(const Memory& ram, u64 frame, Frame& out) = 0;
