@@ -19,8 +19,21 @@ emulators share (`autopilot/analyze_ffb.py`). sm2-emu keeps the agent mode
 and the telemetry (`src/agent.cpp`, `src/telemetry/`) and this log. Below,
 `sm2emu/` is that folder of BackForceFeeder.
 
-## Where it stands (2026-10-15)
+## Where it stands (2026-10-16)
 
+- **Every course of Daytona USA, Sega Rally and Indy 500 finished** by the
+  autopilot in agent mode, frame by frame, with the manual gearbox
+  (BackForceFeeder's `autopilot/sm2emu/rl/`, the section "Reinforcement
+  learning, again" below): **all three Indy 500 courses won**, **Daytona's
+  beginner and expert courses won** (advanced 3rd), **Sega Rally's
+  championship in 3'28"53, the best time** (first of the records table,
+  ahead of 3'30"00; the race 3rd), **Touring Car's round 1 won** (its
+  qualifying lap and its race planned in one go, on an optimised line).
+  The driver that does it is a planner with the emulator itself over a base
+  driver; reinforcement learning alone (PPO) did not get there in the time,
+  nor did a network learning the planner's choices. Each race replays frame
+  by frame with its force feedback recorded, and the force feedback was set
+  against the races' events (hits, off the road, airborne).
 - **Indy 500 is won** by the autopilot: from 33rd on the grid of the oval, 1st
   at the flag, 2'31"069, best lap 36"518 (the cabinet's record 37"248). The
   driver: a racing line optimised by CMA-ES, a pure pursuit, and a planner that
@@ -758,6 +771,166 @@ network makes of it afterwards, a policy iteration).
 | beam search of 3 from 0.75 lap | 4th again: the three leaders lap at our pace; winning would take a faster car |
 | the manual gearbox (gear at `0020462C`, paddles IN1 `10`/`20`; limits 20, 34, 42, 55, 71, 85 units/s), shifted at 96 % of each | the same qualifying lap to the hundredth as the automatic (which shifts sooner): no gain |
 
+## Reinforcement learning, again (16 October): every course, telemetry and picture
+
+The user's request (16 October): the reinforcement learning again, on the
+new telemetry and a reduced picture, the autopilot driving frame by frame,
+until it wins (first place or best time) at Daytona USA, Sega Rally, Indy 500
+and Touring Car, and finishes every course of Sega Rally, Daytona and Indy
+500; the manual gearbox, and Daytona's 4-2-4 (down two gears and back at
+once) to throw the car into the turns. In BackForceFeeder's
+`autopilot/sm2emu/rl/`, its own copy of the emulator in `rl/bin`:
+
+| Piece | File |
+|:--|:--|
+| Start states, the manual gearbox, from power-up (Daytona's three courses, Sega Rally's Celica or Delta) | `menus.py` |
+| The courses' lines: every car recorded (`tel`), binned by the game's own progress, the median; Rally's laps found by their period | `record_map.py`, `build_line.py`, `build_line_laps.py` |
+| The base driver: a pure pursuit of the line, a speed plan from its curvature, the gears by the revs (H shifter `set Gear`, paddles) | `driver.py` |
+| The environment and its two levels | `env.py` |
+| PPO, the emulators in worker processes, one policy for several courses | `train.py`, `model.py` |
+| A whole race, frame by frame, the policy's likeliest choices | `evaluate.py` |
+| Sega Rally's championship, each stage on its own map | `rally_run.py`, `next_stage.py` |
+| The planner: candidates tried from the saved race, the best driven | `plan_drive.py` |
+| A planned race again, frame by frame, the force feedback recorded; set against the events | `replay.py`, `ffb_events.py` |
+| The network learns the planner's choices | `plan_dataset.py`, `imitate.py` |
+| The base driver's settings searched (cross-entropy) | `tune_base.py` |
+| Pools of start states, cleaned of states off the course | `run_base.py --pool`, `clean_pool.py` |
+
+The policy decides every 8 frames: where to be across the road (five lanes,
+a fraction of the half-width either side of the line), how hard to go (0.85,
+1, 1.2 times the speed plan), and the 4-2-4. The base driver turns that into
+the steering, the pedals and the gear every 2 frames. It sees the telemetry
+against the line (speed, slip, rates, gear and revs, the line ahead in the
+car's frame, its width, the six nearest cars, place, laps, clock) and the
+picture: 80 x 60, grey, the last two. Rewarded by the distance along the
+line, the places, the finish (more for a win).
+
+Two first tries were dropped: corrections to the steering and the pedals
+every 2 frames (Gaussian, PPO) drifted (a steady left bias, the brake
+cancelled: the noise on a pedal clipped at 0 brakes at random, and the mean
+learnt against it), and a penalty on the telemetry's impacts made it slow
+(Daytona's fire all the time). The discrete choices explore whole manoeuvres
+and race by their likeliest value.
+
+The agent mode got two commands for it: `tel PATH,...` (only those keys: 3 KB
+a frame instead of 36) and `bands N` (the picture drawn on one thread: 12
+agents at once, 721 frames a second against 669). A picture costs as much as
+running the frames: 1270 frames a second for 12 agents without, about 700 with
+one every 8 frames.
+
+Found on the way: Daytona's expert lap is 990 segments (7527 units: past the
+start straight a long loop), not the 600 the first recording reached; Sega
+Rally's stage ends when its clock stops with the player's progress past
+17 900, and the next stage's time depends on how much was left.
+
+| Course | Base driver alone | Learnt (PPO) | Planner (`plan_drive.py`) |
+|:--|:--|:--|:--|
+| Daytona beginner (8 laps, from 40th) | out of time at lap 7, 28th (19-20 s laps, crashes in traffic) | finished 10th (update 80), 15th (update 100) | 4th (leading laps 7 and 8, then a crash 5 s from the line); the last 10 s planned again, 6 s ahead, a decision every 0.5 s: **WON, 1st**, 8.1 s left |
+| Daytona advanced (4 laps, from 20th) | out of time at lap 3 | no better than the base | **finished 3rd**, 2.0 s left |
+| Daytona expert (2 laps, from 30th) | out of time at lap 2 (lap 1: 128 s) | | 2nd (the leader 1 s ahead for the last 90 s); its last 55 s planned again unbroken (`--prefix`, 6 s ahead, every 0.5 s, a place worth 60 units): **WON, 1st**, 14.1 s left |
+| Sega Rally Desert | cleared, 63.7 s | 0.4 s more left than the base | cleared, 0'58"38 |
+| Sega Rally Forest | cleared, 90.9 s, 1.9 s left | as the base | cleared, 1'18"52 |
+| Sega Rally Mountain | out of time (17 s at its start) | | **cleared**, 1'13"37: the championship 3rd, 3'30"27 (the table's best: 3'30"00); with the Forest's optimised line, unbroken: 0'58"48, 1'17"20, 1'12"85, **3'28"53, first of the records table** ("CHAMPIONSHIP TOP 16"), the race 3rd |
+| Indy 500 oval (4 laps, from 33rd) | finished 25th | as the base | **WON, 1st**, 12.7 s left |
+| Indy 500 Bay Side Street (3 laps) | finished 9th, 3.4 s left (`a_lat` 90) | | **WON, 1st**, 15.1 s left |
+| Indy 500 Highland Raceway (3 laps) | out of time at lap 3 | | **WON, 1st**, 13.6 s left |
+| Touring Car, Country Circuit (round 1, from 8th) | 6th (laps 26-27 s on the new line) | | 4th; the lap record all the same (0'24"384 against the table's 0'40"000) |
+| Touring Car, the qualifying lap then round 1 (one race) | | | with the optimised line (the round 1.5 s quicker): **WON, "RESULT OF ROUND 1: 1st WINNER"**, 0'46"863 (the second 0'47"019) |
+
+PPO over the two levels, with 6 to 12 emulators each, three games at once
+(the machine full: about 1300 frames a second in all), did not get far in a
+few hours: the reward per second flat on Daytona and Sega Rally, slowly up on
+Indy 500. What did it: **a planner over the base driver**, with the emulator
+itself. Every second the race is saved; 13 workers each load it, drive one
+candidate (a lane, a pace, the 4-2-4) for a second and the plain choice for
+three more, and score the distance along the line, the places (30 units
+each) and the finish; the best is driven. The workers start from the race's
+controller state (the line's smoothing, the gearbox's wait, the held gear),
+so the race goes as the winning try did; a race takes 2.5 times its length.
+Its controls are recorded frame by frame: `replay.py` drives the same race
+again (checked: Daytona advanced, 3rd again) and records the force feedback
+as the bench does (`--ffb`); `ffb_events.py` sets it against the race's
+events. Its decisions with every candidate's score are the network's data
+(`plan_dataset.py`, `imitate.py`).
+
+On the way: Daytona's expert line was missing its last 2650 units (a long
+loop past the start straight; 990 segments a lap, not 600); Touring Car's old
+line went out and back over its first 200 units (its lap is 2047 units, not
+2434: the decoder's constant corrected); Sega Rally's Mountain line ended
+before the finish (the road turns back in a hairpin and runs past the start
+to the finish: closed from a run that bounced through it). A Sega Rally
+stage starts with the time left at the last one plus about 18 s. Touring
+Car's round ends with its clock stopping (its lap counter goes back to 0
+and the next round starts on another course).
+
+**A save state is not the race.** From one state, 300 frames at once and
+150, a save, 150 more do not end in the same place, nor does a load in a
+fresh emulator: something outside the save goes on from frame to frame. A
+race driven from its start in one emulator is exact (every replay above
+came out to the place); a race picked up from a loaded state is another
+race. So the planner's tries, each from a loaded state, foresee the race a
+little wrong (the Daytona beginner crash nobody saw coming), and an ending
+planned again from a state does not join the race before it: the planner's
+`--prefix PLAN --until FRAME` drives the earlier plan's controls first, in
+the same emulator, and plans on from there, the race unbroken (the beginner
+win). The Sega Rally championship's two parts (the Mountain planned from a
+state) replay as two races. Narrowed down: it is the first load in an
+emulator that differs. Loaded again in an emulator that has run, a state goes
+on exactly as the race did; run a frame from the same state in a fresh
+emulator and in one that has run, and the next saves differ in 2705 bytes, the
+i960's registers first: something outside the save acts within the first
+frame. Not found yet; not the drive board's interrupt phase (agent mode's,
+tried), not the link board's or the I/O board's memory (saved). Supermodel's
+save states, the Supermodel session checked, are exact.
+
+**The way round it: warm the emulator.** Load any state and run 60 frames or
+more (`common.Agent.warm`: 120); from then on that emulator's loads are exact,
+whatever ran before: from a warmed emulator's save in mid-race, a load in
+another warmed emulator (warmed on another course even) goes on to the same
+place to the hundredth as the race that never stopped. Every emulator of
+`rl/` is now warmed (the environment does it), the planner records it with
+its race (`"warm"`), and `replay.py` warms before replaying such a race. The
+planner's tries now foresee the race exactly. (A warm-up of 1 to 10 frames
+from power-up, or a load and one frame, is not enough.)
+
+Two more things outside a save, on the agent's side, both now reset at a
+load: the gear held on the H shifter (`set Gear`: a race loaded after another
+started in the gear the last one ended in; `rl/` releases the holds at every
+load), and the telemetry's history (the first frame after a load took its
+speed from the race before, held as a jump's: the base driver's speed plan
+read it; the agent now calls `GameTelemetry::forget()` at a load, and the
+planner gives its tries the race's speed for their first step).
+
+The racing lines (`line_opt.py`, CMA-ES, 24 offsets across the road and the
+speed plan's scale; `compare_lines.py` sets them against the mapped line in a
+warmed emulator): the Forest's finishes its stage from its start in 87.4 s,
+where the mapped line has 130 units still to go at 88 s (`courses.py` takes
+it: `driver=dict(offsets=...)`); the Desert's first optimisation gained
+nothing once measured fairly.
+
+### What the force feedback does at the race's events (`ffb_events.py`)
+
+The planned races driven again with `replay.py --ffb`: the frames sorted into
+on the road, off it (outside the line's half-width), a hit (the speed down
+40 km/h in 0.25 s) and light (the height on a parabola of about -g: a crest
+or a jump). The board's commands most written, the force sm2-emu sent
+(|constant|, and how often it turns round: a shake), against the road:
+
+| Game | Off the road | A hit | Light, airborne |
+|:--|:--|:--|:--|
+| Daytona (EPR-16488A) | pushes `50`-`53`/`60`, the wobble `32`/`42`, the brake `27`: the force up 30-45 %, turning round 1.8 times a second (0.5 on the road) | the strongest pushes `57`, `53`, `63`, `67`, the brake `27`: p90 0.86-0.95 | nothing of its own |
+| Indy 500 (EPR-18261) | the vibration (`A3` half period 3, `B7` amplitude 7), the anti-spring `40`, pushes `54`/`64`: the force turning round 3 to 6 times a second (1 on the road) | the same vibration: 6 to 8.5 turns a second | nothing of its own |
+| Sega Rally (EPR-17891) | stronger torques to the left `C7`-`CC` | `00`, then the strongest torque `9F` | **`00`, no torque**: the wheel goes light (mean 0.10 against 0.38) |
+| Touring Car (EPR-18261) | the strong push `57`: the force 0.40 against 0.24 | nothing of its own (the spring `34`) | the soft spring `38`: the wheel light (0.08) |
+
+sm2-emu sends no vibrate effect for these boards: the Indy board's
+vibration reaches the wheel as the constant force turning round. Sega Rally
+has one more: the torque chopped (`15`, until `10`), 2 to 4 s at a time at
+full speed, 26 times over the championship's three stages, on the road (the
+rough stretches, the ground; the telemetry does not say the surface): the
+force sm2-emu sends then turns round 3.1 times a second, against 1.1
+elsewhere (its once-a-frame update smooths the board's chopping).
+
 ## Log
 
 - 2026-10-13, night: agent mode, DIP setting, motor curve built. Visual
@@ -876,3 +1049,33 @@ network makes of it afterwards, a policy iteration).
   emulators' autopilots and benches, and one analysis of their races
   (`autopilot/analyze_ffb.py`, merged by the Supermodel session). The scripts
   find sm2-emu's checkout by `SM2_EMU_REPO`.
+- 2026-10-16: the reinforcement learning started again for every course
+  (section above): start states, lines and pools for Daytona's three
+  courses, Sega Rally's three stages, Indy 500's three courses and Touring
+  Car; the base driver; two levels of control; the first learnt race
+  finished (Daytona beginner, 10th).
+- 2026-10-16: the planner (`plan_drive.py`) finishes every course of Daytona,
+  Sega Rally and Indy 500 that the base driver could not: Daytona advanced
+  3rd and expert 2nd, Sega Rally's championship to the end (3rd, 3'30"27),
+  and **wins Indy 500's Highland Raceway**.
+- 2026-10-16: **all three Indy 500 courses won** (the oval from 33rd, Bay
+  Side Street, Highland); **Daytona beginner won** (the last lap planned
+  again 6 s ahead, `--prefix`); Sega Rally's championship 3rd twice
+  (3'30"27, 3'30"30; the table's best 3'30"00); Touring Car 4th. The races
+  replayed frame by frame with the force feedback recorded; save states
+  found inexact. **Daytona expert won** the same way (its end planned
+  again, unbroken). Sega Rally planned finer (a decision every 0.5 s, 6 s
+  ahead): slower (about 3'33"); Touring Car the same, 4th (the leaders 1.5
+  to 2.5 s ahead and drawing away). The racing lines next (`line_opt.py`,
+  CMA-ES). The machine shared with Supermodel's autopilot: 6 emulators at
+  most, below normal priority.
+- 2026-10-16: save states made exact (warm the emulator first; the agent's
+  held gear and the telemetry's history reset at a load); the Forest's racing
+  line optimised; **Sega Rally's championship in 3'28"53, the records table's
+  first** (the race unbroken, replayed frame by frame with its force
+  feedback).
+- 2026-10-16: Touring Car's qualifying lap and race planned in one go (the
+  planner's `--stages` takes any courses now), on its optimised line: **round
+  1 won**, 0'46"863. Every goal reached: Daytona, Sega Rally (the best time),
+  Indy 500 and Touring Car won, every course of Daytona, Sega Rally and Indy
+  500 finished.
