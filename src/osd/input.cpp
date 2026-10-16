@@ -27,8 +27,10 @@
 #include "render/geometry.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <string>
 
 namespace sm2::osd {
 namespace {
@@ -198,6 +200,19 @@ constexpr int kPedalFloor = 1024;
 bool is_wheel_typed(SDL_JoystickID id)
 {
     return SDL_GetJoystickTypeForID(id) == SDL_JOYSTICK_TYPE_WHEEL;
+}
+
+/// Light guns also expose a joystick interface, its axes the aim.
+bool is_gun_named(SDL_JoystickID id)
+{
+    const char* name = SDL_GetJoystickNameForID(id);
+    if (name == nullptr) {
+        return false;
+    }
+    std::string lower(name);
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower.find("gun") != std::string::npos || lower.find("aimtrak") != std::string::npos;
 }
 
 /// A simulated panel spring: zero in a small deadzone, rising to `full` part
@@ -543,6 +558,11 @@ void Input::add_wheel(SDL_JoystickID id)
     // A named device skips the check, having whatever type uinput gave it.
     const SDL_JoystickType type = SDL_GetJoystickTypeForID(id);
     if (type != SDL_JOYSTICK_TYPE_WHEEL && type != SDL_JOYSTICK_TYPE_UNKNOWN) {
+        return;
+    }
+    if (type != SDL_JOYSTICK_TYPE_WHEEL && is_gun_named(id)) {
+        SM2_DEBUG("joystick %s is a light gun, not taken as a wheel",
+                  SDL_GetJoystickNameForID(id));
         return;
     }
 

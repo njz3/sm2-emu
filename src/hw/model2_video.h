@@ -179,7 +179,7 @@ private:
     std::vector<u8>     m_tile_ram_shown;
 
     u8   m_triggers_held      = 0;
-    bool m_trigger_pressed    = false;
+    u8   m_frames_since_press = 0xff;
     bool m_window_mask_a_full = false;
 
     std::span<const u16> m_palette_ram;
