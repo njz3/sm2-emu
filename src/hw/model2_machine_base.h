@@ -63,6 +63,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <optional>
 #include <span>
 #include <string>
 
@@ -366,6 +367,12 @@ public:
     /// The last value the game wrote to its lamp/coin-counter latch.
     [[nodiscard]] u8 lamp_latch() const { return m_lamp_latch; }
 
+    /// A real drive board's answer (BackForceFeeder's m2ffb_rx, over the
+    /// network outputs), read by the game in place of the emulated board's on
+    /// every board that answers; none: the emulated answer. Not saved in
+    /// states: it comes from outside the machine.
+    void set_drive_reply(std::optional<u8> reply) { m_drive_reply = reply; }
+
     /// Log every access that lands outside a mapped region. Off by default.
     virtual void set_log_unmapped(bool enable) = 0;
 
@@ -397,6 +404,12 @@ protected:
     }
 
     DriveBoardWrites m_drive_board_writes;
+
+    /// What the game reads from its drive board: the real board's answer when
+    /// there is one (set_drive_reply), else `emulated`.
+    [[nodiscard]] u8 drive_reply_or(u8 emulated) const { return m_drive_reply.value_or(emulated); }
+
+    std::optional<u8> m_drive_reply;
 
     /// The steering pot as the game reads it, for a drive board's answer.
     [[nodiscard]] u8 steering_value(const rom::GameSpec& game) const

@@ -514,10 +514,11 @@ void Model2C::reset()
     if (m_game.drive_board) {
         m_io.set_output(4, [this](u8 value) { drive_board_write(value); });
         // The board answers on port D, and the game calibrates the wheel's
-        // centre from that answer.
+        // centre from that answer; a real board's answer instead when one
+        // comes back.
         if (m_game.drive_protocol == rom::DriveProtocol::Indy) {
             m_indy_reply = IndyDriveReply{};
-            m_io.set_input(3, [this] { return m_indy_reply.read(steering_value(m_game)); });
+            m_io.set_input(3, [this] { return drive_reply_or(m_indy_reply.read(steering_value(m_game))); });
         }
     }
 

@@ -29,6 +29,11 @@
 // 2-7), RawLamps and RawDrive, plus LampStart/LampView1-4/LampLeader where the
 // bit meanings are known. Values are sent only when they change.
 //
+// A game with a drive board also sends its bytes as "m2ffb = XX" (hex), the
+// name BackForceFeeder answers to in M2PAC with the real board's reply,
+// "m2ffb_rx = XX": that client's last reply is then what the game reads from
+// its drive board (drive_reply()), until it disconnects.
+//
 // A title can add outputs of its own in games.xml (rom::OutputSpec): state the
 // cabinet never latched but a peripheral wants, read from the program's work
 // RAM. The gun games publish theirs under DemulShooter's names -- P1_CtmRecoil,
@@ -41,6 +46,7 @@
 #include "rom/game.h"
 
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -63,7 +69,7 @@ public:
     /// mame_stop for the old set and mame_start for the new one. `game_outputs`
     /// is the set's own list from games.xml.
     void set_game(const std::string& name, const std::string& parent,
-                  std::span<const rom::OutputSpec> game_outputs = {});
+                  std::span<const rom::OutputSpec> game_outputs = {}, bool drive_board = false);
 
     void set_paused(bool paused);
 
@@ -84,11 +90,16 @@ public:
     };
     [[nodiscard]] NetworkStatus network_status() const;
 
+    /// A real drive board's answer, the last "m2ffb_rx" a network client sent,
+    /// while that client stays connected and the game the same; none otherwise.
+    [[nodiscard]] std::optional<u8> drive_reply() const;
+
     /// One published output, exposed for the backends.
     struct Item {
         std::string name;
         s32         value = 0;
         bool        known = false;  ///< False until the first value is set.
+        bool        hex   = false;  ///< Sent as two hex digits (m2ffb).
     };
 
     class Backend;

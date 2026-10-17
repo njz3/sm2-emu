@@ -243,14 +243,15 @@ bool Model2Original::init(const rom::GameSpec& game, rom::RomSet roms)
         m_ioboard.set_drive([this] { return m_drive_board_latch; },
                             [this](u8 value) { drive_board_write(value); });
         // The board answers on IN2: the command echoed, except $80/$83 (wheel
-        // position), $81 ($FF) and $82 (DIP switches, all off).
+        // position), $81 ($FF) and $82 (DIP switches, all off); a real board's
+        // answer instead when one comes back.
         m_ioboard.set_input(2, [this] {
             switch (m_drive_board_latch) {
                 case 0x80:
-                case 0x83: return steering_value(m_game);
+                case 0x83: return drive_reply_or(steering_value(m_game));
                 case 0x81:
-                case 0x82: return u8{0xff};
-                default:   return m_drive_board_latch;
+                case 0x82: return drive_reply_or(0xff);
+                default:   return drive_reply_or(m_drive_board_latch);
             }
         });
     }

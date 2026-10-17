@@ -381,14 +381,15 @@ void Model2::reset()
     if (m_game.drive_board) {
         m_io.set_output(4, [this](u8 value) { drive_board_write(value); });
         // Sega Rally's board answers on port D: the command echoed, except $01
-        // (wheel position), $02 ($FF) and $03 (DIP switches, all off).
+        // (wheel position), $02 ($FF) and $03 (DIP switches, all off); a real
+        // board's answer instead when one comes back.
         if (m_game.drive_protocol == rom::DriveProtocol::Rally) {
             m_io.set_input(3, [this] {
                 switch (m_drive_board_latch) {
-                    case 0x01: return steering_value(m_game);
+                    case 0x01: return drive_reply_or(steering_value(m_game));
                     case 0x02:
-                    case 0x03: return u8{0xff};
-                    default:   return m_drive_board_latch;
+                    case 0x03: return drive_reply_or(0xff);
+                    default:   return drive_reply_or(m_drive_board_latch);
                 }
             });
         }

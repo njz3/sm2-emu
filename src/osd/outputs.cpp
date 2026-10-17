@@ -21,6 +21,7 @@
 #include "core/net.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <span>
 #include <string_view>
@@ -43,6 +44,7 @@ public:
     virtual void poll(const std::string& game, const std::vector<Item>& items,
                       bool paused) = 0;
     [[nodiscard]] virtual NetworkStatus status() const { return {}; }
+    [[nodiscard]] virtual std::optional<u8> drive_reply() const { return std::nullopt; }
 };
 
 namespace {
@@ -54,6 +56,7 @@ namespace {
 constexpr int kRawDrive   = -1;
 constexpr int kRawLamps   = -2;
 constexpr int kGameOutput = -3;  ///< One of the set's own, from games.xml.
+constexpr int kDriveHex   = -4;  ///< m2ffb: the drive board's bytes again, in hex.
 
 constexpr u32 kWorkRamBase = 0x00500000;
 
@@ -127,6 +130,50 @@ std::string line(std::string_view name, s32 value)
     return std::string(name) + " = " + std::to_string(value) + "\r";
 }
 
+std::string line(const Outputs::Item& item)
+{
+    if (!item.hex) {
+        return line(item.name, item.value);
+    }
+    char hex[8];
+    std::snprintf(hex, sizeof hex, "%02X", static_cast<unsigned>(item.value & 0xff));
+    return item.name + " = " + hex + "\r";
+}
+
+/// "m2ffb_rx = XX", BackForceFeeder's reply from the real drive board: its byte.
+std::optional<u8> parse_drive_reply(std::string_view text)
+{
+    const auto trim = [](std::string_view v) {
+        while (!v.empty() && (v.front() == ' ' || v.front() == '\t')) {
+            v.remove_prefix(1);
+        }
+        while (!v.empty() && (v.back() == ' ' || v.back() == '\t' || v.back() == '\r')) {
+            v.remove_suffix(1);
+        }
+        return v;
+    };
+    const usize equals = text.find('=');
+    if (equals == std::string_view::npos || trim(text.substr(0, equals)) != "m2ffb_rx") {
+        return std::nullopt;
+    }
+    const std::string_view value = trim(text.substr(equals + 1));
+    if (value.empty() || value.size() > 2) {
+        return std::nullopt;
+    }
+    unsigned byte = 0;
+    for (const char c : value) {
+        const int digit = c >= '0' && c <= '9'   ? c - '0'
+                        : c >= 'a' && c <= 'f' ? c - 'a' + 10
+                        : c >= 'A' && c <= 'F' ? c - 'A' + 10
+                                               : -1;
+        if (digit < 0) {
+            return std::nullopt;
+        }
+        byte = byte * 16 + static_cast<unsigned>(digit);
+    }
+    return static_cast<u8>(byte);
+}
+
 // ---------------------------------------------------------------------------
 // Network
 // ---------------------------------------------------------------------------
@@ -164,20 +211,25 @@ public:
 
     void start(const std::string& game, const std::vector<Outputs::Item>& items) override
     {
+        forget_drive_reply();
         m_server.broadcast("mame_start = " + game + "\r");
         for (const Outputs::Item& item : items) {
             if (item.known) {
-                m_server.broadcast(line(item.name, item.value));
+                m_server.broadcast(line(item));
             }
         }
         announce(game);
     }
 
-    void stop() override { m_server.broadcast("mame_stop = 1\r"); }
+    void stop() override
+    {
+        forget_drive_reply();
+        m_server.broadcast("mame_stop = 1\r");
+    }
 
     void changed(usize /*index*/, const Outputs::Item& item) override
     {
-        m_server.broadcast(line(item.name, item.value));
+        m_server.broadcast(line(item));
     }
 
     void paused(bool paused) override { m_server.broadcast(line("pause", paused ? 1 : 0)); }
@@ -192,14 +244,34 @@ public:
             m_server.send(client, "mame_start = " + game + "\r");
             for (const Outputs::Item& item : items) {
                 if (item.known) {
-                    m_server.send(client, line(item.name, item.value));
+                    m_server.send(client, line(item));
                 }
             }
             if (paused) {
                 m_server.send(client, "pause = 1\r");
             }
         });
+
+        // What the clients send, read every frame (a client whose lines pile
+        // up is dropped): BackForceFeeder's reply from the real drive board,
+        // once it has had an m2ffb line.
+        for (const net::TcpServer::Line& in : m_server.take_lines()) {
+            if (const std::optional<u8> reply = parse_drive_reply(in.text)) {
+                if (!m_reply) {
+                    SM2_INFO("outputs: the drive board's answer now comes from a real board "
+                             "(m2ffb_rx)");
+                }
+                m_reply        = reply;
+                m_reply_client = in.client;
+            }
+        }
+        if (m_reply && !m_server.has_client(m_reply_client)) {
+            SM2_INFO("outputs: the real drive board's client left: the emulated answer again");
+            forget_drive_reply();
+        }
     }
+
+    [[nodiscard]] std::optional<u8> drive_reply() const override { return m_reply; }
 
     [[nodiscard]] Outputs::NetworkStatus status() const override
     {
@@ -221,12 +293,22 @@ private:
             m_announce.send_to(std::span<const u8>(bytes, text.size()), "127.0.0.1", m_announce_port));
     }
 
+    void forget_drive_reply()
+    {
+        m_reply.reset();
+        m_reply_client = 0;
+    }
+
     net::TcpServer m_server;
     net::UdpSocket m_announce;
     u16            m_port          = 0;
     u16            m_announce_port = 0;
     std::string    m_error;
     bool           m_started = false;
+
+    /// The real drive board's last answer, and the client that sent it.
+    std::optional<u8> m_reply;
+    u64               m_reply_client = 0;
 };
 
 // ---------------------------------------------------------------------------
@@ -459,7 +541,7 @@ void Outputs::configure(bool network, u16 port, u16 announce_port, bool windows)
 }
 
 void Outputs::set_game(const std::string& name, const std::string& parent,
-                       std::span<const rom::OutputSpec> game_outputs)
+                       std::span<const rom::OutputSpec> game_outputs, bool drive_board)
 {
     if (name == m_game) {
         return;
@@ -478,6 +560,12 @@ void Outputs::set_game(const std::string& name, const std::string& parent,
         return;
     }
     build_items(parent.empty() ? name : parent);
+    if (drive_board) {
+        // Sent from the game's first write, under the name BackForceFeeder
+        // answers to with the real board's reply.
+        m_items.push_back({"m2ffb", 0, false, true});
+        m_bits.push_back(kDriveHex);
+    }
     m_first_game_item = m_items.size();
     for (const rom::OutputSpec& spec : game_outputs) {
         m_items.push_back({spec.name, 0, true});
@@ -634,6 +722,11 @@ void Outputs::poll()
 Outputs::NetworkStatus Outputs::network_status() const
 {
     return m_network != nullptr ? m_network->status() : NetworkStatus{};
+}
+
+std::optional<u8> Outputs::drive_reply() const
+{
+    return m_network != nullptr ? m_network->drive_reply() : std::nullopt;
 }
 
 }  // namespace sm2::osd

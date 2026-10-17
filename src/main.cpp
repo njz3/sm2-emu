@@ -2528,7 +2528,7 @@ int main(int argc, char** argv)
                               options.config.outputs_windows);
             if (machine_iface != nullptr && loaded.has_value()) {
                 outputs.set_game(loaded->game.name, loaded->game.parent,
-                                 loaded->game.outputs);
+                                 loaded->game.outputs, loaded->game.drive_board);
             } else {
                 outputs.set_game({}, {});
             }
@@ -2672,6 +2672,9 @@ int main(int argc, char** argv)
                     backend->set_widescreen(columns, fill_sides && side_fill != rom::SideFill::Pillarbox
                                                          ? 1u + static_cast<u32>(side_fill) : 0u);
                 }
+                // A real drive board's answer, when BackForceFeeder sends it
+                // back over the network outputs (m2ffb_rx); else the emulated one.
+                machine_iface->set_drive_reply(outputs.drive_reply());
                 {
                     auto scope = core::maybe_scope(stage_run_frame, profile_sample);
                     machine_iface->run_frame();
