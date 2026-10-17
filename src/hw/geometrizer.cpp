@@ -2418,7 +2418,8 @@ u32 *Geometrizer::geo_process_command(GeoState *geo, u32 opcode, u32 *input, boo
 		case 0x17: input = geo_mode(geo, opcode, input);                  break;
 		case 0x18: input = geo_zsort_mode(geo, opcode, input);            break;
 		case 0x19: input = geo_focal_distance(geo, opcode, input);        break;
-		case 0x1a: input = geo_light_source(geo, opcode, input);          break;
+		// Last Bronx sends 0x1a with a single word every few frames.
+		case 0x1a: input = geo_dummy(geo, opcode, input);                 break;
 		case 0x1b: input = geo_matrix_write(geo, opcode, input);          break;
 		case 0x1c: input = geo_translate_write(geo, opcode, input);       break;
 		case 0x1d: input = geo_code_upload(geo, opcode, input);           break;

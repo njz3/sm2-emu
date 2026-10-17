@@ -2329,7 +2329,8 @@ s32 I960::run(s32 cycles)
         return cycles;
     }
 
-    m_icount = cycles;
+    m_icount    = cycles;
+    m_end_slice = false;
 
     try {
         // Interrupt checks are deferred while a burst access is part-way through,
@@ -2339,9 +2340,9 @@ s32 I960::run(s32 cycles)
         }
 
         while (m_icount > 0) {
-            if (m_halted) {
-                // A bus handler asserted HALT mid-frame. Stop cleanly with the
-                // instruction pointer intact.
+            if (m_halted || m_end_slice) {
+                // A bus handler asserted HALT mid-frame, or asked to be acted on
+                // at once. Stop cleanly with the instruction pointer intact.
                 break;
             }
 

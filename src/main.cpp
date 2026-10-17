@@ -1822,21 +1822,6 @@ int main(int argc, char** argv)
 #if !defined(SM2_HAVE_VULKAN)
         present_with_opengl = true;
 #endif
-        window_config.graphics_api = present_with_opengl ? osd::GraphicsApi::OpenGl
-                                                          : osd::GraphicsApi::Vulkan;
-
-#if defined(SM2_HAVE_OPENGL_ES)
-        // GLES on X11 needs EGL, not GLX; force it before the GL library loads.
-        if (window_config.graphics_api == osd::GraphicsApi::OpenGl) {
-            SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
-        }
-#endif
-
-        osd::Window window;
-        if (!window.create(window_config)) {
-            SDL_Quit();
-            return 1;
-        }
 
         render::BackendConfig backend_config;
         backend_config.enable_validation = options.config.validation;
@@ -1866,25 +1851,55 @@ int main(int argc, char** argv)
         // Each factory is only defined when its SM2_BUILD_* option was on, so
         // the #if guards keep an absent backend from being an undefined symbol.
         // The mismatched --graphics-backend cases already errored out above.
+        osd::Window                      window;
         std::unique_ptr<render::Backend> backend;
-        if (present_with_opengl) {
+        const auto open_backend = [&](bool opengl) {
+            window_config.graphics_api = opengl ? osd::GraphicsApi::OpenGl
+                                                : osd::GraphicsApi::Vulkan;
+#if defined(SM2_HAVE_OPENGL_ES)
+            // GLES on X11 needs EGL, not GLX; force it before the GL library loads.
+            if (opengl) {
+                SDL_SetHint(SDL_HINT_VIDEO_FORCE_EGL, "1");
+            }
+#endif
+            if (!window.create(window_config)) {
+                window.destroy();
+                return false;
+            }
+            if (opengl) {
 #if defined(SM2_HAVE_OPENGL_DESKTOP) || defined(SM2_HAVE_OPENGL_ES)
-            backend = render::create_opengl_backend();
+                backend = render::create_opengl_backend();
 #endif
-        } else {
+            } else {
 #if defined(SM2_HAVE_VULKAN)
-            backend = render::create_vulkan_backend();
+                backend = render::create_vulkan_backend();
 #endif
+            }
+            if (!backend) {
+                SM2_ERROR("no GPU backend is available to present with. Build with "
+                          "-DSM2_BUILD_VULKAN=ON and/or -DSM2_BUILD_OPENGL_DESKTOP=ON "
+                          "(or run headless with --boot-test).");
+            } else if (!backend->init(window, backend_config)) {
+                SM2_ERROR("render backend initialisation failed");
+                backend.reset();
+            }
+            if (!backend) {
+                window.destroy();
+                return false;
+            }
+            return true;
+        };
+
+        bool opened = open_backend(present_with_opengl);
+#if defined(SM2_HAVE_OPENGL_DESKTOP) || defined(SM2_HAVE_OPENGL_ES)
+        // A GPU without Vulkan 1.3 can still run everything through OpenGL.
+        if (!opened && !present_with_opengl) {
+            SM2_WARN("Vulkan is unavailable; falling back to OpenGL");
+            present_with_opengl = true;
+            opened              = open_backend(true);
         }
-        if (!backend) {
-            SM2_ERROR("no GPU backend is available to present with. Build with "
-                      "-DSM2_BUILD_VULKAN=ON and/or -DSM2_BUILD_OPENGL_DESKTOP=ON "
-                      "(or run headless with --boot-test).");
-            SDL_Quit();
-            return 1;
-        }
-        if (!backend->init(window, backend_config)) {
-            SM2_ERROR("render backend initialisation failed");
+#endif
+        if (!opened) {
             SDL_Quit();
             return 1;
         }
@@ -2017,8 +2032,10 @@ int main(int argc, char** argv)
             }
         }
 
-        // GPU names for the settings dropdown.
-        const std::vector<std::string> gpu_names = render::enumerate_render_devices();
+        // GPU names for the settings dropdown. Only Vulkan picks a device, and an
+        // OpenGL or software run must not touch Vulkan at all.
+        const std::vector<std::string> gpu_names =
+            present_with_opengl ? std::vector<std::string>{} : render::enumerate_render_devices();
 
         // A machine with no gamepad is not an error, so a failure here is worth
         // reporting but not worth refusing to run over: the keyboard covers

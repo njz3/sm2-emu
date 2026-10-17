@@ -392,6 +392,12 @@ elseif(SM2_PLATFORM_WINDOWS)
         "${CMAKE_BINARY_DIR}/sm2-emu.rc"
         @ONLY)
     target_sources(sm2-emu PRIVATE "${CMAKE_BINARY_DIR}/sm2-emu.rc")
+    # Delay-load the Vulkan loader: an old or missing vulkan-1.dll lacks the
+    # 1.3 exports and would stop the exe starting, even for OpenGL/software.
+    if(MSVC AND SM2_BUILD_VULKAN)
+        target_link_options(sm2-emu PRIVATE "/DELAYLOAD:vulkan-1.dll")
+        target_link_libraries(sm2-emu PRIVATE delayimp)
+    endif()
 endif()
 # sm2_core is not listed: sm2_osd and sm2_hw expose it PUBLIC, and naming it
 # again makes the linker warn about a duplicate archive. sm2_hw brings in

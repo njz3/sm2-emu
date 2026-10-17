@@ -299,6 +299,7 @@ void Model2Original::reset()
     m_intreq = 0;
     m_intena = 0;
     m_pending_intena_valid = false;
+    m_intena_written       = false;
     m_timers.fill(Timer{});
 
     m_videocontrol = 0;
@@ -375,6 +376,9 @@ void Model2Original::run_frame()
                 target = m_cycles + 1;
             }
             target = std::min(target, m_cycles + kCoproInterleave);
+            if (m_pending_intena_valid) {
+                target = std::min(target, std::max(m_pending_intena_cycle, m_cycles + 1));
+            }
 
             const s32 slice = static_cast<s32>(std::min<u64>(target - m_cycles, 1u << 20));
             s32 used;
@@ -383,6 +387,11 @@ void Model2Original::run_frame()
                 used = m_cpu.run(slice);
             }
             m_cycles += static_cast<u64>(used);
+            if (m_intena_written) {
+                // The slice ended on the write, so this is when it happened.
+                m_intena_written       = false;
+                m_pending_intena_cycle = m_cycles + 2;
+            }
 
             const u32 spent = static_cast<u32>(used > 0 ? used : 0);
             {
@@ -1037,6 +1046,8 @@ void Model2Original::register_write(u32 address, u32 value, u32 width)
             m_pending_intena       = value;
             m_pending_intena_cycle = m_cycles + 2;
             m_pending_intena_valid = true;
+            m_intena_written       = true;
+            m_cpu.end_slice();
         }
         return;
     }

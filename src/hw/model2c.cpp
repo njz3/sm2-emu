@@ -441,6 +441,7 @@ void Model2C::reset()
     m_intreq = 0;
     m_intena = 0;
     m_pending_intena_valid = false;
+    m_intena_written       = false;
     m_timers.fill(Timer{});
 
     m_videocontrol = 0;
@@ -552,6 +553,9 @@ void Model2C::run_frame()
             u64 target = std::min(line_end, next_timer_deadline());
             if (target <= m_cycles) target = m_cycles + 1;
             target = std::min(target, m_cycles + kCoproInterleave);
+            if (m_pending_intena_valid) {
+                target = std::min(target, std::max(m_pending_intena_cycle, m_cycles + 1));
+            }
 
             const s32 slice = static_cast<s32>(std::min<u64>(target - m_cycles, 1u << 20));
             s32 used;
@@ -560,6 +564,11 @@ void Model2C::run_frame()
                 used = m_cpu.run(slice);
             }
             m_cycles += static_cast<u64>(used);
+            if (m_intena_written) {
+                // The slice ended on the write, so this is when it happened.
+                m_intena_written       = false;
+                m_pending_intena_cycle = m_cycles + 2;
+            }
             {
                 CoreScope scope(m_core_profile, m_core_profile.copro_ns);
                 step_copro(static_cast<u32>(used > 0 ? used : 0));
@@ -687,7 +696,8 @@ void Model2C::raise_interrupt(u32 line)
 
 void Model2C::irq_update()
 {
-    const u32 active = m_intreq & m_intena;
+    // The lines follow the latched requests; the mask only gates new ones.
+    const u32 active = m_intreq;
     m_cpu.set_irq_line(cpu::i960::I960_IRQ0,
                        (active & 0x0001) != 0 ? cpu::i960::kAssertLine
                                               : cpu::i960::kClearLine);
@@ -1177,25 +1187,13 @@ void Model2C::register_write(u32 address, u32 value, u32 width)
             m_intreq &= value;
             irq_update();
         } else {
-            // The mask update is deferred, as on MAME (80 ns via the scheduler).
-            // The sound driver's timer-ack routine writes the mask register three
-            // times around one interrupt -- mask the source, zero its timer,
-            // re-enable -- and MAME's scheduler runs the masked window (and the
-            // zeroed timer's harmless immediate re-fire) in between those writes.
-            // The i960 here runs the whole routine in one uninterrupted slice, so
-            // unless the pending mask is flushed AND its timers serviced when the
-            // next mask write arrives, the masked re-fire never happens and the
-            // byte-by-byte sound command send runs away on its first byte.
-            if (m_pending_intena_valid) {
-                m_intena = m_pending_intena;
-                m_pending_intena_valid = false;
-                sound_ready_w();
-                irq_update();
-                service_timers();
-            }
+            // The mask latches two cycles after the write; end the slice so the
+            // CPU does not run on past it.
             m_pending_intena       = value;
             m_pending_intena_cycle = m_cycles + 2;
             m_pending_intena_valid = true;
+            m_intena_written       = true;
+            m_cpu.end_slice();
         }
         return;
     }

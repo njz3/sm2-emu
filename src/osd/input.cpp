@@ -27,8 +27,10 @@
 #include "render/geometry.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <string>
 
 namespace sm2::osd {
 namespace {
@@ -198,6 +200,19 @@ constexpr int kPedalFloor = 1024;
 bool is_wheel_typed(SDL_JoystickID id)
 {
     return SDL_GetJoystickTypeForID(id) == SDL_JOYSTICK_TYPE_WHEEL;
+}
+
+/// Light guns also expose a joystick interface, its axes the aim.
+bool is_gun_named(SDL_JoystickID id)
+{
+    const char* name = SDL_GetJoystickNameForID(id);
+    if (name == nullptr) {
+        return false;
+    }
+    std::string lower(name);
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return lower.find("gun") != std::string::npos || lower.find("aimtrak") != std::string::npos;
 }
 
 /// A simulated panel spring: zero in a small deadzone, rising to `full` part
@@ -543,6 +558,11 @@ void Input::add_wheel(SDL_JoystickID id)
     // A named device skips the check, having whatever type uinput gave it.
     const SDL_JoystickType type = SDL_GetJoystickTypeForID(id);
     if (type != SDL_JOYSTICK_TYPE_WHEEL && type != SDL_JOYSTICK_TYPE_UNKNOWN) {
+        return;
+    }
+    if (type != SDL_JOYSTICK_TYPE_WHEEL && is_gun_named(id)) {
+        SM2_DEBUG("joystick %s is a light gun, not taken as a wheel",
+                  SDL_GetJoystickNameForID(id));
         return;
     }
 
@@ -1720,8 +1740,8 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
     std::array<bool, kPlayers> on_mouse = {true, true};
 
 #ifdef SM2_HAVE_LIGHTGUNS
-    // Gun 0 drives player 1, gun 1 player 2. A player with no gun keeps the
-    // mouse (aim and buttons), so one gun plus the mouse gives two aims.
+    // Gun 0 drives player 1, gun 1 player 2. A gun also moves the system
+    // pointer, so with one gun player 2 leaves the mouse alone.
     if (m_guns) {
         m_guns->poll();
 
@@ -1813,9 +1833,11 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
             on_mouse[0] = false;
         }
         if (m_guns->count() >= 2) {
-            p2          = from_gun(m_guns->gun(1), 1);
-            on_mouse[1] = false;
+            p2 = from_gun(m_guns->gun(1), 1);
+        } else {
+            p2 = GunInput{};
         }
+        on_mouse[1] = false;
 
         // Recoil: pulse a gun's motor once on the trigger's press edge, keyed on
         // the bound trigger code (not reload) so racking off-screen does not kick.

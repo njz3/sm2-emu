@@ -63,10 +63,18 @@ bool Audio::init(u32 sample_rate)
     // Binding to the default playback device rather than naming one: SDL follows
     // the system default afterwards, so plugging in headphones does the expected
     // thing without the emulator being restarted.
-    m_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec,
+    // Opened in the device's own format so SDL resamples, not the system mixer.
+    m_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr,
                                         nullptr, nullptr);
     if (m_stream == nullptr) {
         SM2_WARN("audio: no output device (%s); running silent", SDL_GetError());
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        return false;
+    }
+    if (!SDL_SetAudioStreamFormat(m_stream, &spec, nullptr)) {
+        SM2_WARN("audio: SDL_SetAudioStreamFormat failed (%s); running silent", SDL_GetError());
+        SDL_DestroyAudioStream(m_stream);
+        m_stream = nullptr;
         SDL_QuitSubSystem(SDL_INIT_AUDIO);
         return false;
     }

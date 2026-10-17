@@ -177,17 +177,23 @@ void Model2Video::build_tone_curve(std::span<u32> out) const
 
 void Model2Video::filter_gun_flash(bool enabled, u8 in1)
 {
+    // Virtua Cop's flash lands up to two frames after the press.
+    constexpr u8 kFlashLatency = 2;
+
     const u8   held    = static_cast<u8>(~in1 & 0x03);
-    const bool pressed = (held & ~m_triggers_held) != 0;
     const bool full    = m_tiles.window_mask_a_full();
+    if ((held & ~m_triggers_held) != 0) {
+        m_frames_since_press = 0;
+    } else if (m_frames_since_press <= kFlashLatency) {
+        ++m_frames_since_press;
+    }
 
     // A flash shows the front tilemap pair's window over the whole screen for one
     // frame after a shot. Fades hold the same mask, so one already up is left alone.
     m_tiles.set_window_mask_a_hidden(enabled && full && !m_window_mask_a_full
-                                     && (pressed || m_trigger_pressed));
+                                     && m_frames_since_press <= kFlashLatency);
 
     m_triggers_held      = held;
-    m_trigger_pressed    = pressed;
     m_window_mask_a_full = full;
 }
 
