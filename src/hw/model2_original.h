@@ -452,6 +452,7 @@ private:
     u32  m_pending_intena       = 0;
     u64  m_pending_intena_cycle = 0;
     bool m_pending_intena_valid = false;
+    bool m_intena_written       = false;  ///< In the slice now running.
 
     Inputs     m_inputs;
     RenderList m_render_list;

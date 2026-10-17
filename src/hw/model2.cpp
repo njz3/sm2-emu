@@ -293,6 +293,7 @@ void Model2::reset()
     m_intreq = 0;
     m_intena = 0;
     m_pending_intena_valid = false;
+    m_intena_written       = false;
     m_timers.fill(Timer{});
 
     m_videocontrol = 0;
@@ -436,6 +437,9 @@ void Model2::run_frame()
             // constantly. Nothing would be lost, but the host would spend the
             // time halted.
             target = std::min(target, m_cycles + kCoproInterleave);
+            if (m_pending_intena_valid) {
+                target = std::min(target, std::max(m_pending_intena_cycle, m_cycles + 1));
+            }
 
             const s32 slice = static_cast<s32>(std::min<u64>(target - m_cycles, 1u << 20));
             s32 used;
@@ -444,6 +448,11 @@ void Model2::run_frame()
                 used = m_cpu.run(slice);
             }
             m_cycles += static_cast<u64>(used);
+            if (m_intena_written) {
+                // The slice ended on the write, so this is when it happened.
+                m_intena_written       = false;
+                m_pending_intena_cycle = m_cycles + 2;
+            }
             {
                 CoreScope scope(m_core_profile, m_core_profile.copro_ns);
                 step_copro(static_cast<u32>(used > 0 ? used : 0));
@@ -1228,6 +1237,8 @@ void Model2::register_write(u32 address, u32 value, u32 width)
             m_pending_intena       = value;
             m_pending_intena_cycle = m_cycles + 2;
             m_pending_intena_valid = true;
+            m_intena_written       = true;
+            m_cpu.end_slice();
         }
         return;
     }

@@ -115,6 +115,10 @@ public:
         m_IP = m_PIP;
     }
 
+    /// Return from run() after the current instruction, so the caller can act
+    /// on something it wrote before the CPU runs on.
+    void end_slice() { m_end_slice = true; }
+
     /// Stop and resume execution, for the HALT line the copro FIFO drives.
     void set_halted(bool halted) { m_halted = halted; }
     [[nodiscard]] bool halted() const { return m_halted; }
@@ -194,6 +198,7 @@ private:
 
     bool        m_stalled = false;
     bool        m_halted  = false;
+    bool        m_end_slice = false;
     bool        m_faulted = false;
     std::string m_fault_message;
 
