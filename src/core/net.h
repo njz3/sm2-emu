@@ -120,7 +120,7 @@ public:
     void send(u64 client, std::string_view text);
     void broadcast(std::string_view text);
 
-    /// A line a client sent, its newline removed.
+    /// A line a client sent, its line end (\n, \r\n or \r) removed.
     struct Line {
         u64         client = 0;
         std::string text;
@@ -151,7 +151,8 @@ private:
         u64         id = 0;
         Fd          fd = kInvalid;
         std::string pending;
-        std::string inbox;  ///< Received, up to its last newline, for take_lines().
+        std::string inbox;  ///< Received, up to its last line end, for take_lines().
+        bool        after_cr = false;  ///< The last line ended at a \r, its \n maybe still to come.
     };
 
     std::optional<u64> accept_one();

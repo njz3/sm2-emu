@@ -457,10 +457,24 @@ std::vector<TcpServer::Line> TcpServer::take_lines()
 {
     std::vector<Line> lines;
     for (Client& c : m_clients) {
+        // A line ends at \n, \r\n or a lone \r, as MAME-style output clients
+        // end theirs. An empty line stays one: telemetry takes it as an ack.
         usize start = 0;
-        for (usize nl = c.inbox.find('\n'); nl != std::string::npos; nl = c.inbox.find('\n', start)) {
-            lines.push_back({c.id, c.inbox.substr(start, nl - start)});
-            start = nl + 1;
+        if (c.after_cr && !c.inbox.empty()) {
+            start      = c.inbox[0] == '\n' ? 1 : 0;  // the \n of a \r\n read apart
+            c.after_cr = false;
+        }
+        for (usize end = c.inbox.find_first_of("\r\n", start); end != std::string::npos;
+             end = c.inbox.find_first_of("\r\n", start)) {
+            lines.push_back({c.id, c.inbox.substr(start, end - start)});
+            start = end + 1;
+            if (c.inbox[end] == '\r') {
+                if (start == c.inbox.size()) {
+                    c.after_cr = true;
+                } else if (c.inbox[start] == '\n') {
+                    ++start;
+                }
+            }
         }
         c.inbox.erase(0, start);
     }
@@ -490,7 +504,7 @@ void TcpServer::flush()
 
         // What clients send is kept for take_lines() (a telemetry client's
         // commands and acknowledgements); reading is also how a closed
-        // connection shows up. A client sending without newlines is dropped.
+        // connection shows up. A client sending without line ends is dropped.
         char scratch[256];
         for (;;) {
             const auto got = ::recv(c.fd, scratch, sizeof scratch, 0);
