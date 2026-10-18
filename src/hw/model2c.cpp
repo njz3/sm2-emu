@@ -1734,6 +1734,10 @@ void Model2C::serialize(Archive& ar)
 
     // Inputs latch (small POD; harmless to carry so a state is self-contained).
     ar.raw(m_inputs);
+    if (ar.format_version() >= 5) {
+        ar.raw(m_indy_reply.command);
+        ar.raw(m_indy_reply.centre);
+    }
 }
 
 bool Model2C::save_state_data(std::vector<u8>& out) const

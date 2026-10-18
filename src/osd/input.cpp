@@ -1374,6 +1374,15 @@ void Input::update_drive_board(const rom::GameSpec& game, std::span<const u8> wr
     }
 }
 
+void Input::reset_drive_board()
+{
+    m_drive_command = DriveCommand{};
+    m_drive_pulse   = 0;
+    m_drive_ticks   = 0.0;
+    m_daytona.reset();
+    m_indy.reset();
+}
+
 void Input::serialize_drive_board(Archive& ar)
 {
     // The layout of this section, for a later one to read this one.

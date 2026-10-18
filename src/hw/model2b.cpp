@@ -1810,6 +1810,10 @@ void Model2B::serialize(Archive& ar)
     ar.raw(m_pending_intena_valid);
     ar.raw(m_copro_debt);
     ar.raw(m_inputs);
+    if (ar.format_version() >= 5) {
+        ar.raw(m_indy_reply.command);
+        ar.raw(m_indy_reply.centre);
+    }
 }
 
 bool Model2B::save_state_data(std::vector<u8>& out) const

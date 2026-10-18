@@ -2449,6 +2449,7 @@ int main(int argc, char** argv)
                 static_cast<void>(audio.init(sound_board->sample_rate()));
             }
             configure_cabinet_link(*machine_iface, options.config);
+            input.reset_drive_board();  // the new machine's board starts from power-up
             if (gui.picker_active()) {
                 scraper.stop();
                 gui.release_picker_textures();
@@ -3211,6 +3212,7 @@ int main(int argc, char** argv)
                 audio.set_paused(true);
                 audio_paused_state = true;
                 input.release_force_feedback();
+                input.reset_drive_board();
                 show_picker();
                 window.set_title(build_title());
                 pacer.resync();

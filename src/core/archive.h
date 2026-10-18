@@ -141,11 +141,14 @@ private:
 //   4  the geometrizer, on every board, saves the state its display list sets
 //      only once (upstream's v0.9.45, its own format 2). Versions 1 to 3 still
 //      load, that state as it stands.
+//   5  Model 2B and 2C save the EPR-18261 drive board's answer on port D (its
+//      last command and the centre the game set). Versions 1 to 4 still load,
+//      that answer as it stands.
 
 namespace state {
 
 inline constexpr char     kMagic[8]      = {'S', 'M', '2', 'S', 'T', 'A', 'T', 'E'};
-inline constexpr u32      kFormatVersion = 4;
+inline constexpr u32      kFormatVersion = 5;
 
 /// The oldest version read_header() accepts. Every serialize() that changed
 /// layout since has to keep reading this one (see Archive::format_version).
