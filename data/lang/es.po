@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: Spanish\n"
@@ -24,6 +24,11 @@ msgstr "Rápido"
 #, c-format
 msgid "Slot %s"
 msgstr "Ranura %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Suelta un archivo de ROM .zip o .7z para jugarlo."
 
 #: src/main.cpp
 #, c-format
@@ -233,6 +238,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (panorámica)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arcade)"
 
@@ -240,11 +250,6 @@ msgstr "4:3 (arcade)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Píxeles cuadrados"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (panorámica)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -261,11 +266,15 @@ msgstr "Aspecto"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 es la forma del monitor arcade (por defecto).\n"
-"Píxeles cuadrados muestra los 496x384 sin más (algo estrecho).\n"
-"Estirar llena toda la ventana. Se aplica al instante."
+"Píxeles cuadrados muestra los 496x384 en bruto (algo estrecho).\n"
+"16:9 (experimental) dibuja el 3D más ancho, con el 2D en medio.\n"
+"Estirar llena toda la ventana.\n"
+"Solo renderizadores GPU. Se aplica al momento."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -565,8 +574,8 @@ msgstr "Un emulador de arcade Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "Licencia BSD de 3 cláusulas. Consulta LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "Licencia GPL-3.0-or-later. Consulta LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -807,7 +816,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Zona muerta central"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -816,11 +825,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Recorrido del volante en torno al centro que cuenta como centro.\n"
+"La mayoría no lo necesita; un poco ayuda si el centro deriva.\n"
+"La barra muestra el volante ahora frente a la zona sombreada."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Posición del volante"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1111,6 +1123,16 @@ msgstr "Usar disposición predeterminada"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Ver asignaciones"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Ver atajos"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Bajar marcha"
 
@@ -1193,18 +1215,77 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Captura"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Izquierda pulsada"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Rebobinar"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Avance rápido"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Derecha pulsada"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Salir"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Carga rápida"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Guardado rápido"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Menú de ajustes"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Mantén primero"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Mantén Guide y pulsa el otro botón; el juego no los ve. Salir vuelve a la "
+"lista de juegos si la hay. Service y Test siempre funcionan."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"El stick izquierdo también mueve; los botones superiores también hacen de "
-"Botón 3/4. La palanca derecha es la de Virtual On. Test y Service son "
-"Guide+Start y Guide+Back."
+"El stick izquierdo también mueve; los gatillos superiores actúan también "
+"como Button 3/4. Palanca derecha es la de Virtual On. Ver atajos lista las "
+"combinaciones con Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Zona muerta del stick"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1213,11 +1294,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Recorrido del stick en torno al centro que cuenta como centro.\n"
+"La barra muestra el stick ahora: suéltalo y sube esto hasta que\n"
+"la marca quede en la zona sombreada. También vale al apuntar."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Posición del stick"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1656,6 +1740,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Mantén Backspace para retroceder en la partida.\n"
+"Cuesta algo de velocidad en cada fotograma mientras está activo."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Memoria de rebobinado"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Carga un juego para guardar y restaurar su estado."
 
@@ -1687,6 +1785,26 @@ msgstr "Guardar"
 #, no-c-format
 msgid "empty"
 msgstr "vacía"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "No se pudo iniciar el juego"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Faltan:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Copiar lista"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "Aceptar"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1756,6 +1874,25 @@ msgstr "Obteniendo descripción..."
 #, no-c-format
 msgid "No description available."
 msgstr "No hay descripción disponible."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 es la forma del monitor arcade (por defecto).\n"
+#~ "Píxeles cuadrados muestra los 496x384 sin más (algo estrecho).\n"
+#~ "Estirar llena toda la ventana. Se aplica al instante."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "El stick izquierdo también mueve; los botones superiores también hacen de "
+#~ "Botón 3/4. La palanca derecha es la de Virtual On. Test y Service son "
+#~ "Guide+Start y Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

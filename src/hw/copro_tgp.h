@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // The Model 2 / Model 2A geometry coprocessor subsystem: the MB86234 together
 // with everything wired around it.

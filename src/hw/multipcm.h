@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Yamaha YMW-258-F "GEW8", which Sega call the 315-5560 and everyone calls
 // MultiPCM. Twenty-eight PCM voices with a per-voice envelope generator, two

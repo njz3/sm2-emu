@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -24,6 +24,11 @@ msgstr "Rýchly"
 #, c-format
 msgid "Slot %s"
 msgstr "Pozícia %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Pustite sem archív ROM .zip alebo .7z a hrajte."
 
 #: src/main.cpp
 #, c-format
@@ -233,6 +238,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (širokouhlý)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (automat)"
 
@@ -240,11 +250,6 @@ msgstr "4:3 (automat)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Štvorcové pixely"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (širokouhlý)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -261,11 +266,15 @@ msgstr "Pomer strán"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"4:3 je tvar monitora automatu (predvolené).\n"
-"Štvorcové pixely ukážu surových 496x384 (trochu úzke).\n"
-"Roztiahnuť vyplní celé okno. Prejaví sa hneď."
+"4:3 je tvar arkádového monitora (predvolené).\n"
+"Štvorcové pixely zobrazia surové 496x384 (mierne úzke).\n"
+"16:9 (experimentálne) kreslí 3D širšie, s 2D v strede.\n"
+"Roztiahnuť vyplní celé okno.\n"
+"Len GPU renderery. Platí okamžite."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -565,8 +574,8 @@ msgstr "Emulátor arkádových automatov Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "Licencia BSD 3-Clause. Pozri LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "Licencia GPL-3.0-or-later. Pozri LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -807,7 +816,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Mŕtva zóna stredu"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -816,11 +825,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Pohyb volantu okolo stredu, ktorý sa číta ako stred. Väčšina\n"
+"volantov ju nepotrebuje; trochu pomôže, ak stred uteká. Pruh\n"
+"ukazuje volant teraz voči vytieňovanej zóne."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Poloha volantu"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1113,6 +1125,16 @@ msgstr "Použiť predvolené rozloženie"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Zobraziť priradenia"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Zobraziť skratky"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Radiť dole"
 
@@ -1195,17 +1217,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Snímka obrazovky"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Držať vľavo"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Pretočiť späť"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Pretočiť dopredu"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Držať vpravo"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Ukončiť"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Rýchle načítanie"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Rýchle uloženie"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Ponuka nastavení"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Najprv podržať"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Podržte Guide a potom stlačte druhé tlačidlo; hra ich nevidí. Ukončiť sa "
+"vráti k hrám, ak nejaké sú. Servis a Test fungujú vždy."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Ľavá páčka tiež pohybuje; ramenné tlačidlá fungujú aj ako Tlačidlo 3/4. "
-"Pravá páka je pre Virtual On. Test a Servis sú Guide+Start a Guide+Back."
+"Ľavá páčka tiež pohybuje; ramenné tlačidlá fungujú aj ako Button 3/4. Pravá "
+"páka je pre Virtual On. Zobraziť skratky vypíše kombinácie s Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Mŕtva zóna páčky"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1214,11 +1295,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Pohyb páčky okolo stredu, ktorý sa číta ako stred. Pruh ukazuje\n"
+"páčku teraz: pustite ju a zvyšujte toto, kým značka\n"
+"nebude vo vytieňovanej zóne. Platí aj pre mierenie páčkou."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Poloha páčky"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1655,6 +1739,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Podržaním Backspace sa vrátite v hre späť.\n"
+"Kým je zapnuté, stojí každý snímok trochu výkonu."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Pamäť pretáčania"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Načítajte hru, aby ste mohli ukladať a obnovovať jej stav."
 
@@ -1686,6 +1784,26 @@ msgstr "Uložiť"
 #, no-c-format
 msgid "empty"
 msgstr "prázdne"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Hru sa nepodarilo spustiť"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Chýba:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Kopírovať zoznam"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1755,6 +1873,24 @@ msgstr "Načítava sa popis..."
 #, no-c-format
 msgid "No description available."
 msgstr "Popis nie je k dispozícii."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 je tvar monitora automatu (predvolené).\n"
+#~ "Štvorcové pixely ukážu surových 496x384 (trochu úzke).\n"
+#~ "Roztiahnuť vyplní celé okno. Prejaví sa hneď."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Ľavá páčka tiež pohybuje; ramenné tlačidlá fungujú aj ako Tlačidlo 3/4. "
+#~ "Pravá páka je pre Virtual On. Test a Servis sú Guide+Start a Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

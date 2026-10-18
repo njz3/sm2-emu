@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -24,6 +24,11 @@ msgstr "سریع"
 #, c-format
 msgid "Slot %s"
 msgstr "اسلات %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "یک آرشیو ROM با پسوند .zip یا .7z را رها کنید تا اجرا شود."
 
 #: src/main.cpp
 #, c-format
@@ -233,6 +238,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (صفحه عریض)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (آرکید)"
 
@@ -240,11 +250,6 @@ msgstr "4:3 (آرکید)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "پیکسل مربعی"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (صفحه عریض)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -261,11 +266,15 @@ msgstr "نسبت تصویر"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 شکل مانیتور آرکید است (پیش‌فرض).\n"
 "پیکسل مربعی 496x384 خام را نشان می‌دهد (کمی باریک).\n"
-"کشش کل پنجره را پر می‌کند. بلافاصله اعمال می‌شود."
+"16:9 (آزمایشی) 3D را پهن‌تر می‌کشد و 2D در وسط می‌ماند.\n"
+"کشش کل پنجره را پر می‌کند.\n"
+"فقط رندرکننده‌های GPU. بی‌درنگ اعمال می‌شود."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -565,8 +574,8 @@ msgstr "شبیه‌ساز آرکید Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "مجوز BSD سه‌بندی. LICENSE را ببینید."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "مجوز GPL-3.0-or-later. LICENSE را ببینید."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -807,7 +816,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "ناحیه مرده مرکز"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -816,11 +825,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"حرکت فرمان در اطراف مرکز که مرکز خوانده می‌شود. بیشتر فرمان‌ها\n"
+"نیازی ندارند؛ کمی از آن برای مرکز لغزان کافی است. نوار\n"
+"فرمان را اکنون نسبت به ناحیه سایه‌دار نشان می‌دهد."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "موقعیت فرمان"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1111,6 +1123,16 @@ msgstr "استفاده از چیدمان پیش‌فرض"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "نمایش کلیدها"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "نمایش میان‌برها"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "دنده پایین"
 
@@ -1193,17 +1215,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "عکس صفحه"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "چپ نگه‌داشته"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "عقب‌بردن"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "جلو بردن سریع"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "راست نگه‌داشته"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "خروج"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "بارگذاری سریع"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "ذخیره سریع"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "منوی تنظیمات"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "اول نگه دارید"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Guide را نگه دارید، سپس دکمه دیگر را بزنید؛ بازی آن‌ها را نمی‌بیند. خروج به "
+"فهرست بازی‌ها برمی‌گردد اگر باشند. سرویس و تست همیشه کار می‌کنند."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"استیک چپ هم حرکت می‌دهد؛ دکمه‌های شانه هم مانند دکمه 3/4 عمل می‌کنند. اهرم راست "
-"مخصوص Virtual On است. تست و سرویس، Guide+Start و Guide+Back هستند."
+"استیک چپ هم حرکت می‌دهد؛ دکمه‌های شانه هم به‌عنوان Button 3/4 عمل می‌کنند. اهرم "
+"راست مال Virtual On است. نمایش میان‌برها ترکیب‌های Guide را فهرست می‌کند."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "ناحیه مرده استیک"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1212,11 +1293,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"حرکت استیک در اطراف مرکز که مرکز خوانده می‌شود. نوار استیک را\n"
+"اکنون نشان می‌دهد: آن را رها کنید و این را بالا ببرید تا نشانگر\n"
+"درون ناحیه سایه‌دار بنشیند. برای نشانه‌گیری با استیک هم اعمال می‌شود."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "موقعیت استیک"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1653,6 +1737,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Backspace را نگه دارید تا در بازی به عقب بروید.\n"
+"تا روشن است، در هر فریم کمی از سرعت می‌کاهد."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "حافظه عقب‌بردن"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "یک بازی بارگذاری کنید تا وضعیت آن را ذخیره و بازیابی کنید."
 
@@ -1684,6 +1782,26 @@ msgstr "ذخیره"
 #, no-c-format
 msgid "empty"
 msgstr "خالی"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "اجرای بازی ممکن نشد"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "مفقود:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "کپی فهرست"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "تأیید"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1753,6 +1871,24 @@ msgstr "در حال دریافت توضیحات..."
 #, no-c-format
 msgid "No description available."
 msgstr "توضیحی موجود نیست."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 شکل مانیتور آرکید است (پیش‌فرض).\n"
+#~ "پیکسل مربعی 496x384 خام را نشان می‌دهد (کمی باریک).\n"
+#~ "کشش کل پنجره را پر می‌کند. بلافاصله اعمال می‌شود."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "استیک چپ هم حرکت می‌دهد؛ دکمه‌های شانه هم مانند دکمه 3/4 عمل می‌کنند. اهرم "
+#~ "راست مخصوص Virtual On است. تست و سرویس، Guide+Start و Guide+Back هستند."
 
 #, no-c-format
 #~ msgid "Read in the background"

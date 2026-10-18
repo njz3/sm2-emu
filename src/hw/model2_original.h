@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 #pragma once
 
@@ -189,8 +189,8 @@ public:
     void load_nvram() override;
     void save_nvram() const override;
 
-    [[nodiscard]] bool save_state(const std::string& path) const override;
-    [[nodiscard]] bool load_state(const std::string& path) override;
+    [[nodiscard]] bool save_state_data(std::vector<u8>& out) const override;
+    [[nodiscard]] bool load_state_data(std::span<const u8> data) override;
 
     /// Copy the set's shipped EEPROM image over the chip, if it ships one.
     void seed_eeprom_from_rom();

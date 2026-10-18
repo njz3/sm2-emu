@@ -194,6 +194,10 @@ has none of its own.
 ./build/bin/sm2-emu --game vf2o vf2.zip
 ```
 
+A `.zip` or `.7z` dropped onto the window starts that game, from the picker or
+in place of the one running. If a set cannot start, a dialog says why and lists
+any chips that are missing.
+
 ROM layouts live in `data/games.xml`, so adding a game is a data edit. A region
 is a flat byte array and each chip contributes `chunk` bytes every `stride`
 bytes, which expresses every interleaving the hardware uses. The schema is
@@ -217,7 +221,17 @@ rather than by label.
 | Left / right trigger | Brake / accelerate on driving titles |
 | Either stick | Aim on gun titles (no mouse needed); right trigger fires, left trigger reloads |
 | Start / Back | Start / insert a coin |
-| Guide + Start / Back | Service / Test (operator menus) |
+| Guide + L3 / R3 | Service / Test (operator menus) |
+| Guide + A | Settings menu |
+| Guide + X / Y | Quick-save / quick-load |
+| Guide + d-pad left / right (held) | Rewind (when turned on) / fast-forward |
+| Guide + LB | Screenshot |
+| Guide + Start | Back to the game picker, or quit when there is none |
+
+The Guide shortcuts follow Batocera's hotkey layout. A front end that maps its
+own hotkeys turns them off with `pad_shortcuts = false` in `sm2-emu.ini`, as
+Batocera does, so nothing fires twice; Service and Test stay on Guide + L3 /
+R3 either way.
 
 The keyboard is live at the same time, so a second player can join on it and
 the operator controls stay reachable without a pad:
@@ -245,6 +259,7 @@ the operator controls stay reachable without a pad:
 | `F11` | Toggle fullscreen (`Cmd+F` on macOS, where the OS reserves F11) |
 | `F12` | Save a screenshot |
 | `Tab` (held) | Fast-forward |
+| `Backspace` (held) | Rewind, when turned on in the **System** tab |
 
 **Virtual On** (a twin-stick cabinet) on the keyboard: `W`/`A`/`S`/`D` are the
 left lever, the arrow keys the right lever, `Q`/`E` the left shot/dash and
@@ -321,6 +336,15 @@ subdirectory of your saves directory, so relocating your saves (with `--nvram`
 or `nvram_dir`) moves the states with them. By default that is
 `~/Library/Application Support/sm2-emu/saves/states` on macOS and
 `$XDG_DATA_HOME/sm2-emu/saves/states` (usually under `~/.local/share`) on Linux.
+
+### Rewind
+
+With **Rewind** on (System tab, or `rewind = true`), holding `Backspace` steps
+back through the last stretch of play at twice real time, silently, and play
+carries on from wherever it is let go. History is kept in memory, up to
+`rewind_buffer_mb` (128 MiB by default, about half a minute), and starts afresh
+when a game is loaded. Taking the snapshots costs a little speed on every frame,
+which is why it is off by default.
 
 ## Settings
 
@@ -564,9 +588,12 @@ xBR/ScaleFX 2D upscaling described under **Settings** above.
 
 ## Licence and credits
 
-BSD 3-Clause. See `LICENSE`.
+GNU GPL version 3 or later, with additional terms under section 7: keep the
+credits, mark modified versions as modified, and give a modified version you
+distribute its own name. See `LICENSE` and `NOTICE`.
 
 I'm standing on the shoulders of giants, and SM2-Emu exists because of the MAME
 project's reverse engineering of this hardware. The emulation is derived from
 MAME's Sega Model 2 driver and its device cores, which their authors released
-under the same licence. See `NOTICE` for per-component attribution.
+under the BSD 3-Clause licence; that code keeps its licence (see
+`LICENSES/BSD-3-Clause.txt`). See `NOTICE` for per-component attribution.

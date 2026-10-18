@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 #include "rom/rom_loader.h"
 
@@ -28,6 +28,7 @@ extern "C" {
 }
 
 #include <algorithm>
+#include <cstdio>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -620,16 +621,24 @@ bool RomLoader::holds_clone(const GameDatabase& database, const std::string& arc
 
 std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
                                           const std::string&  archive_path,
-                                          const std::string&  preferred_game)
+                                          const std::string&  preferred_game,
+                                          LoadError*          load_error)
 {
+    LoadError  unused;
+    LoadError& failure = load_error != nullptr ? *load_error : unused;
+    failure            = {};
+    const std::string file_name = std::filesystem::path(archive_path).filename().string();
+
     std::error_code error;
     if (!std::filesystem::exists(archive_path, error)) {
         SM2_ERROR("'%s' does not exist", archive_path.c_str());
+        failure.message = file_name + " does not exist.";
         return std::nullopt;
     }
 
     ArchiveSet archives;
     if (!archives.open(archive_path)) {
+        failure.message = file_name + " could not be read as a zip or 7z archive.";
         return std::nullopt;
     }
 
@@ -640,6 +649,7 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
         chosen = database.find(preferred_game);
         if (chosen == nullptr) {
             SM2_ERROR("'%s' is not in the ROM database", preferred_game.c_str());
+            failure.message = "'" + preferred_game + "' is not a game sm2-emu knows.";
             return std::nullopt;
         }
     } else {
@@ -671,6 +681,9 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
                       archive_path.c_str());
             SM2_ERROR("Identification is by CRC32, so this means none of the "
                       "expected chips were found, not that the name is wrong.");
+            failure.message = file_name + " does not hold any Model 2 game sm2-emu "
+                              "recognises. Games are matched by their chips' CRC32, "
+                              "not by the file name.";
             return std::nullopt;
         }
         // A parent or device set may still supply the gap; if not, the missing
@@ -706,6 +719,8 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
                 SM2_INFO("'%s' is a clone; also reading %s", chosen->name.c_str(),
                          parent_path->string().c_str());
                 if (!archives.open(parent_path->string())) {
+                    failure.game    = chosen->name;
+                    failure.message = parent_path->filename().string() + " could not be read.";
                     return std::nullopt;
                 }
             } else {
@@ -730,6 +745,8 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
                      chosen->name.c_str(), device_set.c_str(),
                      device_path->string().c_str());
             if (!archives.open(device_path->string())) {
+                failure.game    = chosen->name;
+                failure.message = device_path->filename().string() + " could not be read.";
                 return std::nullopt;
             }
         } else {
@@ -744,6 +761,9 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
         SM2_ERROR("'%s' is a %s board, which is not implemented yet. The original "
                   "Model 2 and the CRX boards (2A, 2B and 2C) are supported.",
                   chosen->name.c_str(), board_name(chosen->board));
+        failure.game    = chosen->name;
+        failure.message = std::string("This is a ") + board_name(chosen->board)
+                        + " game, which sm2-emu does not run yet.";
         return std::nullopt;
     }
     if (chosen->preliminary) {
@@ -772,6 +792,10 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
                 if (region.required) {
                     SM2_ERROR("missing required ROM: '%s' (CRC32 0x%08x), region '%s'",
                               file.name.c_str(), file.crc32, region.name.c_str());
+                    char line[96];
+                    std::snprintf(line, sizeof(line), "%s (CRC32 %08x)", file.name.c_str(),
+                                  file.crc32);
+                    failure.missing.emplace_back(line);
                     ++required_missing;
                 } else {
                     ++optional_missing;
@@ -779,6 +803,8 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
                 continue;
             }
             if (!archives.extract(*entry, &contents[index])) {
+                failure.game    = chosen->name;
+                failure.message = file.name + " could not be unpacked; the archive may be damaged.";
                 return std::nullopt;
             }
         }
@@ -796,6 +822,8 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
 
         std::optional<std::vector<u8>> assembled = assemble_region(region, contents);
         if (!assembled.has_value()) {
+            failure.game    = chosen->name;
+            failure.message = "ROM region '" + region.name + "' could not be built from its files.";
             return std::nullopt;
         }
 
@@ -808,6 +836,14 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
         SM2_ERROR("'%s' cannot be loaded: %u required ROM file(s) missing from %s "
                   "(matched by CRC32; a listed chip is either absent or corrupt)",
                   chosen->name.c_str(), required_missing, archive_path.c_str());
+        failure.game    = chosen->name;
+        failure.message = std::to_string(required_missing)
+                        + (required_missing == 1 ? " required ROM file is" : " required ROM files are")
+                        + " missing or do not match.";
+        if (!chosen->parent.empty()) {
+            failure.message += " This set is a clone, so " + chosen->parent
+                             + ".zip or .7z must be in the same folder.";
+        }
         return std::nullopt;
     }
 

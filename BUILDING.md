@@ -239,6 +239,19 @@ Step by step, from a clean machine:
    reports that no Vulkan devices were found, `molten-vk` is missing: install it
    (`brew install molten-vk`) and reconfigure so it is picked up.
 
+6. **Package** (optional). The build links against Homebrew's libraries, so an
+   app to hand to someone else needs them copied in. With `dylibbundler`
+   installed (`brew install dylibbundler`):
+
+   ```sh
+   cmake --install build --prefix install
+   cmake/macos-bundle.sh install/sm2-emu.app
+   ```
+
+   That copies the dylibs and MoltenVK into `Contents/Frameworks`, registers
+   MoltenVK with the bundled Vulkan loader and signs the app ad hoc, so it runs
+   on a Mac without Homebrew or the Vulkan SDK. The release dmg is made this way.
+
 ## Windows
 
 Windows builds with **MSVC** (Visual Studio 2022's toolchain) and Ninja. SDL3

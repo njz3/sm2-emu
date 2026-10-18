@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -28,6 +28,11 @@ msgstr "Бърз"
 #, c-format
 msgid "Slot %s"
 msgstr "Слот %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Пуснете .zip или .7z ROM архив тук, за да го играете."
 
 #: src/main.cpp
 #, c-format
@@ -237,6 +242,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (широк екран)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (аркада)"
 
@@ -244,11 +254,6 @@ msgstr "4:3 (аркада)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Квадратни пиксели"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (широк екран)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -265,11 +270,15 @@ msgstr "Пропорции"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 е формата на аркадния монитор (по подразбиране).\n"
-"Квадратни пиксели показва суровите 496x384 (по-тясно).\n"
-"Разтегнато запълва целия прозорец. Прилага се веднага."
+"Квадратни пиксели показва суровите 496x384 (малко тясно).\n"
+"16:9 (експериментално) рисува 3D по-широко, 2D е в средата.\n"
+"Разтегнато запълва целия прозорец.\n"
+"Само за GPU рендерери. Прилага се веднага."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -569,8 +578,8 @@ msgstr "Аркаден емулатор на Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "Лиценз BSD 3-Clause. Вижте LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "Лиценз GPL-3.0-or-later. Вижте LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -813,7 +822,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Мъртва зона в центъра"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -822,11 +831,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Ход на волана около центъра, който се чете като център. Повечето\n"
+"волани нямат нужда; малко помага, ако центърът се мести. Лентата\n"
+"показва волана сега спрямо засенчената зона."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Позиция на волана"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1116,6 +1128,16 @@ msgstr "Използвай подредбата по подразбиране"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Покажи бутоните"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Покажи клавишите"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Предавка надолу"
 
@@ -1198,17 +1220,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Екранна снимка"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Задържан ляво"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Превъртане назад"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Превъртане напред"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Задържан дясно"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Изход"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Бързо зареждане"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Бърз запис"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Меню с настройки"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Първо задръжте"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Задръжте Guide, после натиснете другия бутон; играта не ги вижда. Изход "
+"връща към игрите, ако има такива. Сервиз и Тест работят винаги."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Левият стик също движи; раменните бутони са и Бутон 3/4. Десният лост е за "
-"Virtual On. Тест и Сервиз са Guide+Start и Guide+Back."
+"Левият стик също движи; бутоните на раменете действат и като Button 3/4. "
+"Десен лост е за Virtual On. Покажи клавишите изрежда комбинациите с Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Мъртва зона на стика"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1217,11 +1298,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Ход на стика около центъра, който се чете като център. Лентата показва\n"
+"стика сега: пуснете го и увеличавайте това, докато маркерът\n"
+"е в засенчената зона. Важи и за прицелване със стик."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Позиция на стика"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1658,6 +1742,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Задръжте Backspace, за да се върнете назад в играта.\n"
+"Докато е включено, струва малко скорост на всеки кадър."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Памет за превъртане"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Заредете игра, за да записвате и възстановявате състоянието ѝ."
 
@@ -1689,6 +1787,26 @@ msgstr "Запиши"
 #, no-c-format
 msgid "empty"
 msgstr "празно"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Играта не можа да стартира"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Липсват:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Копирай списъка"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1758,6 +1876,24 @@ msgstr "Изтегляне на описание..."
 #, no-c-format
 msgid "No description available."
 msgstr "Няма налично описание."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 е формата на аркадния монитор (по подразбиране).\n"
+#~ "Квадратни пиксели показва суровите 496x384 (по-тясно).\n"
+#~ "Разтегнато запълва целия прозорец. Прилага се веднага."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Левият стик също движи; раменните бутони са и Бутон 3/4. Десният лост е "
+#~ "за Virtual On. Тест и Сервиз са Guide+Start и Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

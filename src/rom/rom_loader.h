@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 #pragma once
 
@@ -31,6 +31,13 @@ struct LoadResult {
     RomSet   roms;
 };
 
+/// Why a load failed, worded for the player rather than the log.
+struct LoadError {
+    std::string              game;     ///< the set it was taken for, when known
+    std::string              message;
+    std::vector<std::string> missing;  ///< required chips not found
+};
+
 /// Reads a zip archive and assembles the ROM regions for whichever game it
 /// holds.
 ///
@@ -49,9 +56,12 @@ public:
     ///
     /// Parent ROMs missing from a clone's archive are looked for in
     /// `<parent>.zip` beside it, matching the usual split-set layout.
+    ///
+    /// On failure `error`, when given, says why.
     [[nodiscard]] static std::optional<LoadResult> load(const GameDatabase& database,
                                                         const std::string&  archive_path,
-                                                        const std::string&  preferred_game = {});
+                                                        const std::string&  preferred_game = {},
+                                                        LoadError*          error = nullptr);
 
     /// Whether `archive_path` holds the chips clone `clone_name` does not share
     /// with its parent: true of a merged archive, which keeps the clones beside

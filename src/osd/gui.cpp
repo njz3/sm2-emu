@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 #include "osd/gui.h"
 #include "core/log.h"
@@ -37,6 +37,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <span>
 #include <string_view>
 #include <system_error>
 
@@ -401,7 +402,8 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
     // touching the cursor, and then SDL_HideCursor() sticks.
     // Not while the picker is up: grabbing the pointer there would confine it to
     // the window, making the title bar and resize edges unreachable.
-    const bool hide_cursor = config.lightgun && !m_visible && !m_picker_enabled;
+    const bool hide_cursor = config.lightgun && !m_visible && !m_picker_enabled
+                          && !m_load_error.has_value();
     if (hide_cursor != m_cursor_hidden) {
         ImGuiIO& io = ImGui::GetIO();
         if (hide_cursor) {
@@ -440,6 +442,10 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
         draw_menu_bar(config);
         draw_settings(config, gpu_names, input);
         draw_status_bar(measured_hz);
+    }
+
+    if (m_load_error.has_value()) {
+        draw_load_error();
     }
 
     return true;
@@ -971,7 +977,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
             ImGui::TextUnformatted(tr("A Sega Model 2 arcade emulator"));
             ImGui::Spacing();
             ImGui::Text("Copyright (c) 2025+ Daniel Martin (dmanlfc)");
-            ImGui::TextUnformatted(tr("BSD 3-Clause licence. See LICENSE."));
+            ImGui::TextUnformatted(tr("GPL-3.0-or-later licence. See LICENSE."));
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
@@ -1390,7 +1396,7 @@ struct PadArtLayout {
 
 constexpr PadArtLayout kPadArt = {
     {0.752f, 0.534f}, {0.818f, 0.438f}, {0.685f, 0.438f}, {0.752f, 0.337f},
-    {0.435f, 0.441f}, {0.503f, 0.286f}, {0.573f, 0.441f},
+    {0.435f, 0.441f}, {0.503f, 0.319f}, {0.573f, 0.441f},
     {0.258f, 0.441f}, {0.630f, 0.650f}, {0.260f, 0.155f}, {0.740f, 0.155f},
     {0.378f, 0.588f}, {0.378f, 0.715f}, {0.335f, 0.650f}, {0.420f, 0.650f},
     {0.245f, 0.070f}, {0.755f, 0.070f},
@@ -1621,6 +1627,12 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
         }
         ImGui::EndDisabled();
     }
+    ImGui::SameLine();
+    if (ImGui::Button(m_pad_shortcuts_view ? tr_id("Show bindings") : tr_id("Show shortcuts"))) {
+        m_pad_shortcuts_view      = !m_pad_shortcuts_view;
+        m_pad_capture_player      = -1;
+        m_pad_axis_capture_player = -1;
+    }
 
     // -- the picture, with a slot for every control around it ---------------
     // A slot per cabinet control; a stick slot binds both axes of its role.
@@ -1692,7 +1704,9 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
     const float  right_x   = img1.x + gap;
     const float  below_y   = img1.y + 20.0f * s;
     int          rows[4]   = {0, 0, 0, 0};
-    for (const Slot& slot : kSlots) {
+    const std::span<const Slot> slots =
+        m_pad_shortcuts_view ? std::span<const Slot>{} : std::span<const Slot>(kSlots);
+    for (const Slot& slot : slots) {
         const int row = rows[slot.column]++;
         ImVec2    pos;
         ImVec2    anchor;  // where the connector leaves the slot
@@ -1878,9 +1892,74 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
     if (binds == &scratch && scratch != config.pad) {
         config.pad_layouts[m_pad_family] = scratch;
     }
+
+    // The Guide shortcuts: Guide is held first, then the other control.
+    if (m_pad_shortcuts_view) {
+        struct Shortcut {
+            const char* name;
+            s32         binding;
+            const char* value;  ///< in place of the control's name, when set
+            int         column;
+            int         row;
+        };
+        // The same layout as Batocera's hotkeys.
+        static const Shortcut kShortcuts[] = {
+            {N_("Screenshot"),    SDL_GAMEPAD_BUTTON_LEFT_SHOULDER, nullptr,          0, 1},
+            {N_("Service"),       SDL_GAMEPAD_BUTTON_LEFT_STICK,    nullptr,          0, 3},
+            {N_("Rewind"),        SDL_GAMEPAD_BUTTON_DPAD_LEFT,     N_("Left held"),  0, 4},
+            {N_("Fast-forward"),  SDL_GAMEPAD_BUTTON_DPAD_RIGHT,    N_("Right held"), 0, 5},
+            {N_("Exit"),          SDL_GAMEPAD_BUTTON_START,         nullptr,          1, 0},
+            {N_("Quick-load"),    SDL_GAMEPAD_BUTTON_NORTH,         nullptr,          1, 2},
+            {N_("Quick-save"),    SDL_GAMEPAD_BUTTON_WEST,          nullptr,          1, 3},
+            {N_("Settings menu"), SDL_GAMEPAD_BUTTON_SOUTH,         nullptr,          1, 4},
+            {N_("Test"),          SDL_GAMEPAD_BUTTON_RIGHT_STICK,   nullptr,          1, 5},
+        };
+        const ImU32 kGuideColour = IM_COL32(240, 190, 90, 255);
+        const auto  label = [&](ImVec2 pos, const char* name, const std::string& value) {
+            const ImVec2 end(pos.x + slot_w, pos.y + slot_h);
+            draw->AddRectFilled(pos, end, IM_COL32(38, 41, 48, 255), 6.0f * s);
+            draw->AddRect(pos, end, IM_COL32(72, 77, 88, 255), 6.0f * s, 0, 1.5f);
+            const float text_y = pos.y + (slot_h - font) * 0.5f;
+            draw->PushClipRect(pos, end, true);
+            draw->AddText(ImVec2(pos.x + 10.0f * s, text_y), IM_COL32(230, 232, 236, 255), name);
+            const float value_w = ImGui::CalcTextSize(value.c_str()).x;
+            draw->AddText(ImVec2(end.x - 10.0f * s - value_w, text_y), IM_COL32(170, 176, 186, 255),
+                          value.c_str());
+            draw->PopClipRect();
+        };
+
+        const ImVec2 guide = at(layout.guide);
+        const ImVec2 guide_pos(guide.x - slot_w * 0.5f, origin.y + 4.0f * s);
+        label(guide_pos, tr("Hold first"), Input::pad_button_name(SDL_GAMEPAD_BUTTON_GUIDE));
+        draw->AddLine(ImVec2(guide.x, guide_pos.y + slot_h), guide, kGuideColour, 1.5f * s);
+        draw->AddCircle(guide, 14.0f * s, kGuideColour, 0, 2.5f * s);
+
+        for (const Shortcut& shortcut : kShortcuts) {
+            const float  y   = img0.y + static_cast<float>(shortcut.row) * pitch - slot_h * 0.5f;
+            const ImVec2 pos(shortcut.column == 0 ? left_x : right_x, y);
+            label(pos, tr(shortcut.name),
+                  shortcut.value != nullptr ? std::string(tr(shortcut.value))
+                                            : Input::pad_button_name(shortcut.binding));
+            const ImVec2 anchor(shortcut.column == 0 ? pos.x + slot_w : pos.x, y + slot_h * 0.5f);
+            const ImVec2 edge(shortcut.column == 0 ? img0.x - 8.0f * s : img1.x + 8.0f * s, anchor.y);
+            const ImVec2 dot    = at(art_binding_point(layout, shortcut.binding));
+            const ImU32  colour = button_colour(shortcut.binding);
+            const ImU32  line   = (colour & 0x00ffffffu) | 0x80000000u;
+            draw->AddLine(anchor, edge, line, 1.5f * s);
+            draw->AddLine(edge, dot, line, 1.5f * s);
+            draw->AddCircleFilled(dot, 4.5f * s, colour);
+        }
+    }
+
     ImGui::SetCursorScreenPos(ImVec2(origin.x, below_y + slot_h + 10.0f * s));
-    ImGui::TextDisabled("%s", tr("The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-                        "is Virtual On's. Test and Service are Guide+Start and Guide+Back."));
+    if (m_pad_shortcuts_view) {
+        ImGui::TextDisabled("%s", tr("Hold Guide, then press the other button; the game does not see "
+                            "them. Exit goes back to the games when there are some. Service and Test "
+                            "always work."));
+    } else {
+        ImGui::TextDisabled("%s", tr("The left stick also moves; the shoulders also act as Button 3/4. "
+                            "Right Lever is Virtual On's. Show shortcuts lists the Guide combinations."));
+    }
 
     // -- sticks and rumble ---------------------------------------------------
     ImGui::Separator();
@@ -2491,6 +2570,22 @@ void Gui::draw_system_tab(Config& config)
                    "not in front. Keyboard and mouse still need the window\n"
                    "in front."));
     }
+
+    ImGui::Spacing();
+    ImGui::Checkbox(tr_id("Rewind"), &config.rewind);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        tooltip(tr("Hold Backspace to step back through play.\n"
+                   "Costs a little speed on every frame while on."));
+    }
+    if (config.rewind) {
+        int buffer = static_cast<int>(config.rewind_buffer_mb);
+        ImGui::SetNextItemWidth(220);
+        if (ImGui::SliderInt(tr_id("Rewind memory"), &buffer, 32, 1024, "%d MiB")) {
+            config.rewind_buffer_mb = static_cast<u32>(buffer);
+        }
+    }
 }
 
 void Gui::draw_states_tab()
@@ -2606,6 +2701,73 @@ void Gui::notify(std::string message)
 {
     m_notify_text         = std::move(message);
     m_notify_seconds_left = 2.0f;  // a couple of seconds, per the request
+}
+
+void Gui::show_load_error(std::string game, std::string message,
+                          std::vector<std::string> missing)
+{
+    m_load_error = LoadErrorDialog{std::move(game), std::move(message), std::move(missing)};
+}
+
+void Gui::draw_load_error()
+{
+    LoadErrorDialog& dialog = *m_load_error;
+    const char*      id     = "###load_error";
+    if (!dialog.opened) {
+        ImGui::OpenPopup(id);
+        dialog.opened = true;
+    }
+
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(viewport->WorkSize.x * 0.4f, 0.0f),
+                                        ImVec2(viewport->WorkSize.x * 0.8f,
+                                               viewport->WorkSize.y * 0.8f));
+    const std::string title = std::string(tr("Could not start the game")) + id;
+    if (!ImGui::BeginPopupModal(title.c_str(), nullptr,
+                                ImGuiWindowFlags_AlwaysAutoResize
+                                    | ImGuiWindowFlags_NoSavedSettings)) {
+        m_load_error.reset();
+        return;
+    }
+
+    if (!dialog.game.empty()) {
+        ImGui::TextUnformatted(dialog.game.c_str());
+        ImGui::Spacing();
+    }
+    ImGui::PushTextWrapPos(viewport->WorkSize.x * 0.75f);
+    ImGui::TextUnformatted(dialog.message.c_str());
+    ImGui::PopTextWrapPos();
+
+    if (!dialog.missing.empty()) {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(tr("Missing:"));
+        const float rows   = static_cast<float>(std::min<usize>(dialog.missing.size(), 12));
+        const float height = rows * ImGui::GetTextLineHeightWithSpacing()
+                           + ImGui::GetStyle().WindowPadding.y * 2.0f;
+        if (ImGui::BeginChild("##missing", ImVec2(0.0f, height), ImGuiChildFlags_Borders)) {
+            for (const std::string& line : dialog.missing) {
+                ImGui::TextUnformatted(line.c_str());
+            }
+        }
+        ImGui::EndChild();
+        if (ImGui::Button(tr_id("Copy list"))) {
+            std::string text;
+            for (const std::string& line : dialog.missing) {
+                text += line;
+                text += '\n';
+            }
+            ImGui::SetClipboardText(text.c_str());
+        }
+        ImGui::SameLine();
+    }
+
+    if (ImGui::Button(tr_id("OK")) || ImGui::IsKeyPressed(ImGuiKey_Escape, false)
+        || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown, false)) {
+        ImGui::CloseCurrentPopup();
+        m_load_error.reset();
+    }
+    ImGui::EndPopup();
 }
 
 void Gui::draw_notification()
@@ -3160,7 +3322,9 @@ void Gui::draw_picker(Config& config)
     // The picker drives selection itself rather than via ImGui nav focus, so
     // the description pane and launch stay in step with the highlighted tile.
     const ImGuiIO& io      = ImGui::GetIO();
-    const auto     pressed = [](ImGuiKey k) { return ImGui::IsKeyPressed(k, true); };
+    const auto     pressed = [this](ImGuiKey k) {
+        return !m_load_error.has_value() && ImGui::IsKeyPressed(k, true);
+    };
     int            sel     = m_picker_selected;
     if (pressed(ImGuiKey_RightArrow) || pressed(ImGuiKey_GamepadDpadRight)) ++sel;
     if (pressed(ImGuiKey_LeftArrow) || pressed(ImGuiKey_GamepadDpadLeft)) --sel;

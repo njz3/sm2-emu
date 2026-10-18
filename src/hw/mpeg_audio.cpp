@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // See mpeg_audio.h. Ported verbatim from MAME's
 // src/devices/sound/mpeg_audio.cpp (BSD-3-Clause, copyright-holders Olivier

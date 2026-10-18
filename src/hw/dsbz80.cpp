@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // See dsbz80.h. Ported from MAME's src/mame/sega/dsbz80.cpp (BSD-3-Clause,
 // copyright-holders R. Belmont, Olivier Galibert).

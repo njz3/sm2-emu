@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -27,6 +27,11 @@ msgstr "クイック"
 #, c-format
 msgid "Slot %s"
 msgstr "スロット %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr ".zip または .7z の ROM アーカイブをドロップしてプレイします。"
 
 #: src/main.cpp
 #, c-format
@@ -236,6 +241,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (ワイド)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3（アーケード）"
 
@@ -243,11 +253,6 @@ msgstr "4:3（アーケード）"
 #, no-c-format
 msgid "Square pixels"
 msgstr "正方形ピクセル"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (ワイド)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -264,11 +269,15 @@ msgstr "アスペクト比"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"4:3 はアーケードモニターの形状です（既定）。\n"
-"正方形ピクセルは元の 496x384 を表示します（やや細長い）。\n"
-"引き伸ばしはウィンドウ全体を埋めます。即時反映。"
+"4:3 はアーケードモニターの形です（デフォルト）。\n"
+"正方形ピクセルは生の 496x384 を表示します（やや細め）。\n"
+"16:9（実験的）は 3D を横に広げ、2D は中央に描きます。\n"
+"引き伸ばしはウィンドウ全体を埋めます。\n"
+"GPU レンダラーのみ。即時に反映されます。"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -568,8 +577,8 @@ msgstr "セガ Model 2 アーケードエミュレーター"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3条項ライセンス。LICENSE を参照してください。"
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later ライセンス。LICENSE を参照してください。"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -811,7 +820,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "中央デッドゾーン"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -820,11 +829,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"中央付近でハンドルを動かしても中央とみなす範囲です。\n"
+"多くのハンドルでは不要ですが、中央がずれるものには少し有効です。\n"
+"バーは網掛けの範囲に対する現在のハンドル位置を示します。"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "ハンドル位置"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1116,6 +1128,16 @@ msgstr "デフォルトの配置を使う"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "割り当てを表示"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "ショートカットを表示"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "ギアダウン"
 
@@ -1198,17 +1220,77 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "スクリーンショット"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "左を長押し"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "巻き戻し"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "早送り"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "右を長押し"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "終了"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "クイックロード"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "クイックセーブ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "設定メニュー"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "先に長押し"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Guide を押したまま、もう一方のボタンを押します。ゲームには伝わりません。ゲー"
+"ムがある場合、終了でゲーム一覧に戻ります。サービスとテストは常に使えます。"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"左スティックでも移動でき、ショルダーはボタン 3/4 としても機能します。右レバー"
-"は Virtual On 用です。テストとサービスは Guide+Start と Guide+Back です。"
+"左スティックでも移動でき、ショルダーボタンは Button 3/4 としても働きます。右"
+"レバーは Virtual On 用です。ショートカットを表示で Guide の組み合わせを一覧で"
+"きます。"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "スティックのデッドゾーン"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1217,11 +1299,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"中央付近でスティックを動かしても中央とみなす範囲です。バーは\n"
+"現在のスティックを示します。手を離し、マーカーが網掛けの範囲に\n"
+"収まるまでこの値を上げてください。スティックでの照準にも適用されます。"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "スティック位置"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1659,6 +1744,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Backspace を押し続けるとプレイを巻き戻せます。\n"
+"有効中は毎フレーム少し速度が落ちます。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "巻き戻しメモリ"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "ゲームを読み込むと、ステートの保存と復元ができます。"
 
@@ -1690,6 +1789,26 @@ msgstr "セーブ"
 #, no-c-format
 msgid "empty"
 msgstr "空"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "ゲームを開始できませんでした"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "不足しているファイル:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "リストをコピー"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1759,6 +1878,25 @@ msgstr "説明を取得中..."
 #, no-c-format
 msgid "No description available."
 msgstr "説明はありません。"
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 はアーケードモニターの形状です（既定）。\n"
+#~ "正方形ピクセルは元の 496x384 を表示します（やや細長い）。\n"
+#~ "引き伸ばしはウィンドウ全体を埋めます。即時反映。"
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "左スティックでも移動でき、ショルダーはボタン 3/4 としても機能します。右レ"
+#~ "バーは Virtual On 用です。テストとサービスは Guide+Start と Guide+Back で"
+#~ "す。"
 
 #, no-c-format
 #~ msgid "Read in the background"

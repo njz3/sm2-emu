@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -26,6 +26,11 @@ msgstr ""
 #: src/main.cpp
 #, c-format
 msgid "Slot %s"
+msgstr ""
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
 msgstr ""
 
 #: src/main.cpp
@@ -223,17 +228,17 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Square pixels"
-msgstr ""
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
 msgstr ""
 
 #: src/osd/gui.cpp
@@ -251,7 +256,9 @@ msgstr ""
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 
 #: src/osd/gui.cpp
@@ -524,7 +531,7 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
 msgstr ""
 
 #: src/osd/gui.cpp
@@ -1046,6 +1053,16 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr ""
 
@@ -1122,9 +1139,66 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
 
 #: src/osd/gui.cpp
@@ -1526,6 +1600,18 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr ""
 
@@ -1554,6 +1640,26 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "empty"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
 msgstr ""
 
 #: src/osd/gui.cpp

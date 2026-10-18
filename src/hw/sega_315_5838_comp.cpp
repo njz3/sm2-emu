@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Derived from MAME's src/mame/sega/315-5838_317-0229_comp.cpp
 // (BSD-3-Clause, copyright-holders David Haywood, Samuel Neves, Peter

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Ported from MAME's src/mame/sega/model2_v.cpp and model2.cpp (BSD-3-Clause,
 // copyright-holders R. Belmont, Olivier Galibert, ElSemi, Angelo Salese,

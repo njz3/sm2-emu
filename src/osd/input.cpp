@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 #include "osd/input.h"
 
@@ -543,7 +543,7 @@ SDL_Gamepad* Input::pad_for(u32 player) const
 {
     const auto match = std::find_if(m_pads.begin(), m_pads.end(),
                                     [player](const Pad& pad) {
-                                        return pad.player == player && pad.handle != nullptr;
+                                        return pad.player == player && plays(pad);
                                     });
     return match != m_pads.end() ? match->handle : nullptr;
 }
@@ -973,7 +973,7 @@ bool Input::pad_button_held(const Pad& pad, SDL_GamepadButton physical) const
 bool Input::pad_role_held(u32 player, Config::PadRole role) const
 {
     for (const Pad& pad : m_pads) {
-        if (pad.handle != nullptr && pad.player == player) {
+        if (plays(pad) && pad.player == player) {
             return binding_held(pad.handle, m_pad_buttons[player][static_cast<u32>(role)]);
         }
     }
@@ -1129,6 +1129,64 @@ bool Input::menu_button_pressed()
     const bool edge = held && !m_menu_held;
     m_menu_held     = held;
     return edge;
+}
+
+Input::PadShortcuts Input::update_pad_shortcuts(bool enabled)
+{
+    enum : u8 { kA = 1, kX = 2, kY = 4, kStart = 8, kLB = 16, kDpadLeft = 32, kDpadRight = 64 };
+
+    PadShortcuts out;
+    for (Pad& pad : m_pads) {
+        if (pad.handle == nullptr) {
+            continue;
+        }
+        if (!enabled) {
+            pad.shortcut_down    = 0;
+            pad.shortcut_claimed = 0;
+            continue;
+        }
+        const auto button = [&](SDL_GamepadButton b) {
+            return SDL_GetGamepadButton(pad.handle, b);
+        };
+        u8 down = 0;
+        down |= button(SDL_GAMEPAD_BUTTON_SOUTH) ? kA : 0;
+        down |= button(SDL_GAMEPAD_BUTTON_WEST) ? kX : 0;
+        down |= button(SDL_GAMEPAD_BUTTON_NORTH) ? kY : 0;
+        down |= button(SDL_GAMEPAD_BUTTON_START) ? kStart : 0;
+        down |= button(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER) ? kLB : 0;
+        down |= button(SDL_GAMEPAD_BUTTON_DPAD_LEFT) ? kDpadLeft : 0;
+        down |= button(SDL_GAMEPAD_BUTTON_DPAD_RIGHT) ? kDpadRight : 0;
+
+        // Only a control pressed while Guide is down starts a shortcut, so a
+        // direction already held for the game does not rewind on Guide.
+        const u8 pressed = down & static_cast<u8>(~pad.shortcut_down);
+        const u8 started = button(SDL_GAMEPAD_BUTTON_GUIDE) ? pressed : 0;
+        pad.shortcut_claimed = static_cast<u8>((pad.shortcut_claimed | started) & down);
+        pad.shortcut_down    = down;
+
+        out.menu         |= (started & kA) != 0;
+        out.save         |= (started & kX) != 0;
+        out.load         |= (started & kY) != 0;
+        out.exit         |= (started & kStart) != 0;
+        out.screenshot   |= (started & kLB) != 0;
+        out.rewind       |= (pad.shortcut_claimed & kDpadLeft) != 0;
+        out.fast_forward |= (pad.shortcut_claimed & kDpadRight) != 0;
+    }
+    return out;
+}
+
+bool Input::operator_chord(const Pad& pad, u8* port0)
+{
+    if (!SDL_GetGamepadButton(pad.handle, SDL_GAMEPAD_BUTTON_GUIDE)) {
+        return false;
+    }
+    if (SDL_GetGamepadButton(pad.handle, SDL_GAMEPAD_BUTTON_LEFT_STICK)) {
+        *port0 &= static_cast<u8>(~kService);
+    }
+    if (SDL_GetGamepadButton(pad.handle, SDL_GAMEPAD_BUTTON_RIGHT_STICK)) {
+        *port0 &= static_cast<u8>(~kTest);
+    }
+    return true;
 }
 
 int Input::wheel_axis_count() const
@@ -2150,7 +2208,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
     const bool is_desert = game.name == "desert" || game.parent == "desert";
 
     for (const Pad& pad : m_pads) {
-        if (pad.handle == nullptr || pad.player >= kPlayers || is_von || is_desert
+        if (!plays(pad) || pad.player >= kPlayers || is_von || is_desert
             || is_ski || is_wski || is_skytgt) {
             continue;
         }
@@ -2210,19 +2268,13 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             ~stick_bits(SDL_GetGamepadAxis(pad.handle, SDL_GAMEPAD_AXIS_LEFTX),
                         SDL_GetGamepadAxis(pad.handle, SDL_GAMEPAD_AXIS_LEFTY)));
 
-        // Start/coin; coin 2 is player 2's slot. Guide is the operator modifier:
-        // Guide+Start = Service, Guide+Back = Test, and while Guide is held the
-        // plain coin/start are suppressed so the chord does not also coin.
+        // Start/coin; coin 2 is player 2's slot.
         const auto held = [&](Config::PadRole role) {
             return binding_held(pad.handle, binds[static_cast<u32>(role)]);
         };
-        const bool guide = SDL_GetGamepadButton(pad.handle, SDL_GAMEPAD_BUTTON_GUIDE);
         const bool start = held(Config::PadRole::Start);
         const bool back  = held(Config::PadRole::Coin);
-        if (guide) {
-            if (start) ports[0] &= static_cast<u8>(~kService);
-            if (back)  ports[0] &= static_cast<u8>(~kTest);
-        } else {
+        if (!operator_chord(pad, &ports[0])) {
             if (start) {
                 const u8 start1 = game.start1_bit != 0 ? game.start1_bit : kStart1;
                 ports[0] &= static_cast<u8>(~(pad.player == 0 ? start1 : kStart2));
@@ -2259,7 +2311,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
 
         for (const Pad& pad : m_pads) {
-            if (pad.handle == nullptr || pad.player != 0) {
+            if (!plays(pad) || pad.player != 0) {
                 continue;
             }
             const auto held = [&](SDL_GamepadButton b) { return pad_button_held(pad, b); };
@@ -2269,13 +2321,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (held(SDL_GAMEPAD_BUTTON_DPAD_UP))   press(kZoomIn);
             if (held(SDL_GAMEPAD_BUTTON_DPAD_DOWN)) press(kZoomOut);
 
-            const bool guide = held(SDL_GAMEPAD_BUTTON_GUIDE);
             const bool start = held(SDL_GAMEPAD_BUTTON_START);
             const bool back  = held(SDL_GAMEPAD_BUTTON_BACK);
-            if (guide) {
-                if (start) ports[0] &= static_cast<u8>(~kService);
-                if (back)  ports[0] &= static_cast<u8>(~kTest);
-            } else {
+            if (!operator_chord(pad, &ports[0])) {
                 if (start) ports[0] &= static_cast<u8>(~kTest);   // no start button; Test advances
                 if (back)  ports[0] &= static_cast<u8>(~kCoin1);
             }
@@ -2307,7 +2355,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
 
         for (const Pad& pad : m_pads) {
-            if (pad.handle == nullptr || pad.player != 0) {
+            if (!plays(pad) || pad.player != 0) {
                 continue;
             }
             const auto held = [&](SDL_GamepadButton b) { return pad_button_held(pad, b); };
@@ -2317,13 +2365,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (held(SDL_GAMEPAD_BUTTON_DPAD_DOWN))      press(kSelectDown);
             if (held(SDL_GAMEPAD_BUTTON_SOUTH))          press(kSet);
 
-            const bool guide = held(SDL_GAMEPAD_BUTTON_GUIDE);
             const bool start = held(SDL_GAMEPAD_BUTTON_START);
             const bool back  = held(SDL_GAMEPAD_BUTTON_BACK);
-            if (guide) {
-                if (start) ports[0] &= static_cast<u8>(~kService);
-                if (back)  ports[0] &= static_cast<u8>(~kTest);
-            } else {
+            if (!operator_chord(pad, &ports[0])) {
                 if (start) ports[0] &= static_cast<u8>(~kStart1);
                 if (back)  ports[0] &= static_cast<u8>(~kCoin1);
             }
@@ -2344,7 +2388,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (kdown(SDL_SCANCODE_X))     ports[1] &= static_cast<u8>(~0x20);
         }
         for (const Pad& pad : m_pads) {
-            if (pad.handle == nullptr || pad.player != 0) {
+            if (!plays(pad) || pad.player != 0) {
                 continue;
             }
             if (SDL_GetGamepadAxis(pad.handle, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > kTriggerPress)
@@ -2354,13 +2398,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (pad_button_held(pad, SDL_GAMEPAD_BUTTON_NORTH))
                 ports[0] &= static_cast<u8>(~0x20);   // View Change
 
-            const bool guide = SDL_GetGamepadButton(pad.handle, SDL_GAMEPAD_BUTTON_GUIDE);
             const bool start = pad_button_held(pad, SDL_GAMEPAD_BUTTON_START);
             const bool back  = pad_button_held(pad, SDL_GAMEPAD_BUTTON_BACK);
-            if (guide) {
-                if (start) ports[0] &= static_cast<u8>(~kService);
-                if (back)  ports[0] &= static_cast<u8>(~kTest);
-            } else {
+            if (!operator_chord(pad, &ports[0])) {
                 if (start) ports[0] &= static_cast<u8>(~0x40);  // Start1
                 if (back)  ports[0] &= static_cast<u8>(~kCoin1);
             }
@@ -2498,7 +2538,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
                 snap_right = kdown(SDL_SCANCODE_RIGHT);
             }
             for (const Pad& pad : m_pads) {
-                if (pad.handle == nullptr || pad.player != 0) continue;
+                if (!plays(pad) || pad.player != 0) continue;
                 if (pad_button_held(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT))
                     snap_left = true;
                 if (pad_button_held(pad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT))
@@ -2541,7 +2581,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             jump_tail  = down(SDL_SCANCODE_X);
         }
         for (const Pad& pad : m_pads) {
-            if (pad.handle == nullptr || pad.player != 0) {
+            if (!plays(pad) || pad.player != 0) {
                 continue;
             }
             left       |= pad_button_held(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
@@ -2560,7 +2600,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         // the triggers rather than the steering axis: left skids left.
         float slide = 0.0f;
         for (const Pad& pad : m_pads) {
-            if (pad.handle == nullptr || pad.player != 0) {
+            if (!plays(pad) || pad.player != 0) {
                 continue;
             }
             const auto pull = [&](SDL_GamepadAxis axis) {
@@ -2626,7 +2666,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             p2_call        = down(SDL_SCANCODE_V);
         }
         for (const Pad& pad : m_pads) {
-            if (pad.handle == nullptr || pad.player != 0) {
+            if (!plays(pad) || pad.player != 0) {
                 continue;
             }
             cancel_error   |= pad_button_held(pad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER);
@@ -2656,7 +2696,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         u8 in2 = 0;
 
         for (const Pad& pad : m_pads) {
-            if (pad.handle == nullptr || pad.player != 0) {
+            if (!plays(pad) || pad.player != 0) {
                 continue;
             }
 
@@ -2781,7 +2821,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
 
         for (const Pad& pad : m_pads) {
-            if (pad.handle == nullptr || pad.player != 0) {
+            if (!plays(pad) || pad.player != 0) {
                 continue;
             }
 
@@ -3061,7 +3101,12 @@ void Input::print_bindings()
     std::printf("  L / R trigger        brake / accelerate on driving titles\n");
     std::printf("  right stick          aim on gun titles (no mouse needed)\n");
     std::printf("  Start / Back         start / insert coin\n");
-    std::printf("  Guide + Start/Back   service / test (operator menus)\n");
+    std::printf("  Guide + L3 / R3      service / test (operator menus)\n");
+    std::printf("  Guide + A            settings menu\n");
+    std::printf("  Guide + X / Y        quick-save / quick-load state\n");
+    std::printf("  Guide + Left / Right rewind / fast-forward (held)\n");
+    std::printf("  Guide + LB           screenshot\n");
+    std::printf("  Guide + Start        back to the games, or quit\n");
     std::printf("\nKeyboard:\n");
     std::printf("  5 6                  coin 1, coin 2\n");
     std::printf("  1 2                  start 1, start 2\n");
@@ -3078,6 +3123,7 @@ void Input::print_bindings()
     std::printf("  Escape               quit\n");
     std::printf("  P                    pause\n");
     std::printf("  Tab (held)           fast-forward\n");
+    std::printf("  Backspace (held)     rewind, when turned on\n");
     std::printf("  F6 F7                quick-save, quick-load state (more slots in F10)\n");
     std::printf("  F8                   toggle FPS counter\n");
     std::printf("  F10 F11 F12          settings menu, fullscreen, screenshot\n");

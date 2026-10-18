@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -30,6 +30,11 @@ msgstr "Pika"
 #, c-format
 msgid "Slot %s"
 msgstr "Paikka %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Pudota .zip- tai .7z-ROM-arkisto pelataksesi sitä."
 
 #: src/main.cpp
 #, c-format
@@ -239,6 +244,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (laajakuva)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arcade)"
 
@@ -246,11 +256,6 @@ msgstr "4:3 (arcade)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Neliöpikselit"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (laajakuva)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -267,11 +272,15 @@ msgstr "Kuvasuhde"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"4:3 on arcade-näytön muoto (oletus).\n"
-"Neliöpikselit näyttää raa'an 496x384 (hieman kapea).\n"
-"Venytä täyttää koko ikkunan. Tulee voimaan heti."
+"4:3 on pelihallinäytön muoto (oletus).\n"
+"Neliöpikselit näyttää raa'an 496x384-kuvan (hieman kapea).\n"
+"16:9 (kokeellinen) piirtää 3D:n leveämpänä, 2D keskellä.\n"
+"Venytä täyttää koko ikkunan.\n"
+"Vain GPU-renderöijät. Toimii heti."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -571,8 +580,8 @@ msgstr "Sega Model 2 -arcade-emulaattori"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3-Clause -lisenssi. Katso LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later -lisenssi. Katso LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -815,7 +824,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Keskikohdan kuollut alue"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -824,11 +833,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Ratin liike keskikohdan ympärillä, joka luetaan keskikohdaksi.\n"
+"Useimmat ratit eivät tarvitse sitä; vähän auttaa, jos keskikohta\n"
+"vaeltaa. Palkki näyttää ratin nyt varjostettua aluetta vasten."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Ratin asento"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1121,6 +1133,16 @@ msgstr "Käytä oletusasettelua"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Näytä määritykset"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Näytä pikavalinnat"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Vaihde alas"
 
@@ -1203,18 +1225,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Kuvakaappaus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Vasen pohjassa"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Takaisinkelaus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Pikakelaus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Oikea pohjassa"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Poistu"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Pikalataus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Pikatallennus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Asetusvalikko"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Pidä ensin"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Pidä Guide pohjassa ja paina toista painiketta; peli ei näe niitä. Poistu "
+"palaa peleihin, jos niitä on. Huolto ja Testi toimivat aina."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Vasen tikku myös liikuttaa; olkapainikkeet toimivat myös painikkeina 3/4. "
-"Oikea vipu on Virtual Onia varten. Testi ja Huolto ovat Guide+Start ja "
-"Guide+Back."
+"Vasen tikku liikuttaa myös; olkapainikkeet toimivat myös Button 3/4:nä. "
+"Oikea vipu on Virtual Onin. Näytä pikavalinnat listaa Guide-yhdistelmät."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Tikun kuollut alue"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1223,11 +1303,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Tikun liike keskikohdan ympärillä, joka luetaan keskikohdaksi. Palkki\n"
+"näyttää tikun nyt: päästä siitä irti ja nosta tätä, kunnes merkki\n"
+"on varjostetun alueen sisällä. Koskee myös tikulla tähtäämistä."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Tikun asento"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1664,6 +1747,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Pidä Backspace pohjassa kelataksesi peliä taaksepäin.\n"
+"Hidastaa hieman jokaista ruutua, kun käytössä."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Takaisinkelauksen muisti"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Lataa peli tallentaaksesi ja palauttaaksesi sen tilan."
 
@@ -1695,6 +1792,26 @@ msgstr "Tallenna"
 #, no-c-format
 msgid "empty"
 msgstr "tyhjä"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Peliä ei voitu käynnistää"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Puuttuu:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Kopioi luettelo"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1764,6 +1881,25 @@ msgstr "Haetaan kuvausta..."
 #, no-c-format
 msgid "No description available."
 msgstr "Kuvausta ei ole saatavilla."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 on arcade-näytön muoto (oletus).\n"
+#~ "Neliöpikselit näyttää raa'an 496x384 (hieman kapea).\n"
+#~ "Venytä täyttää koko ikkunan. Tulee voimaan heti."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Vasen tikku myös liikuttaa; olkapainikkeet toimivat myös painikkeina 3/4. "
+#~ "Oikea vipu on Virtual Onia varten. Testi ja Huolto ovat Guide+Start ja "
+#~ "Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

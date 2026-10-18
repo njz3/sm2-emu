@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -24,6 +24,11 @@ msgstr "Nhanh"
 #, c-format
 msgid "Slot %s"
 msgstr "Khe %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Thả tệp ROM .zip hoặc .7z vào để chơi."
 
 #: src/main.cpp
 #, c-format
@@ -233,6 +238,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (màn hình rộng)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arcade)"
 
@@ -240,11 +250,6 @@ msgstr "4:3 (arcade)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Điểm ảnh vuông"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (màn hình rộng)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -261,11 +266,15 @@ msgstr "Tỷ lệ"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"4:3 là hình dạng màn hình máy arcade (mặc định).\n"
-"Điểm ảnh vuông hiển thị nguyên 496x384 (hơi hẹp).\n"
-"Kéo giãn lấp đầy toàn bộ cửa sổ. Áp dụng ngay."
+"4:3 là tỷ lệ màn hình máy arcade (mặc định).\n"
+"Điểm ảnh vuông hiển thị 496x384 gốc (hơi hẹp).\n"
+"16:9 (thử nghiệm) vẽ 3D rộng hơn, 2D ở giữa.\n"
+"Kéo giãn lấp đầy cả cửa sổ.\n"
+"Chỉ trình kết xuất GPU. Áp dụng ngay."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -565,8 +574,8 @@ msgstr "Trình giả lập máy arcade Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "Giấy phép BSD 3-Clause. Xem LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "Giấy phép GPL-3.0-or-later. Xem LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -806,7 +815,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Vùng chết giữa"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -815,11 +824,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Khoảng xoay quanh tâm vẫn được tính là tâm. Hầu hết vô lăng\n"
+"không cần; một chút giúp vô lăng có tâm bị lệch. Thanh\n"
+"hiển thị vô lăng hiện tại so với vùng tô bóng."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Vị trí vô lăng"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1108,6 +1120,16 @@ msgstr "Dùng bố cục mặc định"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Hiện gán phím"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Hiện phím tắt"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Xuống số"
 
@@ -1190,17 +1212,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Chụp màn hình"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Giữ trái"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Tua lại"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Tua nhanh"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Giữ phải"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Thoát"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Tải nhanh"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Lưu nhanh"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Menu cài đặt"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Giữ trước"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Giữ Guide rồi nhấn nút kia; trò chơi không nhận các nút này. Thoát sẽ quay "
+"về danh sách trò chơi nếu có. Dịch vụ và Kiểm tra luôn hoạt động."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Cần analog trái cũng di chuyển; các nút vai cũng là Nút 3/4. Cần phải dành "
-"cho Virtual On. Kiểm tra và Dịch vụ là Guide+Start và Guide+Back."
+"Cần analog trái cũng di chuyển; nút vai cũng là Button 3/4. Cần phải dành "
+"cho Virtual On. Hiện phím tắt liệt kê các tổ hợp Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Vùng chết cần analog"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1209,11 +1290,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Khoảng di chuyển quanh tâm vẫn được tính là tâm. Thanh hiển thị\n"
+"cần analog hiện tại: thả cần ra và tăng giá trị này đến khi dấu\n"
+"nằm trong vùng tô bóng. Cũng áp dụng khi ngắm bằng cần."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Vị trí cần analog"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1650,6 +1734,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Giữ Backspace để tua lại quá trình chơi.\n"
+"Khi bật, mỗi khung hình chậm đi một chút."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Bộ nhớ tua lại"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Tải một trò chơi để lưu và khôi phục trạng thái."
 
@@ -1681,6 +1779,26 @@ msgstr "Lưu"
 #, no-c-format
 msgid "empty"
 msgstr "trống"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Không thể khởi động trò chơi"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Thiếu:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Sao chép danh sách"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1750,6 +1868,24 @@ msgstr "Đang tải mô tả..."
 #, no-c-format
 msgid "No description available."
 msgstr "Không có mô tả."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 là hình dạng màn hình máy arcade (mặc định).\n"
+#~ "Điểm ảnh vuông hiển thị nguyên 496x384 (hơi hẹp).\n"
+#~ "Kéo giãn lấp đầy toàn bộ cửa sổ. Áp dụng ngay."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Cần analog trái cũng di chuyển; các nút vai cũng là Nút 3/4. Cần phải "
+#~ "dành cho Virtual On. Kiểm tra và Dịch vụ là Guide+Start và Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

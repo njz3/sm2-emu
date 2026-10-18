@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -27,6 +27,11 @@ msgstr "빠른"
 #, c-format
 msgid "Slot %s"
 msgstr "슬롯 %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr ".zip 또는 .7z ROM 압축 파일을 끌어다 놓으면 플레이합니다."
 
 #: src/main.cpp
 #, c-format
@@ -236,6 +241,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (와이드스크린)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (아케이드)"
 
@@ -243,11 +253,6 @@ msgstr "4:3 (아케이드)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "정사각 픽셀"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (와이드스크린)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -264,11 +269,15 @@ msgstr "화면 비율"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"4:3은 아케이드 모니터의 비율입니다 (기본값).\n"
-"정사각 픽셀은 원본 496x384를 표시합니다 (약간 좁음).\n"
-"늘이기는 창 전체를 채웁니다. 즉시 적용됩니다."
+"4:3은 아케이드 모니터의 화면 모양입니다(기본값).\n"
+"정사각 픽셀은 원본 496x384를 표시합니다(약간 좁음).\n"
+"16:9(실험적)는 3D를 더 넓게 그리고 2D는 가운데에 둡니다.\n"
+"늘이기는 창 전체를 채웁니다.\n"
+"GPU 렌더러 전용. 즉시 적용됩니다."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -568,8 +577,8 @@ msgstr "세가 Model 2 아케이드 에뮬레이터"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3조항 라이선스. LICENSE를 참고하세요."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later 라이선스. LICENSE를 참고하세요."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -810,7 +819,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "중앙 데드존"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -819,11 +828,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"핸들이 중앙 근처에서 움직여도 중앙으로 읽는 범위입니다. 대부분의\n"
+"핸들은 필요 없으며, 중앙이 흔들리는 핸들에는 조금 주면 됩니다.\n"
+"막대는 음영 영역에 대한 현재 핸들 위치를 보여 줍니다."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "핸들 위치"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1112,6 +1124,16 @@ msgstr "기본 배치 사용"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "할당 보기"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "단축키 보기"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "기어 내림"
 
@@ -1194,17 +1216,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "스크린샷"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "왼쪽 누른 채"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "되감기"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "빨리 감기"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "오른쪽 누른 채"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "종료"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "빠른 불러오기"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "빠른 저장"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "설정 메뉴"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "먼저 누른 채"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Guide를 누른 채 다른 버튼을 누르세요. 게임에는 전달되지 않습니다. 게임이 있으"
+"면 종료는 게임 목록으로 돌아갑니다. 서비스와 테스트는 항상 작동합니다."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"왼쪽 스틱으로도 이동할 수 있고, 숄더 버튼은 버튼 3/4로도 작동합니다. 오른쪽 "
-"레버는 Virtual On용입니다. 테스트와 서비스는 Guide+Start와 Guide+Back입니다."
+"왼쪽 스틱으로도 움직이고, 숄더 버튼은 Button 3/4로도 동작합니다. 오른쪽 레버"
+"는 Virtual On용입니다. 단축키 보기에서 Guide 조합을 볼 수 있습니다."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "스틱 데드존"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1213,11 +1294,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"스틱이 중앙 근처에서 움직여도 중앙으로 읽는 범위입니다. 막대는\n"
+"현재 스틱을 보여 줍니다. 스틱을 놓고 표시가 음영 영역 안에\n"
+"들어올 때까지 값을 올리세요. 스틱 조준에도 적용됩니다."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "스틱 위치"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1654,6 +1738,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Backspace를 누르고 있으면 플레이를 되감습니다.\n"
+"켜져 있으면 매 프레임 속도가 조금 떨어집니다."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "되감기 메모리"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "게임을 불러오면 상태를 저장하고 복원할 수 있습니다."
 
@@ -1685,6 +1783,26 @@ msgstr "저장"
 #, no-c-format
 msgid "empty"
 msgstr "비어 있음"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "게임을 시작할 수 없음"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "누락:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "목록 복사"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "확인"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1754,6 +1872,25 @@ msgstr "설명을 가져오는 중..."
 #, no-c-format
 msgid "No description available."
 msgstr "설명이 없습니다."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3은 아케이드 모니터의 비율입니다 (기본값).\n"
+#~ "정사각 픽셀은 원본 496x384를 표시합니다 (약간 좁음).\n"
+#~ "늘이기는 창 전체를 채웁니다. 즉시 적용됩니다."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "왼쪽 스틱으로도 이동할 수 있고, 숄더 버튼은 버튼 3/4로도 작동합니다. 오른"
+#~ "쪽 레버는 Virtual On용입니다. 테스트와 서비스는 Guide+Start와 Guide+Back입"
+#~ "니다."
 
 #, no-c-format
 #~ msgid "Read in the background"

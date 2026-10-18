@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -25,6 +25,11 @@ msgstr "Rapid"
 #, c-format
 msgid "Slot %s"
 msgstr "Slot %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Plasați o arhivă ROM .zip sau .7z pentru a o juca."
 
 #: src/main.cpp
 #, c-format
@@ -234,6 +239,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (ecran lat)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arcade)"
 
@@ -241,11 +251,6 @@ msgstr "4:3 (arcade)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Pixeli pătrați"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (ecran lat)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -262,11 +267,15 @@ msgstr "Aspect"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 este forma monitorului arcade (implicit).\n"
 "Pixeli pătrați arată imaginea brută 496x384 (puțin îngustă).\n"
-"Întindere umple toată fereastra. Se aplică imediat."
+"16:9 (experimental) desenează 3D mai lat, cu 2D la mijloc.\n"
+"Întindere umple toată fereastra.\n"
+"Doar randări GPU. Se aplică imediat."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -566,8 +575,8 @@ msgstr "Un emulator arcade Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "Licență BSD 3-Clause. Vedeți LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "Licență GPL-3.0-or-later. Vedeți LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -809,7 +818,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Zonă moartă centrală"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -818,11 +827,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Cursa volanului în jurul centrului citită drept centru. Majoritatea\n"
+"volanelor nu au nevoie; puțin ajută dacă centrul variază. Bara\n"
+"arată volanul acum față de zona umbrită."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Poziția volanului"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1113,6 +1125,16 @@ msgstr "Folosește aranjamentul implicit"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Arată atribuirile"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Arată scurtăturile"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Treaptă jos"
 
@@ -1195,18 +1217,77 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Captură de ecran"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Stânga ținut"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Derulare înapoi"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Derulare rapidă"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Dreapta ținut"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Ieșire"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Încărcare rapidă"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Salvare rapidă"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Meniu setări"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Ține întâi"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Țineți Guide, apoi apăsați celălalt buton; jocul nu le vede. Ieșire revine "
+"la jocuri când există. Service și Test funcționează mereu."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Stick-ul stâng mișcă și el; butoanele de umăr acționează și ca Buton 3/4. "
-"Maneta dreapta este pentru Virtual On. Test și Service sunt Guide+Start și "
-"Guide+Back."
+"Stick-ul stâng mișcă și el; butoanele de umăr acționează și ca Button 3/4. "
+"Maneta dreapta este pentru Virtual On. Arată scurtăturile listează "
+"combinațiile Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Zonă moartă stick"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1215,11 +1296,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Cursa stick-ului în jurul centrului citită drept centru. Bara arată\n"
+"stick-ul acum: eliberați-l și măriți asta până când marcajul\n"
+"este în zona umbrită. Se aplică și la ochirea cu stick-ul."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Poziția stick-ului"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1658,6 +1742,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Țineți Backspace pentru a derula jocul înapoi.\n"
+"Costă puțină viteză la fiecare cadru cât e activ."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Memorie derulare înapoi"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Încărcați un joc pentru a-i salva și restaura starea."
 
@@ -1689,6 +1787,26 @@ msgstr "Salvează"
 #, no-c-format
 msgid "empty"
 msgstr "gol"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Jocul nu a putut porni"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Lipsesc:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Copiază lista"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1758,6 +1876,25 @@ msgstr "Se descarcă descrierea..."
 #, no-c-format
 msgid "No description available."
 msgstr "Nicio descriere disponibilă."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 este forma monitorului arcade (implicit).\n"
+#~ "Pixeli pătrați arată imaginea brută 496x384 (puțin îngustă).\n"
+#~ "Întindere umple toată fereastra. Se aplică imediat."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Stick-ul stâng mișcă și el; butoanele de umăr acționează și ca Buton 3/4. "
+#~ "Maneta dreapta este pentru Virtual On. Test și Service sunt Guide+Start "
+#~ "și Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

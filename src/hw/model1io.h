@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Sega Model 1 I/O board (837-8950-01 / 837-8936 / 837-10539).
 //

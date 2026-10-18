@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Ported from MAME's src/devices/cpu/mb86233/mb86233.cpp (BSD-3-Clause,
 // copyright-holders Olivier Galibert), which builds on Elsemi's original reverse

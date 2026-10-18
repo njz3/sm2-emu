@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -26,6 +26,11 @@ msgstr "Brzo"
 #, c-format
 msgid "Slot %s"
 msgstr "Utor %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Ispustite .zip ili .7z ROM arhivu da biste je igrali."
 
 #: src/main.cpp
 #, c-format
@@ -235,6 +240,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (široki zaslon)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arkadno)"
 
@@ -242,11 +252,6 @@ msgstr "4:3 (arkadno)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Kvadratni pikseli"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (široki zaslon)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -263,11 +268,15 @@ msgstr "Omjer"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 je oblik arkadnog monitora (zadano).\n"
 "Kvadratni pikseli prikazuju sirovih 496x384 (malo usko).\n"
-"Rastegni ispunjava cijeli prozor. Primjenjuje se odmah."
+"16:9 (eksperimentalno) crta 3D šire, a 2D u sredini.\n"
+"Rastegni ispunjava cijeli prozor.\n"
+"Samo GPU iscrtavači. Primjenjuje se odmah."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -567,8 +576,8 @@ msgstr "Emulator arkadnog sustava Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD licenca s 3 klauzule. Pogledajte LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "Licenca GPL-3.0-or-later. Pogledajte LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -810,7 +819,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Mrtva zona središta"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -819,11 +828,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Hod volana oko središta koji se čita kao središte. Većini\n"
+"volana ne treba; malo pomaže volanu čije središte luta. Traka\n"
+"prikazuje trenutni položaj volana naspram osjenčane zone."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Položaj volana"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1116,6 +1128,16 @@ msgstr "Koristi zadani raspored"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Prikaži dodjele"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Prikaži prečace"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Brzina dolje"
 
@@ -1198,17 +1220,77 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Snimka zaslona"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Lijevo držano"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Premotavanje"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Ubrzavanje"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Desno držano"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Izlaz"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Brzo učitavanje"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Brzo spremanje"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Izbornik postavki"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Prvo držite"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Držite Guide pa pritisnite drugu tipku; igra ih ne vidi. Izlaz vraća na igre "
+"kad ih ima. Servis i Test uvijek rade."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Lijeva palica također pomiče; ramene tipke djeluju i kao Tipka 3/4. Desna "
-"poluga je ona iz Virtual On. Test i Servis su Guide+Start i Guide+Back."
+"Lijeva palica također pomiče; tipke na ramenima služe i kao Button 3/4. "
+"Desna poluga pripada igri Virtual On. Prikaži prečace navodi kombinacije s "
+"Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Mrtva zona palice"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1217,11 +1299,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Hod palice oko središta koji se čita kao središte. Traka prikazuje\n"
+"trenutnu palicu: pustite je i povećavajte ovo dok oznaka ne bude\n"
+"unutar osjenčane zone. Vrijedi i za ciljanje palicom."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Položaj palice"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1657,6 +1742,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Držite Backspace za vraćanje unatrag kroz igru.\n"
+"Dok je uključeno, svaki okvir malo usporava."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Memorija premotavanja"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Učitajte igru za spremanje i vraćanje njezina stanja."
 
@@ -1688,6 +1787,26 @@ msgstr "Spremi"
 #, no-c-format
 msgid "empty"
 msgstr "prazno"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Igru nije moguće pokrenuti"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Nedostaje:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Kopiraj popis"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "U redu"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1757,6 +1876,24 @@ msgstr "Dohvaćanje opisa..."
 #, no-c-format
 msgid "No description available."
 msgstr "Opis nije dostupan."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 je oblik arkadnog monitora (zadano).\n"
+#~ "Kvadratni pikseli prikazuju sirovih 496x384 (malo usko).\n"
+#~ "Rastegni ispunjava cijeli prozor. Primjenjuje se odmah."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Lijeva palica također pomiče; ramene tipke djeluju i kao Tipka 3/4. Desna "
+#~ "poluga je ona iz Virtual On. Test i Servis su Guide+Start i Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

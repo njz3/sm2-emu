@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -24,6 +24,11 @@ msgstr "מהיר"
 #, c-format
 msgid "Slot %s"
 msgstr "חריץ %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "גררו לכאן ארכיון ROM מסוג .zip או .7z כדי לשחק בו."
 
 #: src/main.cpp
 #, c-format
@@ -233,6 +238,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (מסך רחב)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (ארקייד)"
 
@@ -240,11 +250,6 @@ msgstr "4:3 (ארקייד)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "פיקסלים ריבועיים"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (מסך רחב)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -261,11 +266,15 @@ msgstr "יחס תצוגה"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 הוא צורת מסך הארקייד (ברירת המחדל).\n"
 "פיקסלים ריבועיים מציג את 496x384 הגולמי (מעט צר).\n"
-"מתיחה ממלאת את כל החלון. חל מיידית."
+"16:9 (ניסיוני) מצייר את ה-3D רחב יותר, עם ה-2D באמצע.\n"
+"מתיחה ממלאת את כל החלון.\n"
+"מרנדרי GPU בלבד. מוחל מיד."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -565,8 +574,8 @@ msgstr "אמולטור ארקייד של Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "רישיון BSD בן 3 סעיפים. ראו LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "רישיון GPL-3.0-or-later. ראו LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -806,7 +815,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "אזור מת במרכז"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -815,11 +824,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"תנועת ההגה סביב המרכז שנקראת כמרכז. רוב ההגאים\n"
+"לא צריכים זאת; מעט עוזר להגה שהמרכז שלו נודד. הפס\n"
+"מציג את ההגה כעת ביחס לאזור המוצלל."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "מיקום ההגה"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1109,6 +1121,16 @@ msgstr "שימוש בפריסת ברירת המחדל"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "הצגת שיוכים"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "הצגת קיצורים"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "הורדת הילוך"
 
@@ -1191,17 +1213,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "צילום מסך"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "שמאלה לחוץ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "הרצה לאחור"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "הרצה קדימה"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "ימינה לחוץ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "יציאה"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "טעינה מהירה"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "שמירה מהירה"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "תפריט הגדרות"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "החזיקו קודם"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"החזיקו את Guide ואז לחצו על הכפתור השני; המשחק לא רואה אותם. יציאה חוזרת "
+"למשחקים כשיש כאלה. שירות ובדיקה פועלים תמיד."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"גם הסטיק השמאלי מזיז; כפתורי הכתף פועלים גם ככפתור 3/4. הידית הימנית היא של "
-"Virtual On. בדיקה ושירות הם Guide+Start ו-Guide+Back."
+"גם הסטיק השמאלי מזיז; כפתורי הכתף משמשים גם כ-Button 3/4. ידית ימנית שייכת "
+"ל-Virtual On. הצגת קיצורים מציגה את צירופי Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "אזור מת של הסטיק"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1210,11 +1291,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"תנועת הסטיק סביב המרכז שנקראת כמרכז. הפס מציג\n"
+"את הסטיק כעת: שחררו אותו והגדילו ערך זה עד שהסמן\n"
+"נמצא בתוך האזור המוצלל. חל גם על כיוון בעזרת הסטיק."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "מיקום הסטיק"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1649,6 +1733,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"החזיקו Backspace כדי לחזור אחורה במשחק.\n"
+"עולה מעט מהירות בכל פריים כשהאפשרות פעילה."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "זיכרון הרצה לאחור"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "טענו משחק כדי לשמור ולשחזר את מצבו."
 
@@ -1680,6 +1778,26 @@ msgstr "שמירה"
 #, no-c-format
 msgid "empty"
 msgstr "ריק"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "לא ניתן להפעיל את המשחק"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "חסרים:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "העתקת הרשימה"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "אישור"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1749,6 +1867,24 @@ msgstr "טוען תיאור..."
 #, no-c-format
 msgid "No description available."
 msgstr "אין תיאור זמין."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 הוא צורת מסך הארקייד (ברירת המחדל).\n"
+#~ "פיקסלים ריבועיים מציג את 496x384 הגולמי (מעט צר).\n"
+#~ "מתיחה ממלאת את כל החלון. חל מיידית."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "גם הסטיק השמאלי מזיז; כפתורי הכתף פועלים גם ככפתור 3/4. הידית הימנית היא "
+#~ "של Virtual On. בדיקה ושירות הם Guide+Start ו-Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

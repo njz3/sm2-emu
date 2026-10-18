@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -29,6 +29,11 @@ msgstr "Hurtig"
 #, c-format
 msgid "Slot %s"
 msgstr "Plass %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Slipp et .zip- eller .7z-ROM-arkiv her for å spille det."
 
 #: src/main.cpp
 #, c-format
@@ -238,6 +243,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (bredformat)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arkade)"
 
@@ -245,11 +255,6 @@ msgstr "4:3 (arkade)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Kvadratiske piksler"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (bredformat)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -266,11 +271,15 @@ msgstr "Sideforhold"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"4:3 er arkademonitorens form (standard).\n"
+"4:3 er formen på arkademonitoren (standard).\n"
 "Kvadratiske piksler viser rå 496x384 (litt smalt).\n"
-"Strekk fyller hele vinduet. Gjelder umiddelbart."
+"16:9 (eksperimentelt) tegner 3D bredere, med 2D i midten.\n"
+"Strekk fyller hele vinduet.\n"
+"Kun GPU-renderere. Gjelder umiddelbart."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -570,8 +579,8 @@ msgstr "En Sega Model 2-arkademulator"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3-Clause-lisens. Se LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later-lisens. Se LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -812,7 +821,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Dødsone i midten"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -821,11 +830,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Rattbevegelse rundt midten som leses som midten. De fleste ratt\n"
+"trenger ingen; litt hjelper et ratt med vandrende midtpunkt. Linjen\n"
+"viser rattet nå mot den skyggelagte sonen."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Rattposisjon"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1117,6 +1129,16 @@ msgstr "Bruk standardoppsett"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Vis tilordninger"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Vis snarveier"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Gir ned"
 
@@ -1199,17 +1221,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Skjermbilde"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Venstre holdt"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Spol tilbake"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Spol fremover"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Høyre holdt"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Avslutt"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Hurtiglast"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Hurtiglagre"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Innstillingsmeny"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Hold først"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Hold Guide, og trykk så den andre knappen; spillet ser dem ikke. Avslutt går "
+"tilbake til spillene når det finnes noen. Service og Test virker alltid."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Venstre stikke beveger også; skulderknappene fungerer også som Knapp 3/4. "
-"Høyre spak er for Virtual On. Test og Service er Guide+Start og Guide+Back."
+"Venstre spak beveger også; skulderknappene virker også som Button 3/4. Høyre "
+"spak er for Virtual On. Vis snarveier lister Guide-kombinasjonene."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Dødsone for spak"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1218,11 +1299,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Spakbevegelse rundt midten som leses som midten. Linjen viser\n"
+"spaken nå: slipp den og øk dette til markøren\n"
+"er inne i den skyggelagte sonen. Gjelder også sikting med spak."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Spakposisjon"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1659,6 +1743,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Hold Backspace for å spole tilbake i spillet.\n"
+"Koster litt fart i hvert bilde mens det er på."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Tilbakespolingsminne"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Last inn et spill for å lagre og gjenopprette tilstanden."
 
@@ -1690,6 +1788,26 @@ msgstr "Lagre"
 #, no-c-format
 msgid "empty"
 msgstr "tom"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Kunne ikke starte spillet"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Mangler:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Kopier liste"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1759,6 +1877,25 @@ msgstr "Henter beskrivelse..."
 #, no-c-format
 msgid "No description available."
 msgstr "Ingen beskrivelse tilgjengelig."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 er arkademonitorens form (standard).\n"
+#~ "Kvadratiske piksler viser rå 496x384 (litt smalt).\n"
+#~ "Strekk fyller hele vinduet. Gjelder umiddelbart."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Venstre stikke beveger også; skulderknappene fungerer også som Knapp 3/4. "
+#~ "Høyre spak er for Virtual On. Test og Service er Guide+Start og "
+#~ "Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

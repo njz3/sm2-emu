@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -27,6 +27,11 @@ msgstr "快速"
 #, c-format
 msgid "Slot %s"
 msgstr "槽位 %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "拖放 .zip 或 .7z ROM 压缩包即可游玩。"
 
 #: src/main.cpp
 #, c-format
@@ -236,6 +241,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9（宽屏）"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3（街机）"
 
@@ -243,11 +253,6 @@ msgstr "4:3（街机）"
 #, no-c-format
 msgid "Square pixels"
 msgstr "方形像素"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9（宽屏）"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -264,11 +269,15 @@ msgstr "宽高比"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 是街机显示器的比例（默认）。\n"
-"方形像素显示原始的 496x384（略窄）。\n"
-"拉伸会填满整个窗口。即时生效。"
+"方形像素显示原始 496x384（略窄）。\n"
+"16:9（实验性）将 3D 画得更宽，2D 居中。\n"
+"拉伸会填满整个窗口。\n"
+"仅限 GPU 渲染器。即时生效。"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -568,8 +577,8 @@ msgstr "世嘉 Model 2 街机模拟器"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3-Clause 许可证。请参阅 LICENSE。"
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later 许可证。请参阅 LICENSE。"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -809,7 +818,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "中心死区"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -818,11 +827,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"方向盘在中心附近仍视为中心的行程。多数方向盘\n"
+"不需要；中心漂移的方向盘可设一点。指示条\n"
+"显示方向盘当前位置与阴影区的对比。"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "方向盘位置"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1111,6 +1123,16 @@ msgstr "使用默认布局"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "显示按键绑定"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "显示快捷键"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "降挡"
 
@@ -1193,17 +1215,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "截图"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "按住左"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "倒带"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "快进"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "按住右"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "退出"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "快速读取"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "快速保存"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "设置菜单"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "先按住"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"按住 Guide，再按另一个按键；游戏不会收到这些按键。有游戏列表时，退出会返回列"
+"表。服务和测试始终可用。"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"左摇杆同样可以移动；肩键同样可作为按键 3/4。右操纵杆用于 Virtual On。测试和服"
-"务分别为 Guide+Start 和 Guide+Back。"
+"左摇杆同样可移动；肩键也可作为 Button 3/4。右操纵杆用于 Virtual On。显示快捷"
+"键会列出 Guide 组合键。"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "摇杆死区"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1212,11 +1293,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"摇杆在中心附近仍视为中心的行程。指示条显示\n"
+"摇杆当前位置：松开摇杆并调高此值，直到标记\n"
+"落在阴影区内。也适用于摇杆瞄准。"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "摇杆位置"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1648,6 +1732,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"按住 Backspace 可回退游戏进程。\n"
+"开启时每帧都会略微降低速度。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "倒带内存"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "加载游戏后即可保存和恢复其状态。"
 
@@ -1677,6 +1775,26 @@ msgstr "保存"
 #, no-c-format
 msgid "empty"
 msgstr "空"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "无法启动游戏"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "缺少："
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "复制列表"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "确定"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1746,6 +1864,24 @@ msgstr "正在获取简介..."
 #, no-c-format
 msgid "No description available."
 msgstr "暂无简介。"
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 是街机显示器的比例（默认）。\n"
+#~ "方形像素显示原始的 496x384（略窄）。\n"
+#~ "拉伸会填满整个窗口。即时生效。"
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "左摇杆同样可以移动；肩键同样可作为按键 3/4。右操纵杆用于 Virtual On。测试"
+#~ "和服务分别为 Guide+Start 和 Guide+Back。"
 
 #, no-c-format
 #~ msgid "Read in the background"

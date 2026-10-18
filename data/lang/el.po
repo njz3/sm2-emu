@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -28,6 +28,11 @@ msgstr "Γρήγορη"
 #, c-format
 msgid "Slot %s"
 msgstr "Θέση %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Αφήστε εδώ ένα αρχείο ROM .zip ή .7z για να παίξετε."
 
 #: src/main.cpp
 #, c-format
@@ -237,6 +242,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (ευρεία οθόνη)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arcade)"
 
@@ -244,11 +254,6 @@ msgstr "4:3 (arcade)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Τετράγωνα pixel"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (ευρεία οθόνη)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -265,11 +270,15 @@ msgstr "Αναλογία"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"Το 4:3 είναι το σχήμα της οθόνης arcade (προεπιλογή).\n"
-"Τα τετράγωνα pixel δείχνουν τα αυτούσια 496x384 (στενότερα).\n"
-"Το τέντωμα γεμίζει όλο το παράθυρο. Ισχύει αμέσως."
+"4:3 είναι το σχήμα της οθόνης arcade (προεπιλογή).\n"
+"Τετράγωνα pixel δείχνει τα σκέτα 496x384 (λίγο στενό).\n"
+"16:9 (πειραματικό) σχεδιάζει το 3D πλατύτερα, με το 2D στη μέση.\n"
+"Τέντωμα γεμίζει όλο το παράθυρο.\n"
+"Μόνο για απεικόνιση GPU. Ισχύει αμέσως."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -569,8 +578,8 @@ msgstr "Εξομοιωτής arcade Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "Άδεια BSD 3-Clause. Δείτε το LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "Άδεια GPL-3.0-or-later. Δείτε το LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -813,7 +822,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Νεκρή ζώνη κέντρου"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -822,11 +831,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Διαδρομή τιμονιού γύρω από το κέντρο που μετρά ως κέντρο. Τα\n"
+"περισσότερα δεν θέλουν· λίγη βοηθά αν το κέντρο μετακινείται. Η μπάρα\n"
+"δείχνει το τιμόνι τώρα σε σχέση με τη σκιασμένη ζώνη."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Θέση τιμονιού"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1120,6 +1132,16 @@ msgstr "Χρήση προεπιλεγμένης διάταξης"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Εμφάνιση αντιστοιχίσεων"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Εμφάνιση συντομεύσεων"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Ταχύτητα κάτω"
 
@@ -1202,18 +1224,77 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Στιγμιότυπο"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Αριστερά πατημένο"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Επαναφορά πίσω"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Γρήγορα εμπρός"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Δεξιά πατημένο"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Έξοδος"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Γρήγορη φόρτωση"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Γρήγορη αποθήκευση"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Μενού ρυθμίσεων"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Κρατήστε πρώτα"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Κρατήστε το Guide και πατήστε το άλλο κουμπί· το παιχνίδι δεν τα βλέπει. Η "
+"Έξοδος γυρνά στα παιχνίδια, όταν υπάρχουν. Σέρβις και Δοκιμή δουλεύουν πάντα."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Ο αριστερός μοχλίσκος κινεί επίσης· τα κουμπιά ώμων λειτουργούν και ως "
-"Κουμπί 3/4. Ο δεξής μοχλός είναι για το Virtual On. Δοκιμή και Σέρβις είναι "
-"Guide+Start και Guide+Back."
+"Ο αριστερός μοχλίσκος κινεί επίσης· τα κουμπιά ώμου δρουν και ως Button 3/4. "
+"Ο Δεξής μοχλός είναι του Virtual On. Η Εμφάνιση συντομεύσεων δείχνει τους "
+"συνδυασμούς με Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Νεκρή ζώνη μοχλίσκου"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1222,11 +1303,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Διαδρομή μοχλίσκου γύρω από το κέντρο που μετρά ως κέντρο. Η μπάρα\n"
+"δείχνει τον μοχλίσκο τώρα: αφήστε τον και αυξήστε αυτό ώσπου ο δείκτης\n"
+"να μπει στη σκιασμένη ζώνη. Ισχύει και για σκόπευση με μοχλίσκο."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Θέση μοχλίσκου"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1664,6 +1748,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Κρατήστε το Backspace για να γυρίσετε πίσω στο παιχνίδι.\n"
+"Κοστίζει λίγη ταχύτητα σε κάθε καρέ όσο είναι ενεργό."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Μνήμη επαναφοράς"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr ""
 "Φορτώστε ένα παιχνίδι για να αποθηκεύσετε και να επαναφέρετε την κατάστασή "
@@ -1697,6 +1795,26 @@ msgstr "Αποθήκευση"
 #, no-c-format
 msgid "empty"
 msgstr "κενή"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Δεν ήταν δυνατή η εκκίνηση"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Λείπουν:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Αντιγραφή λίστας"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1767,6 +1885,25 @@ msgstr "Λήψη περιγραφής..."
 #, no-c-format
 msgid "No description available."
 msgstr "Δεν υπάρχει διαθέσιμη περιγραφή."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "Το 4:3 είναι το σχήμα της οθόνης arcade (προεπιλογή).\n"
+#~ "Τα τετράγωνα pixel δείχνουν τα αυτούσια 496x384 (στενότερα).\n"
+#~ "Το τέντωμα γεμίζει όλο το παράθυρο. Ισχύει αμέσως."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Ο αριστερός μοχλίσκος κινεί επίσης· τα κουμπιά ώμων λειτουργούν και ως "
+#~ "Κουμπί 3/4. Ο δεξής μοχλός είναι για το Virtual On. Δοκιμή και Σέρβις "
+#~ "είναι Guide+Start και Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

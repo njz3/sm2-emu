@@ -216,7 +216,7 @@ jobs:
         run: |
           brew install cmake ninja pkg-config ccache \
             shaderc sdl3 pugixml curl \
-            vulkan-headers vulkan-loader molten-vk
+            vulkan-headers vulkan-loader molten-vk dylibbundler
 
       - name: Cache ccache
         uses: hendrikmuhs/ccache-action@v1.2
@@ -236,7 +236,20 @@ jobs:
         run: cmake --build build
 
       - name: Install app bundle
-        run: cmake --install build --prefix install
+        run: |
+          cmake --install build --prefix install
+          cmake/macos-bundle.sh install/sm2-emu.app
+
+      - name: Check the bundle is self-contained
+        run: |
+          otool -L install/sm2-emu.app/Contents/MacOS/sm2-emu
+          if otool -L install/sm2-emu.app/Contents/MacOS/sm2-emu install/sm2-emu.app/Contents/Frameworks/*.dylib \
+               | grep -E '/opt/homebrew|/usr/local/(opt|Cellar|lib)'; then
+            echo "the app still links against Homebrew" >&2
+            exit 1
+          fi
+          VK_LOADER_DEBUG=driver install/sm2-emu.app/Contents/MacOS/sm2-emu --list-gpus \
+            || echo "no usable GPU on the runner"
 
       - name: Build dmg
         run: |

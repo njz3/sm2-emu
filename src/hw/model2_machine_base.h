@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 //
 // The board-agnostic call surface every Model 2 machine variant presents to
@@ -55,8 +55,10 @@
 // once a frame, and touches none of the ported cores.
 #pragma once
 
+#include "core/log.h"
 #include "core/types.h"
 #include "hw/geometrizer.h"
+#include "hw/save_state_io.h"
 #include "rom/game.h"
 #include "rom/rom_set.h"
 
@@ -66,6 +68,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <vector>
 
 namespace sm2::hw {
 
@@ -248,20 +251,36 @@ public:
     virtual void load_nvram()                                      = 0;
     virtual void save_nvram() const                                = 0;
 
-    /// Snapshot the whole machine to `path` / restore it. Both must be called
-    /// only between frames (see run_frame). Default: unsupported, so a board
-    /// that has not implemented save-states yet returns false rather than
-    /// failing to compile. Return false on any error, leaving a running machine
-    /// untouched on a failed load.
-    [[nodiscard]] virtual bool save_state(const std::string& path) const
+    /// Snapshot the whole machine into `out` / restore it from `data`. Both
+    /// must be called only between frames (see run_frame). Default:
+    /// unsupported, so a board that has not implemented save-states yet returns
+    /// false rather than failing to compile. Return false on any error, leaving
+    /// a running machine untouched on a failed load.
+    [[nodiscard]] virtual bool save_state_data(std::vector<u8>& out) const
     {
-        (void)path;
+        (void)out;
         return false;
     }
-    [[nodiscard]] virtual bool load_state(const std::string& path)
+    [[nodiscard]] virtual bool load_state_data(std::span<const u8> data)
     {
-        (void)path;
+        (void)data;
         return false;
+    }
+
+    /// The same through a state file at `path`.
+    [[nodiscard]] bool save_state(const std::string& path) const
+    {
+        std::vector<u8> data;
+        return save_state_data(data) && write_state_file(path, data);
+    }
+    [[nodiscard]] bool load_state(const std::string& path)
+    {
+        std::vector<u8> data;
+        if (!read_state_file(path, data) || !load_state_data(data)) {
+            return false;
+        }
+        SM2_INFO("save-state: loaded '%s'", path.c_str());
+        return true;
     }
 
     // -- main CPU status, for the boot-test report ------------------------

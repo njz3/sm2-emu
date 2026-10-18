@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -27,6 +27,11 @@ msgstr "Greitoji"
 #, c-format
 msgid "Slot %s"
 msgstr "Lizdas %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Nutempkite .zip arba .7z ROM archyvą, kad jį žaistumėte."
 
 #: src/main.cpp
 #, c-format
@@ -236,6 +241,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (platusis ekranas)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arkadinis)"
 
@@ -243,11 +253,6 @@ msgstr "4:3 (arkadinis)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Kvadratiniai taškai"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (platusis ekranas)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -264,11 +269,15 @@ msgstr "Proporcijos"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"4:3 yra arkadinio monitoriaus forma (numatyta).\n"
+"4:3 – arkadinio monitoriaus forma (numatytoji).\n"
 "Kvadratiniai taškai rodo neapdorotą 496x384 (šiek tiek siaura).\n"
-"„Ištempti“ užpildo visą langą. Įsigalioja iškart."
+"16:9 (eksperimentinis) piešia 3D plačiau, 2D lieka viduryje.\n"
+"Ištempti užpildo visą langą.\n"
+"Tik GPU atvaizdavimui. Taikoma iškart."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -568,8 +577,8 @@ msgstr "Sega Model 2 arkadinių automatų emuliatorius"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3-Clause licencija. Žr. LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later licencija. Žr. LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -812,7 +821,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Centro negyvoji zona"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -821,11 +830,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Vairo eiga apie centrą, kuri laikoma centru. Daugumai vairų\n"
+"jos nereikia; šiek tiek padeda, jei centras klaidžioja. Juosta\n"
+"rodo dabartinę vairo padėtį šešėliuotos zonos atžvilgiu."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Vairo padėtis"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1119,6 +1131,16 @@ msgstr "Naudoti numatytąjį išdėstymą"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Rodyti priskyrimus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Rodyti trumpinius"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Pavara žemyn"
 
@@ -1201,18 +1223,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Ekrano nuotrauka"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Kairė nuspausta"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Atsukimas"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Prasukimas"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Dešinė nuspausta"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Išeiti"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Greitasis įkėlimas"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Greitasis išsaugojimas"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Nustatymų meniu"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Pirma laikykite"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Laikykite Guide, tada paspauskite kitą mygtuką; žaidimas jų nemato. Išeiti "
+"grąžina į žaidimus, kai jų yra. Aptarnavimas ir Testas veikia visada."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Kairė lazdelė taip pat judina; peties mygtukai taip pat veikia kaip Mygtukas "
-"3/4. Dešinė svirtis skirta Virtual On. Testas ir Aptarnavimas yra "
-"Guide+Start ir Guide+Back."
+"Kairė lazdelė taip pat judina; peties mygtukai veikia ir kaip Button 3/4. "
+"Dešinė svirtis skirta Virtual On. Rodyti trumpinius išvardija Guide derinius."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Lazdelės negyvoji zona"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1221,11 +1301,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Lazdelės eiga apie centrą, kuri laikoma centru. Juosta rodo\n"
+"dabartinę lazdelę: paleiskite ją ir didinkite šią vertę, kol žymeklis\n"
+"atsidurs šešėliuotoje zonoje. Taip pat taikoma taikant lazdele."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Lazdelės padėtis"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1663,6 +1746,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Laikykite Backspace, kad atsuktumėte žaidimą atgal.\n"
+"Įjungus kiekvienas kadras šiek tiek sulėtėja."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Atsukimo atmintis"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Įkelkite žaidimą, kad galėtumėte išsaugoti ir atkurti jo būseną."
 
@@ -1694,6 +1791,26 @@ msgstr "Išsaugoti"
 #, no-c-format
 msgid "empty"
 msgstr "tuščia"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Nepavyko paleisti žaidimo"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Trūksta:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Kopijuoti sąrašą"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "Gerai"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1764,6 +1881,25 @@ msgstr "Gaunamas aprašymas..."
 #, no-c-format
 msgid "No description available."
 msgstr "Aprašymo nėra."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 yra arkadinio monitoriaus forma (numatyta).\n"
+#~ "Kvadratiniai taškai rodo neapdorotą 496x384 (šiek tiek siaura).\n"
+#~ "„Ištempti“ užpildo visą langą. Įsigalioja iškart."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Kairė lazdelė taip pat judina; peties mygtukai taip pat veikia kaip "
+#~ "Mygtukas 3/4. Dešinė svirtis skirta Virtual On. Testas ir Aptarnavimas "
+#~ "yra Guide+Start ir Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

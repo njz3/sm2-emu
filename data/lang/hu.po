@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -24,6 +24,11 @@ msgstr "Gyors"
 #, c-format
 msgid "Slot %s"
 msgstr "%s. hely"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Húzzon ide egy .zip vagy .7z ROM-archívumot a játékhoz."
 
 #: src/main.cpp
 #, c-format
@@ -233,6 +238,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (szélesvásznú)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (játékgép)"
 
@@ -240,11 +250,6 @@ msgstr "4:3 (játékgép)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Négyzetes pixelek"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (szélesvásznú)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -261,11 +266,15 @@ msgstr "Képarány"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"A 4:3 a játékgép monitorának alakja (alapértelmezett).\n"
-"A négyzetes pixelek a nyers 496x384-et mutatják (kissé keskeny).\n"
-"A nyújtás kitölti az egész ablakot. Azonnal érvényes."
+"A 4:3 a játékgép monitorának formája (alapértelmezett).\n"
+"A Négyzetes pixelek a nyers 496x384-et mutatja (kissé keskeny).\n"
+"A 16:9 (kísérleti) szélesebben rajzolja a 3D-t, a 2D középen.\n"
+"A Nyújtás kitölti az egész ablakot.\n"
+"Csak GPU-megjelenítők. Azonnal érvényes."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -565,8 +574,8 @@ msgstr "Sega Model 2 játékgép-emulátor"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3-Clause licenc. Lásd: LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later licenc. Lásd: LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -809,7 +818,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Középső holtzóna"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -818,11 +827,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"A kormány középállás körüli mozgása, amely középnek számít. A legtöbb\n"
+"kormánynak nem kell; egy kevés segít, ha a közép vándorol. A sáv\n"
+"a kormány jelenlegi állását mutatja az árnyékolt zónához képest."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Kormány helyzete"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1118,6 +1130,16 @@ msgstr "Alapértelmezett kiosztás használata"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Hozzárendelések mutatása"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Gyorsgombok mutatása"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Leváltás"
 
@@ -1200,18 +1222,77 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Képernyőkép"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Balra nyomva"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Visszatekerés"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Előretekerés"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Jobbra nyomva"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Kilépés"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Gyorsbetöltés"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Gyorsmentés"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Beállítások menü"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Először tartsa"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Tartsa lenyomva a Guide gombot, majd nyomja meg a másikat; a játék nem "
+"érzékeli őket. A Kilépés a játékokhoz tér vissza, ha vannak. A Szerviz és a "
+"Teszt mindig működik."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"A bal analóg kar is mozgat; a vállgombok 3./4. gombként is működnek. A jobb "
-"oldali kar a Virtual On-hoz való. A Teszt és a Szerviz: Guide+Start és "
-"Guide+Back."
+"A bal kar is mozgat; a vállgombok Button 3/4-ként is működnek. A Jobb oldali "
+"kar a Virtual On-é. A Gyorsgombok mutatása listázza a Guide-kombinációkat."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Kar holtzónája"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1220,11 +1301,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"A kar középállás körüli mozgása, amely középnek számít. A sáv a kart\n"
+"mutatja: engedje el, és növelje ezt, amíg a jelölő az árnyékolt\n"
+"zónán belülre nem kerül. A karral való célzásra is vonatkozik."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Kar helyzete"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1663,6 +1747,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Tartsa lenyomva a Backspace-t a játék visszatekeréséhez.\n"
+"Bekapcsolva minden képkockán kissé lassít."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Visszatekerés memóriája"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Töltsön be egy játékot az állapot mentéséhez és visszaállításához."
 
@@ -1694,6 +1792,26 @@ msgstr "Mentés"
 #, no-c-format
 msgid "empty"
 msgstr "üres"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Nem sikerült elindítani a játékot"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Hiányzik:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Lista másolása"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1763,6 +1881,25 @@ msgstr "Leírás letöltése..."
 #, no-c-format
 msgid "No description available."
 msgstr "Nincs elérhető leírás."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "A 4:3 a játékgép monitorának alakja (alapértelmezett).\n"
+#~ "A négyzetes pixelek a nyers 496x384-et mutatják (kissé keskeny).\n"
+#~ "A nyújtás kitölti az egész ablakot. Azonnal érvényes."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "A bal analóg kar is mozgat; a vállgombok 3./4. gombként is működnek. A "
+#~ "jobb oldali kar a Virtual On-hoz való. A Teszt és a Szerviz: Guide+Start "
+#~ "és Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -29,6 +29,11 @@ msgstr "ด่วน"
 #, c-format
 msgid "Slot %s"
 msgstr "ช่อง %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "ลากไฟล์ ROM แบบ .zip หรือ .7z มาวางเพื่อเล่น"
 
 #: src/main.cpp
 #, c-format
@@ -238,6 +243,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (จอกว้าง)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (อาร์เคด)"
 
@@ -245,11 +255,6 @@ msgstr "4:3 (อาร์เคด)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "พิกเซลจัตุรัส"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (จอกว้าง)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -266,11 +271,15 @@ msgstr "อัตราส่วน"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 คือรูปทรงจออาร์เคด (ค่าเริ่มต้น)\n"
-"พิกเซลจัตุรัสแสดงภาพดิบ 496x384 (แคบลงเล็กน้อย)\n"
-"ยืดเต็มจะเติมทั้งหน้าต่าง มีผลทันที"
+"พิกเซลจัตุรัสแสดง 496x384 ดิบ (แคบเล็กน้อย)\n"
+"16:9 (ทดลอง) วาด 3D ให้กว้างขึ้น โดย 2D อยู่ตรงกลาง\n"
+"ยืดเต็มจะเติมเต็มทั้งหน้าต่าง\n"
+"เฉพาะตัวเรนเดอร์ GPU มีผลทันที"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -570,8 +579,8 @@ msgstr "อีมูเลเตอร์อาร์เคด Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "สัญญาอนุญาต BSD 3-Clause ดู LICENSE"
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "สัญญาอนุญาต GPL-3.0-or-later ดู LICENSE"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -811,7 +820,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "เดดโซนกึ่งกลาง"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -820,11 +829,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"ระยะหมุนพวงมาลัยรอบกึ่งกลางที่นับเป็นกึ่งกลาง พวงมาลัยส่วนใหญ่\n"
+"ไม่ต้องใช้ ใส่เล็กน้อยช่วยพวงมาลัยที่กึ่งกลางคลาดเคลื่อน แถบ\n"
+"แสดงพวงมาลัยตอนนี้เทียบกับโซนที่แรเงา"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "ตำแหน่งพวงมาลัย"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1113,6 +1125,16 @@ msgstr "ใช้เลย์เอาต์ค่าเริ่มต้น"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "แสดงการกำหนดปุ่ม"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "แสดงทางลัด"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "ลดเกียร์"
 
@@ -1195,17 +1217,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "ภาพหน้าจอ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "กดซ้ายค้าง"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "ย้อนกลับ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "เร่งความเร็ว"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "กดขวาค้าง"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "ออก"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "โหลดด่วน"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "บันทึกด่วน"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "เมนูการตั้งค่า"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "กดค้างก่อน"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"กด Guide ค้างไว้ แล้วกดปุ่มอื่น เกมจะไม่เห็นปุ่มเหล่านั้น ออก จะกลับไปที่รายการเกมเมื่อมีเกม "
+"เซอร์วิสและทดสอบใช้ได้เสมอ"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"สติกซ้ายใช้เคลื่อนที่ได้ด้วย ปุ่มไหล่ทำหน้าที่เป็นปุ่ม 3/4 ด้วย คันโยกขวาใช้สำหรับ Virtual On "
-"ทดสอบและเซอร์วิสคือ Guide+Start และ Guide+Back"
+"สติกซ้ายก็ขยับได้ ปุ่มไหล่ทำหน้าที่เป็น Button 3/4 ด้วย คันโยกขวาเป็นของ Virtual On "
+"แสดงทางลัด จะแสดงรายการชุดปุ่ม Guide"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "เดดโซนสติก"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1214,11 +1295,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"ระยะสติกรอบกึ่งกลางที่นับเป็นกึ่งกลาง แถบแสดง\n"
+"สติกตอนนี้: ปล่อยสติกแล้วเพิ่มค่านี้จนเครื่องหมาย\n"
+"อยู่ในโซนที่แรเงา มีผลกับการเล็งด้วยสติกด้วย"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "ตำแหน่งสติก"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1650,6 +1734,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"กด Backspace ค้างเพื่อย้อนการเล่นกลับ\n"
+"เมื่อเปิดใช้ จะช้าลงเล็กน้อยทุกเฟรม"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "หน่วยความจำย้อนกลับ"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "โหลดเกมเพื่อบันทึกและกู้คืนสถานะ"
 
@@ -1679,6 +1777,26 @@ msgstr "บันทึก"
 #, no-c-format
 msgid "empty"
 msgstr "ว่าง"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "ไม่สามารถเริ่มเกมได้"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "ขาดหาย:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "คัดลอกรายการ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "ตกลง"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1747,6 +1865,24 @@ msgstr "กำลังดึงคำอธิบาย..."
 #, no-c-format
 msgid "No description available."
 msgstr "ไม่มีคำอธิบาย"
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 คือรูปทรงจออาร์เคด (ค่าเริ่มต้น)\n"
+#~ "พิกเซลจัตุรัสแสดงภาพดิบ 496x384 (แคบลงเล็กน้อย)\n"
+#~ "ยืดเต็มจะเติมทั้งหน้าต่าง มีผลทันที"
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "สติกซ้ายใช้เคลื่อนที่ได้ด้วย ปุ่มไหล่ทำหน้าที่เป็นปุ่ม 3/4 ด้วย คันโยกขวาใช้สำหรับ Virtual On "
+#~ "ทดสอบและเซอร์วิสคือ Guide+Start และ Guide+Back"
 
 #, no-c-format
 #~ msgid "Read in the background"

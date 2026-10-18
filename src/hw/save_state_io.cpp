@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 #include "hw/save_state_io.h"
 
@@ -75,17 +75,17 @@ void set_host_state(SerializeFn serialize)
     pending_host_section().clear();
 }
 
-bool save_state_to_file(const std::string& path, const std::string& game, u32 board,
-                        bool in_frame, const SerializeFn& serialize)
+bool save_state_to_buffer(std::vector<u8>& out, const std::string& game, u32 board,
+                          bool in_frame, const SerializeFn& serialize)
 {
     if (in_frame) {
         SM2_ERROR("save_state called mid-frame; only allowed between frames");
         return false;
     }
 
-    std::vector<u8> buffer;
-    Archive         ar(buffer);
-    state::Header   header;
+    out.clear();
+    Archive       ar(out);
+    state::Header header;
     header.game  = game;
     header.board = board;
     state::write_header(ar, header);
@@ -100,66 +100,24 @@ bool save_state_to_file(const std::string& path, const std::string& game, u32 bo
         ar.raw(tag);
         ar.vector_pod(section);
     }
-
-    // Create the parent directory (e.g. the states dir) on first use, the way
-    // the screenshot path does; fopen("wb") will not make it.
-    const std::filesystem::path parent = std::filesystem::path(path).parent_path();
-    if (!parent.empty()) {
-        std::error_code ec;
-        std::filesystem::create_directories(parent, ec);
-    }
-
-    std::FILE* handle = std::fopen(path.c_str(), "wb");
-    if (handle == nullptr) {
-        SM2_ERROR("save-state: could not open '%s' for writing", path.c_str());
-        return false;
-    }
-    const usize written = std::fwrite(buffer.data(), 1, buffer.size(), handle);
-    std::fclose(handle);
-    if (written != buffer.size()) {
-        SM2_ERROR("save-state: short write to '%s'", path.c_str());
-        return false;
-    }
-    SM2_INFO("save-state: wrote %zu bytes to '%s'", buffer.size(), path.c_str());
     return true;
 }
 
-bool load_state_from_file(const std::string& path, const std::string& game, u32 board,
-                          bool in_frame, const SerializeFn& serialize)
+bool load_state_from_buffer(std::span<const u8> data, const std::string& game, u32 board,
+                            bool in_frame, const SerializeFn& serialize)
 {
     if (in_frame) {
         SM2_ERROR("load_state called mid-frame; only allowed between frames");
         return false;
     }
 
-    std::FILE* handle = std::fopen(path.c_str(), "rb");
-    if (handle == nullptr) {
-        SM2_ERROR("save-state: could not open '%s' for reading", path.c_str());
-        return false;
-    }
-    std::fseek(handle, 0, SEEK_END);
-    const long size = std::ftell(handle);
-    std::fseek(handle, 0, SEEK_SET);
-    if (size <= 0) {
-        std::fclose(handle);
-        SM2_ERROR("save-state: '%s' is empty or unreadable", path.c_str());
-        return false;
-    }
-    std::vector<u8> buffer(static_cast<usize>(size));
-    const usize     read = std::fread(buffer.data(), 1, buffer.size(), handle);
-    std::fclose(handle);
-    if (read != buffer.size()) {
-        SM2_ERROR("save-state: short read from '%s'", path.c_str());
-        return false;
-    }
-
     state::Header parsed;
     usize         payload_offset = 0;
-    if (!state::read_header(buffer.data(), buffer.size(), parsed, payload_offset)) {
+    if (!state::read_header(data.data(), data.size(), parsed, payload_offset)) {
         return false;  // read_header logged the reason
     }
     if (parsed.game != game) {
-        SM2_ERROR("save-state: file is for '%s', running '%s' — refused",
+        SM2_ERROR("save-state: state is for '%s', running '%s' — refused",
                   parsed.game.c_str(), game.c_str());
         return false;
     }
@@ -179,20 +137,19 @@ bool load_state_from_file(const std::string& path, const std::string& game, u32 
         serialize(save_ar);
     }
 
-    Archive load_ar(buffer.data() + payload_offset, buffer.size() - payload_offset);
+    Archive load_ar(data.data() + payload_offset, data.size() - payload_offset);
     load_ar.set_format_version(parsed.version);
     serialize(load_ar);
     if (load_ar.failed()) {
-        SM2_ERROR("save-state: '%s' is truncated, corrupt or unusable here — rolling back",
-                  path.c_str());
+        SM2_ERROR("save-state: state is truncated, corrupt or unusable here — rolling back");
         Archive restore_ar(rollback.data(), rollback.size());
         serialize(restore_ar);
         return false;
     }
 
-    // The host's section, when the file has one.
+    // The host's section, when the state has one.
     pending_host_section().clear();
-    const usize payload_size = buffer.size() - payload_offset;
+    const usize payload_size = data.size() - payload_offset;
     if (payload_size - load_ar.position() >= sizeof(u32)) {
         u32 tag = 0;
         load_ar.raw(tag);
@@ -201,16 +158,63 @@ bool load_state_from_file(const std::string& path, const std::string& game, u32 
             load_ar.vector_pod(section);
         }
         if (tag != kHostTag || load_ar.failed()) {
-            SM2_WARN("save-state: '%s' ends with bytes that are no host section, ignored",
-                     path.c_str());
+            SM2_WARN("save-state: state ends with bytes that are no host section, ignored");
         } else if (host_state()) {
             apply_host_section(section);
         } else {
             pending_host_section() = std::move(section);
         }
     }
+    return true;
+}
 
-    SM2_INFO("save-state: loaded '%s'", path.c_str());
+bool write_state_file(const std::string& path, std::span<const u8> data)
+{
+    // Create the parent directory (e.g. the states dir) on first use, the way
+    // the screenshot path does; fopen("wb") will not make it.
+    const std::filesystem::path parent = std::filesystem::path(path).parent_path();
+    if (!parent.empty()) {
+        std::error_code ec;
+        std::filesystem::create_directories(parent, ec);
+    }
+
+    std::FILE* handle = std::fopen(path.c_str(), "wb");
+    if (handle == nullptr) {
+        SM2_ERROR("save-state: could not open '%s' for writing", path.c_str());
+        return false;
+    }
+    const usize written = std::fwrite(data.data(), 1, data.size(), handle);
+    std::fclose(handle);
+    if (written != data.size()) {
+        SM2_ERROR("save-state: short write to '%s'", path.c_str());
+        return false;
+    }
+    SM2_INFO("save-state: wrote %zu bytes to '%s'", data.size(), path.c_str());
+    return true;
+}
+
+bool read_state_file(const std::string& path, std::vector<u8>& out)
+{
+    std::FILE* handle = std::fopen(path.c_str(), "rb");
+    if (handle == nullptr) {
+        SM2_ERROR("save-state: could not open '%s' for reading", path.c_str());
+        return false;
+    }
+    std::fseek(handle, 0, SEEK_END);
+    const long size = std::ftell(handle);
+    std::fseek(handle, 0, SEEK_SET);
+    if (size <= 0) {
+        std::fclose(handle);
+        SM2_ERROR("save-state: '%s' is empty or unreadable", path.c_str());
+        return false;
+    }
+    out.resize(static_cast<usize>(size));
+    const usize read = std::fread(out.data(), 1, out.size(), handle);
+    std::fclose(handle);
+    if (read != out.size()) {
+        SM2_ERROR("save-state: short read from '%s'", path.c_str());
+        return false;
+    }
     return true;
 }
 

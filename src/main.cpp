@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 //
 // Loads a ROM set, runs the machine, and presents its output. Settings come from
@@ -34,6 +34,7 @@
 #include "hw/model2_debug.h"
 #include "hw/model2_softrender.h"
 #include "hw/model2_softrender_async.h"
+#include "hw/rewind.h"
 #include "hw/save_state_io.h"
 #include "hw/scsp_core.h"
 #include "osd/audio.h"
@@ -60,6 +61,7 @@
 #include <imgui_impl_sdl3.h>
 
 #include <algorithm>
+#include <cctype>
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -795,16 +797,19 @@ struct LoadedMachine {
 
 /// Load, build, wire, point at NVRAM and reset a machine. The one path both a
 /// --game/positional launch and the picker use, so a picked game boots exactly
-/// like a directly-launched one. nullopt (logged) on failure.
+/// like a directly-launched one. nullopt (logged, and in `error` when given)
+/// on failure.
 [[nodiscard]] std::optional<LoadedMachine> load_game(sm2::rom::GameDatabase& database,
                                                      const std::string& rom_path,
                                                      const std::string& game_name,
                                                      const std::string& nvram_dir,
                                                      bool               log_unmapped,
-                                                     sm2::hw::ScspCoreKind scsp_core)
+                                                     sm2::hw::ScspCoreKind scsp_core,
+                                                     sm2::rom::LoadError* error = nullptr)
 {
     using namespace sm2;
-    std::optional<rom::LoadResult> result = rom::RomLoader::load(database, rom_path, game_name);
+    std::optional<rom::LoadResult> result =
+        rom::RomLoader::load(database, rom_path, game_name, error);
     if (!result.has_value()) {
         return std::nullopt;
     }
@@ -813,6 +818,10 @@ struct LoadedMachine {
     out.game          = result->game;
     out.machine_iface = hw::create_machine(result->game, std::move(result->roms));
     if (!out.machine_iface) {
+        if (error != nullptr) {
+            error->game    = result->game.name;
+            error->message = "The emulated machine could not be built; the log has the details.";
+        }
         return std::nullopt;
     }
 
@@ -1025,6 +1034,8 @@ int main(int argc, char** argv)
     options.config.software_async      = from_file.software_async;
     options.config.software_slow_cores = from_file.software_slow_cores;
     options.config.show_notifications  = from_file.show_notifications;
+    options.config.rewind              = from_file.rewind;
+    options.config.rewind_buffer_mb    = from_file.rewind_buffer_mb;
     options.config.language            = from_file.language;
     options.config.wheel_ffb           = from_file.wheel_ffb;
     options.config.wheel_ffb_strength  = from_file.wheel_ffb_strength;
@@ -1055,6 +1066,7 @@ int main(int argc, char** argv)
     options.config.pad_rumble_cornering = from_file.pad_rumble_cornering;
     options.config.pad_stick_sensitivity = from_file.pad_stick_sensitivity;
     options.config.pad_stick_deadzone    = from_file.pad_stick_deadzone;
+    options.config.pad_shortcuts         = from_file.pad_shortcuts;
     options.config.pad                   = from_file.pad;
     options.config.pad_layouts           = from_file.pad_layouts;
     options.config.wheel_steer_deadzone  = from_file.wheel_steer_deadzone;
@@ -2316,6 +2328,12 @@ int main(int argc, char** argv)
             gpu_stage_samples;
         bool gpu_timing_unavailable_warned = false;
 
+        // One snapshot every other frame, so a held rewind runs at twice real time.
+        constexpr u32 kRewindInterval = 2;
+        hw::Rewind                   rewind;
+        const hw::Model2MachineBase* rewind_machine = nullptr;
+        bool                         rewind_held    = false;  ///< Backspace is down.
+
         u32  frames_presented = 0;   ///< Since the loop started.
         u32  frames_written_off = 0; ///< Whole frames given up after a stall.
         bool paused             = false;
@@ -2325,6 +2343,7 @@ int main(int argc, char** argv)
         bool quit_key_pressed   = false;  ///< F9 went down during this run.
         bool screenshot_requested = false;  ///< Set by F12, serviced next frame.
         bool return_to_picker_requested = false;  ///< Set by Esc; unload + picker.
+        std::string dropped_path;  ///< A file dropped on the window, launched next frame.
 
         // A pending save-state action (F6/F7 or an overlay button), serviced
         // between frames next to the screenshot. `slot` is the slot name
@@ -2409,6 +2428,34 @@ int main(int argc, char** argv)
         std::unique_ptr<render::TextureReplacements> replacements;
         std::string                                  replacements_game;
 
+        // Make `next` the running game, from the picker or a dropped file.
+        const auto adopt_game = [&](LoadedMachine&& next) {
+            async_soft.forget_machine();
+            backend->wait_idle();
+            loaded        = std::move(next);
+            machine_iface = loaded->machine_iface.get();
+            telemetry_decoder = telemetry::make_telemetry(loaded->game);
+            machine       = loaded->machine;
+            machine_2b    = loaded->machine_2b;
+            machine_2c    = loaded->machine_2c;
+            machine_orig  = loaded->machine_orig;
+            main_cpu      = loaded->main_cpu;
+            sound_board   = loaded->sound_board;
+            sound_link    = loaded->sound_link;
+
+            if (sound_board != nullptr) {
+                static_cast<void>(audio.init(sound_board->sample_rate()));
+            }
+            configure_cabinet_link(*machine_iface, options.config);
+            if (gui.picker_active()) {
+                scraper.stop();
+                gui.release_picker_textures();
+                gui.hide_picker();
+            }
+            window.set_title(build_title());
+            pacer.resync();
+        };
+
         while (running) {
             const u64 frame_start_ns = SDL_GetTicksNS();
 
@@ -2432,7 +2479,9 @@ int main(int argc, char** argv)
                         running = false;
                         break;
                     case SDL_EVENT_KEY_DOWN:
-                        if (event.key.key == SDLK_ESCAPE) {
+                        if (event.key.key == SDLK_ESCAPE && gui.load_error_open()) {
+                            // The dialog takes this Esc.
+                        } else if (event.key.key == SDLK_ESCAPE) {
                             // Esc returns to the game picker (unloading the
                             // current game) when there is a picker to return to;
                             // otherwise -- a single ROM launched by path with no
@@ -2473,12 +2522,21 @@ int main(int argc, char** argv)
                                 options.config.show_fps = !options.config.show_fps;
                             } else if (event.key.key == SDLK_TAB && !event.key.repeat) {
                                 fast_forward = true;
+                            } else if (event.key.key == SDLK_BACKSPACE) {
+                                rewind_held = true;
                             }
+                        }
+                        break;
+                    case SDL_EVENT_DROP_FILE:
+                        if (event.drop.data != nullptr) {
+                            dropped_path = event.drop.data;
                         }
                         break;
                     case SDL_EVENT_KEY_UP:
                         if (event.key.key == SDLK_TAB) {
                             fast_forward = false;
+                        } else if (event.key.key == SDLK_BACKSPACE) {
+                            rewind_held = false;
                         } else if (event.key.key == SDLK_F9 && quit_key_pressed) {
                             running = false;
                         }
@@ -2494,9 +2552,33 @@ int main(int argc, char** argv)
                 break;
             }
 
+            // The pad's Guide shortcuts, read before poll() so their buttons stay
+            // out of the game.
+            const osd::Input::PadShortcuts pad_shortcuts =
+                input.update_pad_shortcuts(options.config.pad_shortcuts);
+            if (pad_shortcuts.exit) {
+                // As Esc: back to the games when there are some, else quit.
+                if (will_show_picker && machine_iface != nullptr) {
+                    return_to_picker_requested = true;
+                } else {
+                    running = false;
+                }
+            }
+            if (pad_shortcuts.screenshot) {
+                screenshot_requested = true;
+            }
+            if (!gui.visible() && machine_iface != nullptr) {
+                if (pad_shortcuts.save) {
+                    state_action = StateAction{StateOp::Save, hw::kQuickSlot};
+                } else if (pad_shortcuts.load) {
+                    state_action = StateAction{StateOp::Load, hw::kQuickSlot};
+                }
+            }
+
             // Fast-forward is a held key rather than a toggle, so letting go always
             // returns to real time.
-            pacer.set_throttled(options.config.throttle && !fast_forward);
+            pacer.set_throttled(options.config.throttle && !fast_forward
+                                && !pad_shortcuts.fast_forward);
 
             // Audio clock pull: nudge the frame rate toward the audio device's
             // true rate so the queue does not drift. Too full -> slower, too
@@ -2522,7 +2604,7 @@ int main(int argc, char** argv)
             // The wheel's Menu-bound button toggles the overlay, same as F1.
             // Polled every frame (not only while running) so it can also close
             // the overlay once it has paused the game.
-            if (input.menu_button_pressed()) {
+            if (input.menu_button_pressed() || pad_shortcuts.menu) {
                 gui.toggle();
             }
 
@@ -2590,7 +2672,25 @@ int main(int argc, char** argv)
                 }
             }
 
+            rewind.configure(options.config.rewind
+                                 ? static_cast<usize>(options.config.rewind_buffer_mb) << 20
+                                 : 0,
+                             kRewindInterval);
+            if (machine_iface != rewind_machine) {
+                rewind.clear();
+                rewind_machine = machine_iface;
+            }
+            if (gui.visible()) {
+                rewind_held = false;
+            }
+
+            bool rewinding = false;
             if (machine_iface && !effective_pause) {
+                // Step back a snapshot, then run a frame from it so there is a
+                // picture; its sound is dropped.
+                rewinding = (rewind_held || pad_shortcuts.rewind)
+                         && rewind.step_back(*machine_iface);
+
                 // Inputs are levels, sampled whenever the program polls the I/O
                 // controller during the frame, so they have to be set before the
                 // frame runs rather than after.
@@ -2696,6 +2796,9 @@ int main(int argc, char** argv)
                     auto scope = core::maybe_scope(stage_run_frame, profile_sample);
                     machine_iface->run_frame();
                 }
+                if (!rewinding) {
+                    rewind.capture(*machine_iface);
+                }
                 if (loaded->game.lightgun.present) {
                     machine_iface->video().filter_gun_flash(options.config.lightgun_hide_flash,
                                                             machine_iface->inputs().in1);
@@ -2729,7 +2832,9 @@ int main(int argc, char** argv)
                 // Handed over every frame rather than buffered here, so the only
                 // buffering is SDL's. Null on the original Model 2, whose sound
                 // board is not emulated.
-                if (sound_board != nullptr) {
+                if (sound_board != nullptr && rewinding) {
+                    sound_board->clear_pending_samples();
+                } else if (sound_board != nullptr) {
                     const std::span<const s16> produced = sound_board->pending_samples();
                     const u32 volume = options.config.volume_for(game_family(loaded->game));
                     if (volume == Config::kDefaultGameVolume) {
@@ -3119,35 +3224,61 @@ int main(int argc, char** argv)
                 backend->wait_idle();
 
                 std::optional<LoadedMachine> chosen;
+                rom::LoadError               load_error;
                 if (const std::optional<std::filesystem::path> archive =
                         find_set_archive(database, options.config.rom_dir, *pick)) {
                     chosen = load_game(database, archive->string(), *pick,
                                        options.config.nvram_dir, options.log_unmapped,
-                                       scsp_core_of(options.config));
+                                       scsp_core_of(options.config), &load_error);
+                } else {
+                    load_error.message = "Its archive is no longer in the ROM folder.";
                 }
                 if (!chosen.has_value()) {
                     SM2_ERROR("picker: could not load '%s' from rom_dir", pick->c_str());
+                    show_picker();
+                    const rom::GameSpec* spec = database.find(*pick);
+                    gui.show_load_error(spec != nullptr ? spec->title : *pick,
+                                        std::move(load_error.message),
+                                        std::move(load_error.missing));
                 } else {
-                    loaded        = std::move(chosen);
-                    machine_iface = loaded->machine_iface.get();
-                    telemetry_decoder = telemetry::make_telemetry(loaded->game);
-                    machine       = loaded->machine;
-                    machine_2b    = loaded->machine_2b;
-                    machine_2c    = loaded->machine_2c;
-                    machine_orig  = loaded->machine_orig;
-                    main_cpu      = loaded->main_cpu;
-                    sound_board   = loaded->sound_board;
-                    sound_link    = loaded->sound_link;
-
-                    if (sound_board != nullptr) {
-                        static_cast<void>(audio.init(sound_board->sample_rate()));
-                    }
-                    configure_cabinet_link(*machine_iface, options.config);
-                    gui.hide_picker();
-                    window.set_title(build_title());
+                    adopt_game(std::move(*chosen));
                     SM2_INFO("picker: launched '%s'", loaded->game.name.c_str());
                 }
                 pacer.resync();
+                continue;
+            }
+
+            // A ROM archive dropped on the window. The running game keeps going
+            // if the new one does not load.
+            if (!dropped_path.empty()) {
+                const std::filesystem::path path(dropped_path);
+                dropped_path.clear();
+                std::string extension = path.extension().string();
+                std::transform(extension.begin(), extension.end(), extension.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                if (extension != ".zip" && extension != ".7z") {
+                    gui.show_load_error(path.filename().string(),
+                                        i18n::tr("Drop a .zip or .7z ROM archive to play it."), {});
+                    continue;
+                }
+                if (machine_iface != nullptr) {
+                    machine_iface->save_nvram();
+                }
+                rom::LoadError               load_error;
+                std::optional<LoadedMachine> dropped =
+                    load_game(database, path.string(), {}, options.config.nvram_dir,
+                              options.log_unmapped, scsp_core_of(options.config), &load_error);
+                if (!dropped.has_value()) {
+                    const rom::GameSpec* spec =
+                        load_error.game.empty() ? nullptr : database.find(load_error.game);
+                    gui.show_load_error(spec != nullptr ? spec->title : path.filename().string(),
+                                        std::move(load_error.message),
+                                        std::move(load_error.missing));
+                    continue;
+                }
+                input.release_force_feedback();
+                adopt_game(std::move(*dropped));
+                SM2_INFO("launched '%s' from a dropped file", loaded->game.name.c_str());
                 continue;
             }
 

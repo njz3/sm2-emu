@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Ported from MAME's src/mame/sega/segaic24.cpp (BSD-3-Clause, copyright-holders
 // Olivier Galibert), together with the parts of src/emu/tilemap.cpp that decide

@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 #pragma once
 
@@ -191,6 +191,27 @@ public:
     /// main loop to toggle the overlay. Edge-triggered, so a held button fires
     /// once. Returns false when no wheel is connected or Menu is unbound.
     [[nodiscard]] bool menu_button_pressed();
+
+    /// Emulator shortcuts on a pad's Guide button, laid out as Batocera's
+    /// hotkeys: Guide+A menu, Guide+X / Guide+Y quick save / load, Guide+Start
+    /// exit (back to the games when there are some), Guide+LB screenshot, and
+    /// Guide+d-pad left / right held for rewind / fast-forward. The presses are
+    /// one-shot, the holds last while held.
+    struct PadShortcuts {
+        bool menu         = false;
+        bool save         = false;
+        bool load         = false;
+        bool exit         = false;
+        bool screenshot   = false;
+        bool fast_forward = false;
+        bool rewind       = false;
+    };
+
+    /// Read the shortcuts; call once a frame, before poll(). A pad taking part
+    /// in one is hidden from the game until its buttons are let go, so the
+    /// presses do not also reach the machine. With `enabled` false nothing is
+    /// read or hidden, for a host that maps the hotkeys itself.
+    [[nodiscard]] PadShortcuts update_pad_shortcuts(bool enabled);
 
     /// Number of axes on the connected wheel, or 0 if none.
     [[nodiscard]] int wheel_axis_count() const;
@@ -398,7 +419,16 @@ private:
         u16            rumble_low  = 0;
         u16            rumble_high = 0;
         int            rumble_age  = 0;
+        /// Shortcut controls down last frame, and those claimed by a shortcut.
+        u8             shortcut_down    = 0;
+        u8             shortcut_claimed = 0;
     };
+
+    /// Whether the game sees this pad: not while it is in a shortcut.
+    [[nodiscard]] static bool plays(const Pad& pad)
+    {
+        return pad.handle != nullptr && pad.shortcut_claimed == 0;
+    }
 
     /// A steering wheel, opened through the joystick API because a wheel has no
     /// gamepad mapping and its steering axis wants the full 16 bits a gamepad
@@ -481,6 +511,11 @@ private:
     /// Whether the pad's `physical` button is held, read through the user's
     /// bindings: a button that is a role's default reads that role's binding.
     [[nodiscard]] bool pad_button_held(const Pad& pad, SDL_GamepadButton physical) const;
+
+    /// Guide + L3 / R3 press Service / Test into `port0`. True while Guide is
+    /// held, when Start and Back are left alone so a host's own Guide+Start
+    /// does not also reach the game.
+    [[nodiscard]] static bool operator_chord(const Pad& pad, u8* port0);
     /// Whether the button bound to `role` is held on `player`'s pad.
     [[nodiscard]] bool pad_role_held(u32 player, Config::PadRole role) const;
 

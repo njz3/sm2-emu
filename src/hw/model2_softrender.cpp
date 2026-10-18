@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Derived from MAME's src/mame/sega/model2rd.ipp, src/mame/sega/model2_v.cpp and
 // src/devices/video/poly.h (BSD-3-Clause, copyright-holders R. Belmont, Olivier

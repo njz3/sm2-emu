@@ -6,11 +6,11 @@
 #
 # A Sega Model 2 arcade emulator.
 # Copyright (c) 2025+ Daniel Martin (dmanlfc)
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: GPL-3.0-or-later
 #
-# This header must not be removed. The source files in this project may not be
-# used to contribute to commercial projects or for monetary gain without the
-# express written permission of the author.
+# This header must not be removed. sm2-emu is licensed under the GNU General
+# Public License, version 3 or later, with additional terms under section 7 of
+# that licence. See LICENSE and NOTICE.
 #
 
 # ---------------------------------------------------------------------------
@@ -250,6 +250,7 @@ add_library(sm2_hw STATIC
     hw/model2_softrender_async.cpp
     hw/model2_video.cpp
     hw/msm6253.cpp
+    hw/rewind.cpp
     hw/save_state_io.cpp
     hw/sega_315_5338a.cpp
     hw/sega_315_5838_comp.cpp

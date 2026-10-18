@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -29,6 +29,11 @@ msgstr "Швидкий"
 #, c-format
 msgid "Slot %s"
 msgstr "Слот %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Перетягніть архів ROM .zip або .7z, щоб грати."
 
 #: src/main.cpp
 #, c-format
@@ -238,6 +243,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (широкий екран)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (аркада)"
 
@@ -245,11 +255,6 @@ msgstr "4:3 (аркада)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Квадратні пікселі"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (широкий екран)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -266,11 +271,15 @@ msgstr "Пропорції"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 — форма аркадного монітора (типово).\n"
-"Квадратні пікселі — вихідні 496x384 (трохи вужче).\n"
-"Розтягнути — на все вікно. Застосовується одразу."
+"Квадратні пікселі показують сирі 496x384 (трохи вузько).\n"
+"16:9 (експериментально) малює 3D ширше, 2D посередині.\n"
+"Розтягнути заповнює все вікно.\n"
+"Лише GPU-рендерери. Застосовується одразу."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -570,8 +579,8 @@ msgstr "Емулятор аркадної плати Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "Ліцензія BSD 3-Clause. Див. LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "Ліцензія GPL-3.0-or-later. Див. LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -812,7 +821,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Мертва зона центру"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -821,11 +830,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Хід керма біля центру, що вважається центром. Більшості керм\n"
+"це не потрібно; трохи допоможе, якщо центр зміщується. Смуга\n"
+"показує поточне кермо відносно затіненої зони."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Положення керма"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1116,6 +1128,16 @@ msgstr "Використати типову розкладку"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Показати призначення"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Показати комбінації"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Передача вниз"
 
@@ -1198,17 +1220,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Знімок екрана"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Ліво утримано"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Перемотка назад"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Прискорення"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Право утримано"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Вихід"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Швидке завантаження"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Швидке збереження"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Меню налаштувань"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Спершу утримуйте"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Утримуйте Guide, потім натисніть іншу кнопку; гра їх не бачить. Вихід "
+"повертає до списку ігор, якщо вони є. Сервіс і Тест працюють завжди."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Лівий стік теж рухає; шифти теж працюють як кнопки 3/4. Правий важіль — для "
-"Virtual On. Тест і Сервіс — Guide+Start і Guide+Back."
+"Лівий стік теж рухає; плечові кнопки діють також як Button 3/4. Правий "
+"важіль — для Virtual On. «Показати комбінації» виводить комбінації з Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Мертва зона стіка"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1217,11 +1298,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Хід стіка біля центру, що вважається центром. Смуга показує\n"
+"стік зараз: відпустіть його й збільшуйте це, доки позначка\n"
+"не опиниться в затіненій зоні. Діє й на прицілювання стіком."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Положення стіка"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1658,6 +1742,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Утримуйте Backspace, щоб перемотати гру назад.\n"
+"Коли ввімкнено, трохи сповільнює кожен кадр."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Пам'ять перемотки"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Завантажте гру, щоб зберігати й відновлювати її стан."
 
@@ -1689,6 +1787,26 @@ msgstr "Зберегти"
 #, no-c-format
 msgid "empty"
 msgstr "порожньо"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Не вдалося запустити гру"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Бракує:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Копіювати список"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1758,6 +1876,24 @@ msgstr "Завантаження опису..."
 #, no-c-format
 msgid "No description available."
 msgstr "Опис недоступний."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 — форма аркадного монітора (типово).\n"
+#~ "Квадратні пікселі — вихідні 496x384 (трохи вужче).\n"
+#~ "Розтягнути — на все вікно. Застосовується одразу."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Лівий стік теж рухає; шифти теж працюють як кнопки 3/4. Правий важіль — "
+#~ "для Virtual On. Тест і Сервіс — Guide+Start і Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

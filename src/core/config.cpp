@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 #include "core/config.h"
 
@@ -513,6 +513,14 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_bool(value, &out->show_notifications)) {
                 bad_value();
             }
+        } else if (key == "rewind") {
+            if (!parse_bool(value, &out->rewind)) {
+                bad_value();
+            }
+        } else if (key == "rewind_buffer_mb") {
+            if (!parse_u32(value, &out->rewind_buffer_mb)) {
+                bad_value();
+            }
         } else if (key == "lightgun") {
             if (!parse_bool(value, &out->lightgun)) {
                 bad_value();
@@ -750,6 +758,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             }
         } else if (key == "pad_stick_sensitivity") {
             if (!parse_u32(value, &out->pad_stick_sensitivity)) {
+                bad_value();
+            }
+        } else if (key == "pad_shortcuts") {
+            if (!parse_bool(value, &out->pad_shortcuts)) {
                 bad_value();
             }
         } else if (key == "pad_stick_deadzone") {
@@ -1009,6 +1021,10 @@ bool save_config(const std::string& path, const Config& config)
         << "# With software_async on a big.LITTLE CPU, draw on the slow cores.\n"
         << "software_slow_cores = " << bool_text(config.software_slow_cores) << "\n"
         << "show_notifications = " << bool_text(config.show_notifications) << "\n"
+        << "# Keep recent states so holding Backspace steps back through play,\n"
+        << "# using up to rewind_buffer_mb MiB of memory.\n"
+        << "rewind = " << bool_text(config.rewind) << "\n"
+        << "rewind_buffer_mb = " << config.rewind_buffer_mb << "\n"
         << "# Overlay language: auto (follow the system), en, or a file name from\n"
         << "# lang/ without .po (de, pt_BR, zh_TW, ...).\n"
         << "language = " << config.language << "\n"
@@ -1144,6 +1160,9 @@ bool save_config(const std::string& path, const Config& config)
         << "# Stick travel about centre that reads as centre, percent (0..40).\n"
         << "# Raise it for a stick that no longer settles at rest.\n"
         << "pad_stick_deadzone = " << config.pad_stick_deadzone << "\n"
+        << "# Guide button shortcuts on a gamepad (menu, save, load, rewind...).\n"
+        << "# Off for a front end that maps its own hotkeys.\n"
+        << "pad_shortcuts = " << bool_text(config.pad_shortcuts) << "\n"
         << "# Cabinet lamps and drive-board bytes for MAMEHooker, DOFLinx and\n"
         << "# similar tools, in MAME's formats: over TCP (network) and, on\n"
         << "# Windows, as window messages. With the network outputs on, a starting\n"

@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 #pragma once
 
@@ -97,6 +97,12 @@ struct Config {
     /// Show brief on-screen notifications (e.g. "State saved"), top-centered,
     /// while gameplay continues. On by default.
     bool show_notifications = true;
+
+    /// Keep recent states so Backspace can step back through play.
+    bool rewind = false;
+
+    /// Memory the rewind history may use, in MiB.
+    u32 rewind_buffer_mb = 128;
 
     /// Overlay language: a catalog name from lang/ ("de", "pt_BR"), "en", or
     /// "auto" to follow the system's preferred languages.
@@ -316,6 +322,10 @@ struct Config {
     /// Stick travel about centre that reads as centre, in percent of full
     /// deflection. Raise it for a stick that no longer settles at rest.
     u32 pad_stick_deadzone = 5;
+
+    /// The Guide button shortcuts (menu, save, load, rewind...). Off for a host
+    /// that maps the hotkeys itself, such as Batocera.
+    bool pad_shortcuts = true;
 
     /// The cabinet controls a gamepad button can be bound to. Test and Service
     /// stay on the Guide chord, so they are not here. Keep kCount last.

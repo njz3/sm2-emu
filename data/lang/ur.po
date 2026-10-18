@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -24,6 +24,11 @@ msgstr "فوری"
 #, c-format
 msgid "Slot %s"
 msgstr "سلاٹ %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "کھیلنے کے لیے .zip یا .7z ROM آرکائیو یہاں چھوڑیں۔"
 
 #: src/main.cpp
 #, c-format
@@ -233,6 +238,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (وائڈ اسکرین)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (آرکیڈ)"
 
@@ -240,11 +250,6 @@ msgstr "4:3 (آرکیڈ)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "مربع پکسل"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (وائڈ اسکرین)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -261,11 +266,15 @@ msgstr "تناسب"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 آرکیڈ مانیٹر کی شکل ہے (طے شدہ)۔\n"
-"مربع پکسل خام 496x384 دکھاتا ہے (کچھ تنگ)۔\n"
-"کھینچیں پوری ونڈو بھر دیتا ہے۔ فوراً لاگو ہوتا ہے۔"
+"مربع پکسل خام 496x384 دکھاتا ہے (تھوڑا تنگ)۔\n"
+"16:9 (تجرباتی) 3D کو چوڑا بناتا ہے، 2D درمیان میں۔\n"
+"کھینچیں پوری ونڈو بھر دیتا ہے۔\n"
+"صرف GPU رینڈرر۔ فوراً لاگو ہوتا ہے۔"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -565,8 +574,8 @@ msgstr "ایک Sega Model 2 آرکیڈ ایمولیٹر"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3-Clause لائسنس۔ LICENSE دیکھیں۔"
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later لائسنس۔ LICENSE دیکھیں۔"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -806,7 +815,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "مرکزی ڈیڈ زون"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -815,11 +824,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"مرکز کے آس پاس وہیل کی حرکت جو مرکز ہی پڑھی جائے۔ زیادہ تر وہیل کو\n"
+"اس کی ضرورت نہیں؛ تھوڑا سا اُس وہیل کے لیے جس کا مرکز سرکتا ہو۔ بار\n"
+"وہیل کی موجودہ حالت سایہ دار حصے کے مقابل دکھاتی ہے۔"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "وہیل کی پوزیشن"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1111,6 +1123,16 @@ msgstr "طے شدہ لے آؤٹ استعمال کریں"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "بائنڈنگز دکھائیں"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "شارٹ کٹس دکھائیں"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "گیئر نیچے"
 
@@ -1193,17 +1215,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "اسکرین شاٹ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "بایاں دبا ہوا"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "ریوائنڈ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "تیز آگے"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "دایاں دبا ہوا"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "باہر نکلیں"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "فوری لوڈ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "فوری محفوظ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "ترتیبات مینو"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "پہلے دبائے رکھیں"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Guide دبائے رکھیں، پھر دوسرا بٹن دبائیں؛ گیم انہیں نہیں دیکھتی۔ باہر نکلیں "
+"گیمز کی فہرست پر لے جاتا ہے جب گیمز ہوں۔ سروس اور ٹیسٹ ہمیشہ کام کرتے ہیں۔"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"بائیں اسٹک بھی حرکت دیتی ہے؛ شولڈر بٹن بٹن 3/4 کا کام بھی کرتے ہیں۔ دایاں "
-"لیور Virtual On کے لیے ہے۔ ٹیسٹ اور سروس Guide+Start اور Guide+Back ہیں۔"
+"بائیں اسٹک بھی حرکت دیتی ہے؛ کندھے کے بٹن Button 3/4 کا کام بھی کرتے ہیں۔ "
+"دایاں لیور Virtual On کا ہے۔ شارٹ کٹس دکھائیں Guide کے مجموعے دکھاتا ہے۔"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "اسٹک ڈیڈ زون"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1212,11 +1293,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"مرکز کے آس پاس اسٹک کی حرکت جو مرکز ہی پڑھی جائے۔ بار اسٹک کی\n"
+"موجودہ حالت دکھاتی ہے: اسے چھوڑ دیں اور اسے بڑھائیں جب تک نشان\n"
+"سایہ دار حصے میں نہ آ جائے۔ اسٹک سے نشانہ لینے پر بھی لاگو۔"
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "اسٹک کی پوزیشن"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1653,6 +1737,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"کھیل میں پیچھے جانے کے لیے Backspace دبائے رکھیں۔\n"
+"آن ہونے پر ہر فریم پر رفتار تھوڑی کم ہوتی ہے۔"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "ریوائنڈ میموری"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "حالت محفوظ اور بحال کرنے کے لیے کوئی گیم لوڈ کریں۔"
 
@@ -1684,6 +1782,26 @@ msgstr "محفوظ"
 #, no-c-format
 msgid "empty"
 msgstr "خالی"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "گیم شروع نہیں ہو سکی"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "غائب:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "فہرست کاپی کریں"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "ٹھیک ہے"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1753,6 +1871,24 @@ msgstr "تفصیل حاصل کی جا رہی ہے..."
 #, no-c-format
 msgid "No description available."
 msgstr "کوئی تفصیل دستیاب نہیں۔"
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 آرکیڈ مانیٹر کی شکل ہے (طے شدہ)۔\n"
+#~ "مربع پکسل خام 496x384 دکھاتا ہے (کچھ تنگ)۔\n"
+#~ "کھینچیں پوری ونڈو بھر دیتا ہے۔ فوراً لاگو ہوتا ہے۔"
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "بائیں اسٹک بھی حرکت دیتی ہے؛ شولڈر بٹن بٹن 3/4 کا کام بھی کرتے ہیں۔ دایاں "
+#~ "لیور Virtual On کے لیے ہے۔ ٹیسٹ اور سروس Guide+Start اور Guide+Back ہیں۔"
 
 #, no-c-format
 #~ msgid "Read in the background"

@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 //
 // Sega Model 2C-CRX.
@@ -1736,20 +1736,20 @@ void Model2C::serialize(Archive& ar)
     ar.raw(m_inputs);
 }
 
-bool Model2C::save_state(const std::string& path) const
+bool Model2C::save_state_data(std::vector<u8>& out) const
 {
     // serialize is non-const (Save refreshes each 68000's context blob first),
     // so a const save walks a non-const view — sound, because a save reads state
     // rather than changing emulation behaviour.
     auto* self = const_cast<Model2C*>(this);
-    return save_state_to_file(path, m_game.name, static_cast<u32>(m_game.board),
-                              m_in_frame, [self](Archive& ar) { self->serialize(ar); });
+    return save_state_to_buffer(out, m_game.name, static_cast<u32>(m_game.board),
+                                m_in_frame, [self](Archive& ar) { self->serialize(ar); });
 }
 
-bool Model2C::load_state(const std::string& path)
+bool Model2C::load_state_data(std::span<const u8> data)
 {
-    if (!load_state_from_file(path, m_game.name, static_cast<u32>(m_game.board),
-                              m_in_frame, [this](Archive& ar) { serialize(ar); })) {
+    if (!load_state_from_buffer(data, m_game.name, static_cast<u32>(m_game.board),
+                                m_in_frame, [this](Archive& ar) { serialize(ar); })) {
         return false;
     }
 

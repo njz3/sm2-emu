@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -27,6 +27,11 @@ msgstr "Ātrā"
 #, c-format
 msgid "Slot %s"
 msgstr "Slots %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Nometiet .zip vai .7z ROM arhīvu, lai to spēlētu."
 
 #: src/main.cpp
 #, c-format
@@ -236,6 +241,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (platekrāns)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arkādes)"
 
@@ -243,11 +253,6 @@ msgstr "4:3 (arkādes)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Kvadrātveida pikseļi"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (platekrāns)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -264,11 +269,15 @@ msgstr "Malu attiecība"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 ir arkādes monitora forma (noklusējums).\n"
-"Kvadrātveida pikseļi rāda neapstrādātu 496x384 (nedaudz šauru).\n"
-"„Izstiept” aizpilda visu logu. Stājas spēkā uzreiz."
+"Kvadrātveida pikseļi rāda neapstrādātu 496x384 (nedaudz šaurāku).\n"
+"16:9 (eksperimentāls) zīmē 3D platāk, ar 2D vidū.\n"
+"Izstiept aizpilda visu logu.\n"
+"Tikai GPU renderētājiem. Darbojas uzreiz."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -568,8 +577,8 @@ msgstr "Sega Model 2 arkādes automātu emulators"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3-Clause licence. Skatīt LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later licence. Skatīt LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -811,7 +820,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Centra nejutīgā zona"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -820,11 +829,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Stūres gājiens ap centru, kas tiek nolasīts kā centrs. Lielākajai\n"
+"daļai stūru to nevajag; nedaudz palīdz, ja centrs klejo. Josla\n"
+"rāda stūres stāvokli pret iekrāsoto zonu."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Stūres pozīcija"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1117,6 +1129,16 @@ msgstr "Izmantot noklusējuma izkārtojumu"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Rādīt piesaistes"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Rādīt saīsnes"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Pārnesums lejup"
 
@@ -1199,17 +1221,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Ekrānuzņēmums"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Turēt pa kreisi"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Attīt atpakaļ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Paātrināt"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Turēt pa labi"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Iziet"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Ātrā ielāde"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Ātrā saglabāšana"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Iestatījumu izvēlne"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Vispirms turēt"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Turiet Guide, tad nospiediet otru pogu; spēle tās neredz. Iziet atgriežas "
+"pie spēlēm, ja tādas ir. Serviss un Tests darbojas vienmēr."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Kreisā kursorsvira arī pārvieto; plecu pogas darbojas arī kā Poga 3/4. Labā "
-"svira ir Virtual On spēlei. Tests un Serviss ir Guide+Start un Guide+Back."
+"Kustina arī kreisā svira; plecu pogas darbojas arī kā Button 3/4. Labā svira "
+"ir Virtual On spēlei. Rādīt saīsnes uzskaita Guide kombinācijas."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Sviras nejutīgā zona"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1218,11 +1299,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Sviras gājiens ap centru, kas tiek nolasīts kā centrs. Josla rāda\n"
+"sviru tagad: atlaidiet to un palieliniet šo, līdz marķieris\n"
+"ir iekrāsotajā zonā. Attiecas arī uz tēmēšanu ar sviru."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Sviras pozīcija"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1659,6 +1743,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Turiet Backspace, lai atgrieztos spēlē atpakaļ.\n"
+"Kamēr ieslēgts, katrs kadrs nedaudz palēninās."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Atpakaļattīšanas atmiņa"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Ielādējiet spēli, lai saglabātu un atjaunotu tās stāvokli."
 
@@ -1690,6 +1788,26 @@ msgstr "Saglabāt"
 #, no-c-format
 msgid "empty"
 msgstr "tukšs"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Neizdevās palaist spēli"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Trūkst:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Kopēt sarakstu"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "Labi"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1759,6 +1877,25 @@ msgstr "Ielādē aprakstu..."
 #, no-c-format
 msgid "No description available."
 msgstr "Apraksts nav pieejams."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 ir arkādes monitora forma (noklusējums).\n"
+#~ "Kvadrātveida pikseļi rāda neapstrādātu 496x384 (nedaudz šauru).\n"
+#~ "„Izstiept” aizpilda visu logu. Stājas spēkā uzreiz."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Kreisā kursorsvira arī pārvieto; plecu pogas darbojas arī kā Poga 3/4. "
+#~ "Labā svira ir Virtual On spēlei. Tests un Serviss ir Guide+Start un "
+#~ "Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

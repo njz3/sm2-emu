@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Ported from MAME's src/devices/sound/scspdsp.cpp (BSD-3-Clause,
 // copyright-holders ElSemi, R. Belmont).

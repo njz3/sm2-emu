@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -29,6 +29,11 @@ msgstr "விரைவு"
 #, c-format
 msgid "Slot %s"
 msgstr "ஸ்லாட் %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "விளையாட ஒரு .zip அல்லது .7z ROM காப்பகத்தை இங்கே இழுத்து விடவும்."
 
 #: src/main.cpp
 #, c-format
@@ -238,6 +243,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (அகலத்திரை)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (ஆர்கேட்)"
 
@@ -245,11 +255,6 @@ msgstr "4:3 (ஆர்கேட்)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "சதுரப் பிக்சல்கள்"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (அகலத்திரை)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -266,11 +271,15 @@ msgstr "விகிதம்"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
-"4:3 என்பது ஆர்கேட் மானிட்டரின் வடிவம் (இயல்புநிலை).\n"
-"சதுரப் பிக்சல்கள் மூல 496x384 ஐக் காட்டும் (சற்றுக் குறுகலாக).\n"
-"நீட்டு முழுச் சாளரத்தையும் நிரப்பும். உடனே பொருந்தும்."
+"4:3 என்பது ஆர்கேட் திரையின் வடிவம் (இயல்புநிலை).\n"
+"சதுரப் பிக்சல்கள் மூல 496x384 ஐக் காட்டும் (சற்று குறுகலாக).\n"
+"16:9 (சோதனை) 3D ஐ அகலமாக வரையும், 2D நடுவில் இருக்கும்.\n"
+"நீட்டு முழுச் சாளரத்தையும் நிரப்பும்.\n"
+"GPU ரெண்டரர்களுக்கு மட்டும். உடனே பொருந்தும்."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -570,8 +579,8 @@ msgstr "ஒரு Sega Model 2 ஆர்கேட் எமுலேட்டர
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "BSD 3-Clause உரிமம். LICENSE ஐப் பார்க்கவும்."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "GPL-3.0-or-later உரிமம். LICENSE ஐப் பார்க்கவும்."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -811,7 +820,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "மைய டெட்ஸோன்"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -820,11 +829,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"மையத்தைச் சுற்றி மையமாகவே படிக்கப்படும் ஸ்டீயரிங் நகர்வு. பெரும்பாலான\n"
+"ஸ்டீயரிங்குகளுக்கு இது தேவையில்லை; மையம் அலையும் ஒன்றுக்குச் சிறிது உதவும்.\n"
+"பட்டை தற்போதைய ஸ்டீயரிங்கை நிழலிட்ட பகுதியுடன் காட்டும்."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "ஸ்டீயரிங் நிலை"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1115,6 +1127,16 @@ msgstr "இயல்புநிலை அமைப்பைப் பயன்�
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "பிணைப்புகளைக் காட்டு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "குறுக்குவழிகளைக் காட்டு"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "கியர் கீழே"
 
@@ -1197,17 +1219,76 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "திரைப்பிடிப்பு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "இடது அழுத்தி"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "பின்னோக்கு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "வேகமாக முன்னோக்கு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "வலது அழுத்தி"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "வெளியேறு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "விரைவு ஏற்றம்"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "விரைவு சேமிப்பு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "அமைப்புகள் மெனு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "முதலில் அழுத்திப் பிடி"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Guide ஐ அழுத்திப் பிடித்து, மற்ற பொத்தானை அழுத்தவும்; விளையாட்டு அவற்றைப் பார்க்காது. "
+"கேம்கள் இருந்தால் வெளியேறு அவற்றுக்குத் திரும்பும். சர்வீஸ், சோதனை எப்போதும் வேலை செய்யும்."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"இடது ஸ்டிக்கும் நகர்த்தும்; ஷோல்டர்களும் பொத்தான் 3/4 ஆகச் செயல்படும். வலது லீவர் Virtual On "
-"க்கானது. சோதனை, சர்வீஸ் என்பவை Guide+Start, Guide+Back."
+"இடது ஸ்டிக்கும் நகர்த்தும்; தோள் பொத்தான்கள் Button 3/4 ஆகவும் செயல்படும். வலது லீவர் "
+"Virtual On க்கானது. குறுக்குவழிகளைக் காட்டு Guide சேர்க்கைகளைப் பட்டியலிடும்."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "ஸ்டிக் டெட்ஸோன்"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1216,11 +1297,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"மையத்தைச் சுற்றி மையமாகவே படிக்கப்படும் ஸ்டிக் நகர்வு. பட்டை தற்போதைய\n"
+"ஸ்டிக்கைக் காட்டும்: அதை விட்டுவிட்டு, குறி நிழலிட்ட பகுதிக்குள்\n"
+"வரும் வரை இதை உயர்த்தவும். ஸ்டிக் குறிவைப்புக்கும் பொருந்தும்."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "ஸ்டிக் நிலை"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1658,6 +1742,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"ஆட்டத்தில் பின்னோக்கிச் செல்ல Backspace ஐ அழுத்திப் பிடிக்கவும்.\n"
+"இயக்கத்தில் இருக்கும்போது ஒவ்வொரு பிரேமிலும் சற்று வேகம் குறையும்."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "பின்னோக்கு நினைவகம்"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "நிலையைச் சேமிக்கவும் மீட்கவும் ஒரு கேமை ஏற்றவும்."
 
@@ -1689,6 +1787,26 @@ msgstr "சேமி"
 #, no-c-format
 msgid "empty"
 msgstr "காலி"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "விளையாட்டைத் தொடங்க முடியவில்லை"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "இல்லாதவை:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "பட்டியலை நகலெடு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "சரி"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1758,6 +1876,24 @@ msgstr "விளக்கம் பெறப்படுகிறது..."
 #, no-c-format
 msgid "No description available."
 msgstr "விளக்கம் இல்லை."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 என்பது ஆர்கேட் மானிட்டரின் வடிவம் (இயல்புநிலை).\n"
+#~ "சதுரப் பிக்சல்கள் மூல 496x384 ஐக் காட்டும் (சற்றுக் குறுகலாக).\n"
+#~ "நீட்டு முழுச் சாளரத்தையும் நிரப்பும். உடனே பொருந்தும்."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "இடது ஸ்டிக்கும் நகர்த்தும்; ஷோல்டர்களும் பொத்தான் 3/4 ஆகச் செயல்படும். வலது லீவர் Virtual "
+#~ "On க்கானது. சோதனை, சர்வீஸ் என்பவை Guide+Start, Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-14 21:16+1000\n"
+"POT-Creation-Date: 2026-10-18 15:17+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -24,6 +24,11 @@ msgstr "Pantas"
 #, c-format
 msgid "Slot %s"
 msgstr "Slot %s"
+
+#: src/main.cpp
+#, no-c-format
+msgid "Drop a .zip or .7z ROM archive to play it."
+msgstr "Lepaskan arkib ROM .zip atau .7z untuk memainkannya."
 
 #: src/main.cpp
 #, c-format
@@ -233,6 +238,11 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "16:9 (widescreen)"
+msgstr "16:9 (skrin lebar)"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "4:3 (arcade)"
 msgstr "4:3 (arked)"
 
@@ -240,11 +250,6 @@ msgstr "4:3 (arked)"
 #, no-c-format
 msgid "Square pixels"
 msgstr "Piksel segi empat sama"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "16:9 (widescreen)"
-msgstr "16:9 (skrin lebar)"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -261,11 +266,15 @@ msgstr "Nisbah aspek"
 msgid ""
 "4:3 is the arcade monitor's shape (the default).\n"
 "Square pixels shows the raw 496x384 (slightly narrow).\n"
-"Stretch fills the whole window. Applies live."
+"16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
+"Stretch fills the whole window.\n"
+"GPU renderers only. Applies live."
 msgstr ""
 "4:3 ialah bentuk monitor arked (lalai).\n"
-"Piksel segi empat sama memaparkan 496x384 mentah (agak sempit).\n"
-"Regangkan memenuhi seluruh tetingkap. Berkuat kuasa serta-merta."
+"Piksel segi empat sama menunjukkan 496x384 mentah (agak sempit).\n"
+"16:9 (eksperimen) melukis 3D lebih lebar, dengan 2D di tengah.\n"
+"Regangkan memenuhi seluruh tetingkap.\n"
+"Pemapar GPU sahaja. Berkesan serta-merta."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -565,8 +574,8 @@ msgstr "Emulator arked Sega Model 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "BSD 3-Clause licence. See LICENSE."
-msgstr "Lesen BSD 3-Klausa. Lihat LICENSE."
+msgid "GPL-3.0-or-later licence. See LICENSE."
+msgstr "Lesen GPL-3.0-or-later. Lihat LICENSE."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -807,7 +816,7 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Centre deadzone"
-msgstr ""
+msgstr "Zon mati tengah"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -816,11 +825,14 @@ msgid ""
 "want none; a little covers one whose centre wanders. The bar\n"
 "shows the wheel now against the shaded zone."
 msgstr ""
+"Gerakan stereng di sekitar tengah yang dibaca sebagai tengah. Kebanyakan\n"
+"stereng tidak perlu; sedikit membantu jika tengahnya berubah. Bar\n"
+"menunjukkan stereng sekarang berbanding zon berlorek."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Wheel position"
-msgstr ""
+msgstr "Kedudukan stereng"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1110,6 +1122,16 @@ msgstr "Guna Susun Atur Lalai"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Show bindings"
+msgstr "Tunjuk pemetaan"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Show shortcuts"
+msgstr "Tunjuk pintasan"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Gear Down"
 msgstr "Turun Gear"
 
@@ -1192,18 +1214,77 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Screenshot"
+msgstr "Tangkapan skrin"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Left held"
+msgstr "Kiri ditahan"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind"
+msgstr "Undur"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Fast-forward"
+msgstr "Laju ke depan"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Right held"
+msgstr "Kanan ditahan"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Exit"
+msgstr "Keluar"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-load"
+msgstr "Muat pantas"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Quick-save"
+msgstr "Simpan pantas"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Settings menu"
+msgstr "Menu tetapan"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Hold first"
+msgstr "Tahan dahulu"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Hold Guide, then press the other button; the game does not see them. Exit "
+"goes back to the games when there are some. Service and Test always work."
+msgstr ""
+"Tahan Guide, kemudian tekan butang lain; permainan tidak melihatnya. Keluar "
+"kembali ke senarai permainan jika ada. Servis dan Ujian sentiasa berfungsi."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid ""
 "The left stick also moves; the shoulders also act as Button 3/4. Right Lever "
-"is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+"is Virtual On's. Show shortcuts lists the Guide combinations."
 msgstr ""
-"Batang kiri juga menggerakkan; butang bahu juga bertindak sebagai Butang "
-"3/4. Tuil Kanan ialah untuk Virtual On. Ujian dan Servis ialah Guide+Start "
-"dan Guide+Back."
+"Batang kiri juga menggerakkan; butang bahu juga bertindak sebagai Button "
+"3/4. Tuil Kanan untuk Virtual On. Tunjuk pintasan menyenaraikan gabungan "
+"Guide."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick deadzone"
-msgstr ""
+msgstr "Zon mati batang"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1212,11 +1293,14 @@ msgid ""
 "the stick now: let go of it and raise this until the marker\n"
 "sits inside the shaded zone. Also applies to stick aiming."
 msgstr ""
+"Gerakan batang di sekitar tengah yang dibaca sebagai tengah. Bar\n"
+"menunjukkan batang sekarang: lepaskannya dan naikkan ini hingga\n"
+"penanda berada dalam zon berlorek. Juga untuk membidik dengan batang."
 
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Stick position"
-msgstr ""
+msgstr "Kedudukan batang"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1655,6 +1739,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"Hold Backspace to step back through play.\n"
+"Costs a little speed on every frame while on."
+msgstr ""
+"Tahan Backspace untuk mengundur permainan.\n"
+"Mengurangkan sedikit kelajuan setiap bingkai semasa aktif."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Rewind memory"
+msgstr "Memori undur"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Load a game to save and restore its state."
 msgstr "Muatkan permainan untuk menyimpan dan memulihkan keadaannya."
 
@@ -1686,6 +1784,26 @@ msgstr "Simpan"
 #, no-c-format
 msgid "empty"
 msgstr "kosong"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Could not start the game"
+msgstr "Tidak dapat memulakan permainan"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missing:"
+msgstr "Tiada:"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Copy list"
+msgstr "Salin senarai"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "OK"
+msgstr "OK"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1757,6 +1875,25 @@ msgstr "Mendapatkan perihalan..."
 #, no-c-format
 msgid "No description available."
 msgstr "Tiada perihalan tersedia."
+
+#, no-c-format
+#~ msgid ""
+#~ "4:3 is the arcade monitor's shape (the default).\n"
+#~ "Square pixels shows the raw 496x384 (slightly narrow).\n"
+#~ "Stretch fills the whole window. Applies live."
+#~ msgstr ""
+#~ "4:3 ialah bentuk monitor arked (lalai).\n"
+#~ "Piksel segi empat sama memaparkan 496x384 mentah (agak sempit).\n"
+#~ "Regangkan memenuhi seluruh tetingkap. Berkuat kuasa serta-merta."
+
+#, no-c-format
+#~ msgid ""
+#~ "The left stick also moves; the shoulders also act as Button 3/4. Right "
+#~ "Lever is Virtual On's. Test and Service are Guide+Start and Guide+Back."
+#~ msgstr ""
+#~ "Batang kiri juga menggerakkan; butang bahu juga bertindak sebagai Butang "
+#~ "3/4. Tuil Kanan ialah untuk Virtual On. Ujian dan Servis ialah "
+#~ "Guide+Start dan Guide+Back."
 
 #, no-c-format
 #~ msgid "Read in the background"

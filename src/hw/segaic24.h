@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Sega System 24 tilemap chip (315-5292), as reused on Model 1 and Model 2.
 //

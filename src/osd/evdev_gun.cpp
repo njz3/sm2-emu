@@ -6,11 +6,11 @@
 //
 // A Sega Model 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. The source files in this project may not be
-// used to contribute to commercial projects or for monetary gain without the
-// express written permission of the author.
+// This header must not be removed. sm2-emu is licensed under the GNU General
+// Public License, version 3 or later, with additional terms under section 7 of
+// that licence. See LICENSE and NOTICE.
 //
 // The Linux backend of light_guns.h.
 
@@ -45,13 +45,19 @@ namespace {
     return h.find(needle) != std::string::npos;
 }
 
-/// Whether a udev input device looks like a light gun. True if the light-gun
-/// udev rule tagged it ID_INPUT_GUN, or its name/model names it one (the Sinden
-/// presents as an absolute mouse with no gun rule, so the name is all we have).
+/// Whether the light-gun udev rule tagged the device ID_INPUT_GUN.
+[[nodiscard]] bool is_tagged_gun(udev_device* dev)
+{
+    const char* gun = udev_device_get_property_value(dev, "ID_INPUT_GUN");
+    return gun != nullptr && std::strcmp(gun, "1") == 0;
+}
+
+/// Whether a udev input device looks like a light gun. True if tagged, or its
+/// name/model names it one (the Sinden presents as an absolute mouse with no
+/// gun rule, so the name is all we have).
 [[nodiscard]] bool is_gun_device(udev_device* dev)
 {
-    if (const char* gun = udev_device_get_property_value(dev, "ID_INPUT_GUN");
-        gun != nullptr && std::strcmp(gun, "1") == 0) {
+    if (is_tagged_gun(dev)) {
         return true;
     }
     for (const char* key : {"ID_MODEL", "ID_MODEL_ENC", "NAME"}) {
@@ -146,6 +152,7 @@ bool LightGuns::init()
         std::string node;
         std::string phys;  // physical_device_key: one per physical gun.
         int         prio = 1;
+        bool        tagged = false;
     };
     std::vector<Candidate> candidates;
     if (udev_enumerate* enumerate = udev_enumerate_new(ctx); enumerate != nullptr) {
@@ -171,13 +178,23 @@ bool LightGuns::init()
                     named_mouse    |= contains_ci(v, "mouse");
                 }
                 const int prio = (named_lightgun && !named_mouse) ? 0 : 1;
-                candidates.push_back({node, physical_device_key(dev), prio});
+                candidates.push_back(
+                    {node, physical_device_key(dev), prio, is_tagged_gun(dev)});
             }
             udev_device_unref(dev);
         }
         udev_enumerate_unref(enumerate);
     }
     udev_unref(ctx);
+
+    // Batocera merges the Sinden's raw nodes into a virtual "Sinden lightgun"
+    // and tags only that one; the raw nodes keep a gun-like name but have
+    // another physical key, so one gun would open twice. Once anything is
+    // tagged, the name match is not used.
+    if (std::any_of(candidates.begin(), candidates.end(),
+                    [](const Candidate& c) { return c.tagged; })) {
+        std::erase_if(candidates, [](const Candidate& c) { return !c.tagged; });
+    }
 
     std::sort(candidates.begin(), candidates.end(),
               [](const Candidate& a, const Candidate& b) {

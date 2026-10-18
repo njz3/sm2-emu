@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // Derived from MAME's src/mame/sega/315-5881_crypt.cpp/.h
 // (BSD-3-Clause, copyright-holders Andreas Naive, Olivier Galibert,
