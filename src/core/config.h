@@ -194,22 +194,27 @@ struct Config {
     /// feel, not a reproduction. Off means the wheel still steers, just limp.
     bool wheel_ffb = true;
 
-    /// Centring resistance, 0..100 percent of the wheel's maximum torque.
+    /// The gain on the drive board's forces, 0..200 percent: at 100 the board's
+    /// full power (63) gives the wheel's maximum torque, every force in
+    /// proportion; 200 doubles them, the strongest saturating.
     u32 wheel_ffb_strength = 30;
 
-    /// The Sega Rally / Daytona panel spring, 0..100 percent of the wheel's
-    /// strength. Very light on a cabinet; the other panels have none.
+    /// The Sega Rally / Daytona panel spring, 0..100 percent of Sega Rally's
+    /// strongest torque (32) at the gain. Very light on a cabinet; the other
+    /// panels have none.
     u32 wheel_panel_spring = 20;
 
     /// EPR-18261 boards: the motor power (0..63) below which there is no
-    /// torque, and the power that gives full strength. Linear in between.
+    /// torque, and the power taken as the board's full one. Linear in between.
     u32 wheel_indy_deadband   = 0;
     u32 wheel_indy_full_power = 63;
 
-    /// The operator's strength on the drive board's DIP switches, 0..7 (the
-    /// switches ON counted in binary; 0, all OFF, as from the factory): Sega
+    /// The operator's strength on the drive board's DIP switches, 0..7, the
+    /// switches ON counted in binary: 0 all OFF, as Sega Rally's and Daytona's
+    /// board leaves the factory (their manual; switches 4-8 stay OFF). Sega
     /// Rally's 1-3 add 0..7 to every torque, Daytona's 1-3 add 4 times that,
-    /// Indy 500's family's 1-1..1-3 add 0..7 to every strength.
+    /// Indy 500's family's 1-1..1-3 add 0..7 to every strength (the Le Mans
+    /// 24 cabinet ships that DRIVE CONTROL BD, 838-11967, at 3).
     u32 wheel_drive_dip = 0;
 
     /// Reverses the wheel's force, for a driver that pushes right on the

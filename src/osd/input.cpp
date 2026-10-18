@@ -243,8 +243,11 @@ constexpr int kRallyCalibCountsLeft  = 32;
 /// mean of the two powers minus one.
 constexpr int kDaytonaCalibCounts = 16;
 
-/// The board power that maps to the wheel's full strength: Sega Rally's
-/// strongest push.
+/// The drive boards' full motor power, 6 bits: at a gain of 100 % it gives the
+/// wheel's full force.
+constexpr int kBoardFullRange = 63;
+
+/// Sega Rally's strongest torque: the power of a command at full strength.
 constexpr int kBoardFullPower = 32;
 
 /// Converts the wheel's axis to board ADC counts off centre, 128 a side.
@@ -1304,12 +1307,15 @@ void Input::update_force_feedback(const rom::GameSpec& game)
     const double board_ticks = kDriveBoardIrqHz / kMachineHz;
     m_drive_ticks += board_ticks;
     if (wheel_ffb_active(game)) {
-        const int ceiling = static_cast<int>(
-            std::clamp(m_wheel_settings.strength, 0u, 100u) * 32767 / 100);
-        const int mag = command.strength * ceiling / kDriveFull;
+        // The gain: at 100 % the board's full power gives the wheel's full
+        // force, and a command at full strength Sega Rally's strongest torque.
+        const int board_full = static_cast<int>(
+            std::clamp(m_wheel_settings.strength, 0u, 200u) * 32767 / 100);
+        const int command_full = board_full * kBoardFullPower / kBoardFullRange;
+        const int mag = command.strength * command_full / kDriveFull;
         // The board's motor stiction level, added to every force it outputs.
         constexpr int kStiction = 5 * kDriveFull / 26;
-        const int     stiction  = kStiction * ceiling / kDriveFull;
+        const int     stiction  = kStiction * command_full / kDriveFull;
 
         // An axis that has not reported yet says nothing about where the wheel is.
         const bool steer_known =
@@ -1346,7 +1352,7 @@ void Input::update_force_feedback(const rom::GameSpec& game)
         // 16 steps of distance and the stiction level. Inside it the board keeps
         // the stiction level in its last direction until the pot reads centre,
         // then holds it with no direction, which brakes the motor. 26 is kDriveFull.
-        const auto board_spring = [this, pot, velocity, ceiling, stiction](const DriveCommand& c) {
+        const auto board_spring = [this, pot, velocity, command_full, stiction](const DriveCommand& c) {
             constexpr int kPotStep = 256;
             const int     m        = std::abs(pot);
             if (m > c.deadzone) {
@@ -1354,7 +1360,7 @@ void Input::update_force_feedback(const rom::GameSpec& game)
                 const int ramp    = 2 * (m - c.ramp_from) * kDriveFull / (26 * kPotStep);
                 const int reach   = m * kDriveFull / (26 * 16 * kPotStep);
                 const int held    = m > c.full_at ? c.strength : std::min(c.strength, ramp);
-                const int force   = (held + reach + kStiction) * ceiling / kDriveFull;
+                const int force   = (held + reach + kStiction) * command_full / kDriveFull;
                 return pot < 0 ? -force : force;
             }
             if (m < kPotStep) {
@@ -1371,8 +1377,7 @@ void Input::update_force_feedback(const rom::GameSpec& game)
         // of the strength. The EPR-18261 panels are direct drive and have none.
         const bool panel_spring = game.drive_protocol == rom::DriveProtocol::Rally
                                || game.drive_protocol == rom::DriveProtocol::Daytona;
-        const int  panel_full =
-            ceiling * static_cast<int>(std::min(m_wheel_settings.panel_spring, 100u)) / 100;
+        const int  panel_full   = command_full * static_cast<int>(m_wheel_settings.panel_spring) / 100;
         const int  baseline     = panel_spring ? spring(panel_full) : 0;
 
         // Positive levels push the wheel left, as WheelForce::set_force takes them.
@@ -1384,7 +1389,7 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             // spring.
             const u32 steer       = m_wheel_settings.steer_degrees;
             const u32 lock        = m_wheel_settings.lock_degrees;
-            const int unit        = std::max(1, ceiling / kBoardFullPower);
+            const int unit        = std::max(1, board_full / kBoardFullRange);
             const int calib_force = centring_spring(
                 board_deflection(kDaytonaCalibCounts, steer, lock), panel_full);
             const int breakaway = std::max(0, (calib_force + unit - 1) / unit - 1);
@@ -1393,7 +1398,7 @@ void Input::update_force_feedback(const rom::GameSpec& game)
                 m_agent != nullptr && m_agent->daytona
                     ? m_agent->daytona(m_daytona, counts, board_ticks, breakaway)
                     : m_daytona.step(counts, board_ticks, breakaway);
-            const int force = out.power * ceiling / kBoardFullPower;
+            const int force = out.power * board_full / kBoardFullRange;
             switch (out.way) {
                 case DaytonaBoard::Way::Down: game_force = force; break;   // left
                 case DaytonaBoard::Way::Up:   game_force = -force; break;  // right
@@ -1429,9 +1434,9 @@ void Input::update_force_feedback(const rom::GameSpec& game)
                                               : m_indy.step(position, nmis);
             const int dead   = static_cast<int>(m_wheel_settings.indy_deadband);
             const int full   = static_cast<int>(m_wheel_settings.indy_full_power);
-            const auto torque = [dead, full, ceiling](int power) {
+            const auto torque = [dead, full, board_full](int power) {
                 const int span = std::max(1, full - dead);
-                return std::clamp(power - dead, 0, span) * ceiling / span;
+                return std::clamp(power - dead, 0, span) * board_full / span;
             };
             constexpr int kFullSpeed = 1024;
             const int up    = torque(out.up);
@@ -1452,7 +1457,7 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             int       force = mag;
             if (game.drive_protocol == rom::DriveProtocol::Rally) {
                 // The operator's strength, DIP switches 1-3: 0..7 more power.
-                force += static_cast<int>(m_wheel_settings.drive_dip) * ceiling / kBoardFullPower;
+                force += static_cast<int>(m_wheel_settings.drive_dip) * board_full / kBoardFullRange;
                 // An outward push also gets the calibration power, capped at the
                 // spring's force at that point, since a PC wheel has no gear drag.
                 const bool outward = dir > 0 ? deflection < 0 : deflection >= 0;
@@ -1519,7 +1524,12 @@ void Input::update_force_feedback(const rom::GameSpec& game)
                     // Opposes the turn, full strength from this speed (axis units per frame).
                     constexpr int kFullSpeed = 1024;
                     m_wheel.board_dir = 0;
-                    game_force = mag * std::clamp(velocity, -kFullSpeed, kFullSpeed) / kFullSpeed;
+                    int brake = mag;
+                    if (game.drive_protocol == rom::DriveProtocol::Rally) {
+                        // Sega Rally's board adds its DIP strength to the brake too.
+                        brake += static_cast<int>(m_wheel_settings.drive_dip) * board_full / kBoardFullRange;
+                    }
+                    game_force = brake * std::clamp(velocity, -kFullSpeed, kFullSpeed) / kFullSpeed;
                     break;
                 }
                 default:
@@ -1527,7 +1537,8 @@ void Input::update_force_feedback(const rom::GameSpec& game)
                     break;
             }
         }
-        level = std::clamp(baseline + game_force, -ceiling, ceiling);
+        // The wheel's full force: above a gain of 100 %, the strongest saturate.
+        level = std::clamp(baseline + game_force, -32767, 32767);
     }
 
     // Without force feedback, the game's impacts come through as rumble instead.

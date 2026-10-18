@@ -954,7 +954,7 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     // A window smaller than the raster is not useful and a zero one is not valid.
     out->window_width  = std::max(out->window_width, 256u);
     out->window_height = std::max(out->window_height, 192u);
-    out->wheel_ffb_strength    = std::min(out->wheel_ffb_strength, 100u);
+    out->wheel_ffb_strength    = std::min(out->wheel_ffb_strength, 200u);
     out->wheel_panel_spring    = std::min(out->wheel_panel_spring, 100u);
     out->wheel_indy_full_power = std::clamp(out->wheel_indy_full_power, 1u, 63u);
     out->wheel_indy_deadband   = std::min(out->wheel_indy_deadband, out->wheel_indy_full_power - 1);
@@ -1119,23 +1119,26 @@ bool save_config(const std::string& path, const Config& config)
         << "# Wheels and gamepads keep working while the window is not in front.\n"
         << "# Keyboard and mouse still need the window in front.\n"
         << "input_background = " << bool_text(config.input_background) << "\n"
-        << "# Steering-wheel force feedback: a synthesised centring spring (the\n"
-        << "# drive board is not emulated, so this is a feel, not the real motor\n"
-        << "# force). Strength is 0..100 percent of the wheel's maximum torque.\n"
+        << "# Steering-wheel force feedback, from the game's drive board. The gain\n"
+        << "# is 0..200 percent: at 100 the board's full power (63) gives the\n"
+        << "# wheel's maximum torque, every force in proportion; 200 doubles them,\n"
+        << "# the strongest saturating.\n"
         << "wheel_ffb = " << bool_text(config.wheel_ffb) << "\n"
         << "wheel_ffb_strength = " << config.wheel_ffb_strength << "\n"
         << "# Sega Rally Championship and Daytona USA only, all their versions:\n"
-        << "# their panel's light centring spring, 0..100 percent of the strength\n"
-        << "# above. The other games' panels have none.\n"
+        << "# their panel's light centring spring, 0..100 percent of Sega Rally's\n"
+        << "# strongest torque (32) at the gain above. The other games' panels\n"
+        << "# have none.\n"
         << "wheel_panel_spring = " << config.wheel_panel_spring << "\n"
         << "# Indy 500, Touring Car, Over Rev and Super GT 24h: the drive board's\n"
-        << "# power (0..63) that gives no torque yet, and the one that gives the\n"
-        << "# wheel's full strength. 0 and 63: the torque in proportion to the\n"
-        << "# power, as the board sends it to the motor drive board.\n"
+        << "# power (0..63) that gives no torque yet, and the one taken as its full\n"
+        << "# power. 0 and 63: the torque in proportion to the power, as the board\n"
+        << "# sends it to the motor drive board.\n"
         << "wheel_indy_deadband = " << config.wheel_indy_deadband << "\n"
         << "wheel_indy_full_power = " << config.wheel_indy_full_power << "\n"
         << "# The drive board's DIP switches for the motor's strength, 0..7 (0 all\n"
-        << "# OFF): Sega Rally and Daytona switches 1-3, Indy 500's family 1-1..1-3.\n"
+        << "# OFF, as Sega Rally and Daytona leave the factory): Sega Rally and\n"
+        << "# Daytona switches 1-3, Indy 500's family 1-1..1-3.\n"
         << "wheel_drive_dip = " << config.wheel_drive_dip << "\n"
         << "# Reverses the force, for a wheel whose driver pushes the wrong way:\n"
         << "# one that pulls away from the centre instead of bringing it back.\n"

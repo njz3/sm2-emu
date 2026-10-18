@@ -727,6 +727,22 @@ msgstr "Résistance"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"Un gain sur toutes les forces de la carte de direction. À\n"
+"100 %, la pleine puissance de la carte (63) donne la pleine\n"
+"force du volant, chaque force en proportion. 200 % double\n"
+"chaque force : celles au-delà de la moitié de la puissance\n"
+"de la carte (32, le couple le plus fort de Sega Rally)\n"
+"saturent alors."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Invert force feedback"
 msgstr "Inverser le retour de force"
 
@@ -1881,11 +1897,6 @@ msgstr "Aucune description disponible."
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "100 % = the force of the arcade cabinet."
-msgstr "100 % = force de la borne."
-
-#: src/osd/gui.cpp
-#, no-c-format
 msgid "Drive board DIP strength"
 msgstr "Force DIP de la carte de direction"
 
@@ -1893,17 +1904,18 @@ msgstr "Force DIP de la carte de direction"
 #, no-c-format
 msgid ""
 "The motor strength set on the drive board's DIP switches,\n"
-"the switches ON counted in binary: 0 all OFF, as from the\n"
-"factory. Sega Rally: switches 1-3, 0 to 7 added to every\n"
-"torque. Daytona USA: switches 1-3, 4 times that. Indy 500,\n"
-"Touring Car, Over Rev, Super GT 24h: switches 1-1 to 1-3,\n"
-"0 to 7 added to every force."
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
 msgstr ""
 "La force du moteur réglée par les interrupteurs DIP de la\n"
-"carte de direction, ceux sur ON comptés en binaire : 0 tous\n"
-"sur OFF, comme en sortie d'usine. Sega Rally : interrupteurs\n"
-"1-3, 0 à 7 ajouté à chaque couple. Daytona USA : interrupteurs\n"
-"1-3, 4 fois plus. Indy 500, Touring Car, Over Rev, Super GT 24h :\n"
+"carte de direction, ceux sur ON comptés en binaire :\n"
+"0 = tous sur OFF.\n"
+"Sega Rally : interrupteurs 1-3, 0 à 7 ajouté à chaque couple.\n"
+"Daytona USA : interrupteurs 1-3, 4 fois plus.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h :\n"
 "interrupteurs 1-1 à 1-3, 0 à 7 ajouté à chaque force."
 
 #, no-c-format

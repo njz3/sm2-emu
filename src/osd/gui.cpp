@@ -1075,11 +1075,19 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
 
     ImGui::BeginDisabled(!config.wheel_ffb);
     int resistance = static_cast<int>(config.wheel_ffb_strength);
-    if (ImGui::SliderInt(tr_id("Resistance"), &resistance, 0, 100, "%d%%")) {
+    if (ImGui::SliderInt(tr_id("Resistance"), &resistance, 0, 200, "%d%%")) {
         resistance = ((resistance + 5) / 10) * 10;  // snap to 10 % steps
-        config.wheel_ffb_strength = static_cast<u32>(std::clamp(resistance, 0, 100));
+        config.wheel_ffb_strength = static_cast<u32>(std::clamp(resistance, 0, 200));
     }
-    ImGui::TextDisabled("%s", tr("100 % = the force of the arcade cabinet."));
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        tooltip(tr("A gain on every force of the drive board. At 100 %, the\n"
+                   "board's full power (63) gives the wheel's full force, every\n"
+                   "force in proportion. 200 % doubles every force: those above\n"
+                   "half the board's power (32, Sega Rally's strongest torque)\n"
+                   "then saturate."));
+    }
 
     // The light spring of the one panel that has one.
     int panel_spring = static_cast<int>(config.wheel_panel_spring);
@@ -1107,11 +1115,11 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
         tooltip(tr("The motor strength set on the drive board's DIP switches,\n"
-                   "the switches ON counted in binary: 0 all OFF, as from the\n"
-                   "factory. Sega Rally: switches 1-3, 0 to 7 added to every\n"
-                   "torque. Daytona USA: switches 1-3, 4 times that. Indy 500,\n"
-                   "Touring Car, Over Rev, Super GT 24h: switches 1-1 to 1-3,\n"
-                   "0 to 7 added to every force."));
+                   "the switches ON counted in binary: 0 = all OFF.\n"
+                   "Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+                   "Daytona USA: switches 1-3, 4 times that.\n"
+                   "Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+                   "switches 1-1 to 1-3, 0 to 7 added to every force."));
     }
 
     ImGui::Checkbox(tr_id("Invert force feedback"), &config.wheel_ffb_invert);

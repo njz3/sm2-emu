@@ -103,15 +103,17 @@ public:
     Input& operator=(const Input&) = delete;
 
     /// Feel settings for a force-feedback wheel. `ffb` off leaves the wheel
-    /// steering but limp; `strength` is 0..100 percent of the wheel's torque.
+    /// steering but limp; `strength` is a gain, 0..200 percent, 100 giving the
+    /// drive board's full power (63) the wheel's full torque.
     struct WheelSettings {
         bool ffb           = true;
         u32  strength      = 50;
         /// The light centring spring of the Sega Rally and Daytona USA panel,
-        /// 0..100 percent of `strength`; no other game has one.
+        /// 0..100 percent of Sega Rally's strongest torque (32) at `strength`;
+        /// no other game has one.
         u32  panel_spring  = 20;
         /// Indy 500's family: the drive board's power giving no torque yet, and
-        /// the one giving the full strength (see Config::wheel_indy_deadband).
+        /// the one taken as its full power (see Config::wheel_indy_deadband).
         u32  indy_deadband   = 0;
         u32  indy_full_power = 63;
         /// The drive board's DIP strength, 0..7 (see Config::wheel_drive_dip).
