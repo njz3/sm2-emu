@@ -173,6 +173,20 @@ constexpr KeyBinding kPlayerTwoKeys[] = {
     {SDL_SCANCODE_J, kButton3}, {SDL_SCANCODE_K, kButton4},
 };
 
+/// The emulator's own keys (main.cpp's), by what they type on this layout:
+/// never a cabinet control, so never bound to one.
+[[nodiscard]] bool emulator_key(SDL_Scancode key)
+{
+    switch (SDL_GetKeyFromScancode(key, SDL_KMOD_NONE, false)) {
+        case SDLK_ESCAPE: case SDLK_F6:  case SDLK_F7:  case SDLK_F8: case SDLK_F9:
+        case SDLK_F10:    case SDLK_F11: case SDLK_F12: case SDLK_P:  case SDLK_TAB:
+        case SDLK_BACKSPACE:
+            return true;
+        default:
+            return false;
+    }
+}
+
 /// Pull a port's bits low for every held key.
 template <usize Count>
 void gather_keys(u8* port, const bool* keys, int key_count,
@@ -627,10 +641,115 @@ void Input::set_wheel_settings(const WheelSettings& wheel)
         || wheel.brake_invert != old.brake_invert || wheel.accel_half != old.accel_half
         || wheel.brake_half != old.brake_half;
     m_wheel_settings = wheel;
+    if (m_wheel_settings.keys != m_wheel_key_names) {
+        resolve_keys();
+    }
     // A calibration takes effect at once, not at the wheel's next connection.
     if (axes_changed && m_wheel.handle != nullptr) {
         assign_wheel_axes();
     }
+}
+
+void Input::set_pad_layout(const Config::PadLayout& layout)
+{
+    m_pad_buttons      = layout.buttons;
+    m_pad_axes         = layout.axes;
+    m_pad_axis_invert  = layout.axis_invert;
+    m_pad_axis_buttons = layout.axis_buttons;
+    if (layout.keys != m_pad_key_names) {
+        m_pad_key_names = layout.keys;
+        resolve_keys();
+    }
+}
+
+void Input::resolve_keys()
+{
+    m_wheel_key_names = m_wheel_settings.keys;
+    m_key_taken.fill(false);
+    const auto take = [this](const std::string& name) {
+        SDL_Scancode key = name.empty() ? SDL_SCANCODE_UNKNOWN : SDL_GetScancodeFromName(name.c_str());
+        if (key >= SDL_SCANCODE_COUNT || emulator_key(key)) {
+            key = SDL_SCANCODE_UNKNOWN;
+        }
+        m_key_taken[key] = key != SDL_SCANCODE_UNKNOWN;
+        return key;
+    };
+    for (usize role = 0; role < m_wheel_keys.size(); ++role) {
+        m_wheel_keys[role] = take(m_wheel_key_names[role]);
+    }
+    for (usize player = 0; player < m_pad_keys.size(); ++player) {
+        for (usize role = 0; role < kPadRoles; ++role) {
+            m_pad_keys[player][role] = take(m_pad_key_names[player][role]);
+        }
+    }
+}
+
+const bool* Input::default_keys(std::array<bool, SDL_SCANCODE_COUNT>* buffer, int* count) const
+{
+    const bool* keys = SDL_GetKeyboardState(count);
+    if (keys == nullptr) {
+        return nullptr;
+    }
+    *count = std::min(*count, static_cast<int>(SDL_SCANCODE_COUNT));
+    for (int key = 0; key < *count; ++key) {
+        (*buffer)[static_cast<usize>(key)] = keys[key] && !m_key_taken[static_cast<usize>(key)];
+    }
+    return buffer->data();
+}
+
+bool Input::key_down(SDL_Scancode key)
+{
+    if (key == SDL_SCANCODE_UNKNOWN) {
+        return false;
+    }
+    int         count = 0;
+    const bool* keys  = SDL_GetKeyboardState(&count);
+    return keys != nullptr && static_cast<int>(key) < count && keys[key];
+}
+
+void Input::key_capture_begin()
+{
+    int         count = 0;
+    const bool* keys  = SDL_GetKeyboardState(&count);
+    m_key_capture_held.fill(false);
+    for (int key = 0; keys != nullptr && key < std::min(count, static_cast<int>(SDL_SCANCODE_COUNT)); ++key) {
+        m_key_capture_held[static_cast<usize>(key)] = keys[key];
+    }
+}
+
+s32 Input::captured_key()
+{
+    int         count = 0;
+    const bool* keys  = SDL_GetKeyboardState(&count);
+    if (keys == nullptr) {
+        return -1;
+    }
+    s32 found = -1;
+    for (int key = 1; key < std::min(count, static_cast<int>(SDL_SCANCODE_COUNT)); ++key) {
+        if (!keys[key]) {
+            m_key_capture_held[static_cast<usize>(key)] = false;  // let go: it counts again
+        } else if (found < 0 && !m_key_capture_held[static_cast<usize>(key)]
+                   && !emulator_key(static_cast<SDL_Scancode>(key))) {
+            found = key;
+        }
+    }
+    return found;
+}
+
+std::string Input::key_name(s32 key)
+{
+    const char* name = SDL_GetScancodeName(static_cast<SDL_Scancode>(key));
+    return name != nullptr ? name : "";
+}
+
+std::string Input::key_label(const std::string& name)
+{
+    const SDL_Scancode key = SDL_GetScancodeFromName(name.c_str());
+    if (key == SDL_SCANCODE_UNKNOWN) {
+        return name;
+    }
+    const char* label = SDL_GetKeyName(SDL_GetKeyFromScancode(key, SDL_KMOD_NONE, false));
+    return label != nullptr && *label != '\0' ? label : name;
 }
 
 void Input::assign_wheel_axes()
@@ -975,6 +1094,9 @@ bool Input::pad_button_held(const Pad& pad, SDL_GamepadButton physical) const
 
 bool Input::pad_role_held(u32 player, Config::PadRole role) const
 {
+    if (player < m_pad_keys.size() && key_down(m_pad_keys[player][static_cast<u32>(role)])) {
+        return true;
+    }
     for (const Pad& pad : m_pads) {
         if (plays(pad) && pad.player == player) {
             return binding_held(pad.handle, m_pad_buttons[player][static_cast<u32>(role)]);
@@ -1126,9 +1248,10 @@ s32 Input::pressed_wheel_button() const
 bool Input::menu_button_pressed()
 {
     const s32 button = m_wheel_settings.buttons[static_cast<usize>(Config::WheelRole::Menu)];
-    const bool held  = m_wheel.handle != nullptr && button >= 0
-                    && button < SDL_GetNumJoystickButtons(m_wheel.handle)
-                    && SDL_GetJoystickButton(m_wheel.handle, button);
+    const bool held  = (m_wheel.handle != nullptr && button >= 0
+                        && button < SDL_GetNumJoystickButtons(m_wheel.handle)
+                        && SDL_GetJoystickButton(m_wheel.handle, button))
+                    || key_down(m_wheel_keys[static_cast<usize>(Config::WheelRole::Menu)]);
     const bool edge = held && !m_menu_held;
     m_menu_held     = held;
     return edge;
@@ -1986,8 +2109,9 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
                 }
             }
             // Keyboard aim only for player one (arrows), so it does not fight P2.
-            int         key_count = 0;
-            const bool* keys      = SDL_GetKeyboardState(&key_count);
+            int                                  key_count = 0;
+            std::array<bool, SDL_SCANCODE_COUNT> unbound_keys{};
+            const bool* keys = default_keys(&unbound_keys, &key_count);
             if (player == 0 && keys != nullptr) {
                 const auto kd = [&](SDL_Scancode sc) {
                     return static_cast<int>(sc) < key_count && keys[sc];
@@ -2173,8 +2297,10 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
     // 0x20), not the generic button nibble, so a pad never fired. Own map below.
     const bool is_skytgt = game.name == "skytargt" || game.parent == "skytargt";
 
-    int         key_count = 0;
-    const bool* keys      = SDL_GetKeyboardState(&key_count);
+    // The default key map, without the keys bound to a role.
+    int                                  key_count = 0;
+    std::array<bool, SDL_SCANCODE_COUNT> unbound_keys{};
+    const bool* keys = default_keys(&unbound_keys, &key_count);
     if (keys != nullptr) {
         gather_keys(&ports[0], keys, key_count, kOperatorKeys);
         if (!is_ski && !is_wski && !is_skytgt) {
@@ -2293,6 +2419,31 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (back) {
                 ports[0] &= static_cast<u8>(~(pad.player == 0 ? kCoin1 : kCoin2));
             }
+        }
+    }
+
+    // The keys bound on the gamepad page press their role as the pad's button
+    // does; the titles with their own map take only Start and Coin.
+    for (usize player = 0; player < kPlayers; ++player) {
+        const auto key_held = [&](Config::PadRole role) {
+            return key_down(m_pad_keys[player][static_cast<u32>(role)]);
+        };
+        if (!is_von && !is_desert && !is_ski && !is_wski && !is_skytgt) {
+            static constexpr u8 kKeyRoleBit[] = {
+                kButton1, kButton2, kButton3, kButton4, kUp, kDown, kLeft, kRight,
+            };
+            for (usize role = 0; role < std::size(kKeyRoleBit); ++role) {
+                if (key_held(static_cast<Config::PadRole>(role))) {
+                    ports[1 + player] &= static_cast<u8>(~kKeyRoleBit[role]);
+                }
+            }
+        }
+        if (key_held(Config::PadRole::Start)) {
+            const u8 start1 = game.start1_bit != 0 ? game.start1_bit : kStart1;
+            ports[0] &= static_cast<u8>(~(player == 0 ? start1 : kStart2));
+        }
+        if (key_held(Config::PadRole::Coin)) {
+            ports[0] &= static_cast<u8>(~(player == 0 ? kCoin1 : kCoin2));
         }
     }
 
@@ -2418,15 +2569,16 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
     }
 
-    // Wheel buttons, driving player one, each from its bound button index. The
-    // four arcade buttons are also where a driving cabinet's view/VR buttons sit,
-    // so binding those covers them. Gears are handled with the gearbox below.
-    if (m_wheel.handle != nullptr) {
-        const int count = SDL_GetNumJoystickButtons(m_wheel.handle);
+    // Wheel buttons, driving player one, each from its bound button index or
+    // key, the key with or without the wheel. The four arcade buttons are also
+    // where a driving cabinet's view/VR buttons sit, so binding those covers
+    // them. Gears are handled with the gearbox below.
+    {
+        const int count = m_wheel.handle != nullptr ? SDL_GetNumJoystickButtons(m_wheel.handle) : 0;
         const auto role_pressed = [&](Config::WheelRole role) {
             const s32 button = m_wheel_settings.buttons[static_cast<usize>(role)];
-            return button >= 0 && button < count
-                && SDL_GetJoystickButton(m_wheel.handle, button);
+            return (button >= 0 && button < count && SDL_GetJoystickButton(m_wheel.handle, button))
+                || key_down(m_wheel_keys[static_cast<usize>(role)]);
         };
 
         // The four action buttons go to whichever port/bit this title wires its
@@ -2950,10 +3102,12 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             const s32 button = m_wheel_settings.buttons[static_cast<usize>(role)];
             return button >= 0 && button < wheel_buttons;
         };
+        // A key held picks its gear as F1-F4 do: the gear stays once let go.
         const auto role_held = [&](Config::WheelRole role) {
-            return role_bound(role)
-                && SDL_GetJoystickButton(m_wheel.handle,
-                                         m_wheel_settings.buttons[static_cast<usize>(role)]);
+            return (role_bound(role)
+                    && SDL_GetJoystickButton(m_wheel.handle,
+                                             m_wheel_settings.buttons[static_cast<usize>(role)]))
+                || key_down(m_wheel_keys[static_cast<usize>(role)]);
         };
 
         // An H shifter: a button per gear, and maybe one for neutral.
@@ -2996,13 +3150,21 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
                 m_shift_neutral_frames = crossing;
             }
         };
+        const auto wheel_key = [&](Config::WheelRole role) {
+            return m_wheel_keys[static_cast<usize>(role)] != SDL_SCANCODE_UNKNOWN;
+        };
+        const auto pad_key = [&](Config::PadRole role) {
+            return m_pad_keys[0][static_cast<u32>(role)] != SDL_SCANCODE_UNKNOWN;
+        };
         bool sequential = false;
-        if (m_wheel.handle != nullptr) {
+        if (m_wheel.handle != nullptr || wheel_key(Config::WheelRole::GearUp)
+            || wheel_key(Config::WheelRole::GearDown)) {
             sequential = true;
             step(role_held(Config::WheelRole::GearUp), role_held(Config::WheelRole::GearDown),
                  &m_gear_up_held, &m_gear_down_held);
         }
-        if (pad_for(0) != nullptr) {
+        if (pad_for(0) != nullptr || pad_key(Config::PadRole::GearUp)
+            || pad_key(Config::PadRole::GearDown)) {
             sequential = true;
             step(pad_role_held(0, Config::PadRole::GearUp),
                  pad_role_held(0, Config::PadRole::GearDown),
@@ -3051,6 +3213,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             up   |= role_held(Config::WheelRole::GearUp);
             down |= role_held(Config::WheelRole::GearDown);
         }
+        up   |= key_down(m_wheel_keys[static_cast<usize>(Config::WheelRole::GearUp)]);
+        down |= key_down(m_wheel_keys[static_cast<usize>(Config::WheelRole::GearDown)]);
 
         if (up)   inputs->in1 &= static_cast<u8>(~0x10);
         if (down) inputs->in1 &= static_cast<u8>(~0x20);
@@ -3138,6 +3302,9 @@ void Input::print_bindings()
     std::printf("  F6 F7                quick-save, quick-load state (more slots in F10)\n");
     std::printf("  F8                   toggle FPS counter\n");
     std::printf("  F10 F11 F12          settings menu, fullscreen, screenshot\n");
+    std::printf("The Wheel and Gamepad tabs can bind a key beside each button, which then\n");
+    std::printf("leaves its role above; the emulator's keys (Escape, P, Tab, Backspace,\n");
+    std::printf("F6-F12) cannot be bound.\n");
     std::printf("\nVirtual On (keyboard): WASD left lever, arrows right lever,\n");
     std::printf("Q/E left shot/dash, Right Shift/Right Ctrl right shot/dash.\n");
     std::printf("\nThe first gamepad to connect is player 1. Gamepads and the keyboard\n");

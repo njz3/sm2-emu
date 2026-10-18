@@ -147,6 +147,7 @@ void apply_input_background(bool on)
     w.rumble_strength = c.wheel_rumble_strength;
     w.rumble_engine   = c.wheel_rumble_engine;
     w.buttons       = c.wheel_buttons;
+    w.keys          = c.wheel_keys;
     w.shifter_neutral  = c.wheel_shifter_neutral;
     w.shift_neutral_ms = c.wheel_shift_neutral_ms;
     w.steer_axis    = c.wheel_steer_axis;
@@ -1051,6 +1052,7 @@ int main(int argc, char** argv)
     options.config.wheel_rumble_strength = from_file.wheel_rumble_strength;
     options.config.wheel_rumble_engine   = from_file.wheel_rumble_engine;
     options.config.wheel_buttons       = from_file.wheel_buttons;
+    options.config.wheel_keys          = from_file.wheel_keys;
     options.config.wheel_shifter_neutral  = from_file.wheel_shifter_neutral;
     options.config.wheel_shift_neutral_ms = from_file.wheel_shift_neutral_ms;
     options.config.wheel_steer_axis    = from_file.wheel_steer_axis;

@@ -1024,6 +1024,27 @@ msgid "press a button..."
 msgstr "appuyez sur un bouton..."
 
 #: src/osd/gui.cpp
+msgid ""
+"A key can be bound as well: it then leaves its default role.\n"
+"The emulator's keys (Esc, F6 to F12, P, Tab, Backspace) cannot be."
+msgstr ""
+"Une touche peut aussi être assignée : elle quitte alors son rôle par défaut.\n"
+"Les touches de l'émulateur (Échap, F6 à F12, P, Tab, Retour arrière) ne le peuvent pas."
+
+#: src/osd/gui.cpp
+msgid "press a button or a key..."
+msgstr "appuyez sur un bouton ou une touche..."
+
+#: src/osd/gui.cpp
+#, c-format
+msgid "key %s"
+msgstr "touche %s"
+
+#: src/osd/gui.cpp
+msgid "A key works too, and leaves its default role."
+msgstr "Une touche marche aussi, et quitte son rôle par défaut."
+
+#: src/osd/gui.cpp
 #, no-c-format
 msgid "Bind"
 msgstr "Assigner"

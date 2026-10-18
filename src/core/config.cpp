@@ -200,6 +200,13 @@ constexpr std::array<const char*, Config::kPadRoleCount> kPadRoleNames = {
     "up", "down", "left", "right", "start", "coin", "gear_up", "gear_down",
 };
 
+/// Wheel-role names in the wheel_key_* settings, in Config::WheelRole order,
+/// as the wheel_button_* settings name them.
+constexpr std::array<const char*, Config::kWheelRoleCount> kWheelRoleNames = {
+    "start", "coin", "1", "2", "3", "4", "gear_up", "gear_down",
+    "test", "service", "menu", "gear_1", "gear_2", "gear_3", "gear_4", "gear_neutral",
+};
+
 /// Pad analogue-axis role names in the ini, in Config::PadAxisRole order.
 constexpr std::array<const char*, Config::kPadAxisCount> kPadAxisNames = {
     "aim_x", "aim_y", "accel", "brake", "lever_x", "lever_y",
@@ -353,7 +360,8 @@ enum class PadKey { NotPad, Unknown, BadValue, Set };
 [[nodiscard]] bool is_pad_key(const std::string& key)
 {
     return key.rfind("pad1_button_", 0) == 0 || key.rfind("pad2_button_", 0) == 0
-        || key.rfind("pad1_axis_", 0) == 0 || key.rfind("pad2_axis_", 0) == 0;
+        || key.rfind("pad1_axis_", 0) == 0 || key.rfind("pad2_axis_", 0) == 0
+        || key.rfind("pad1_key_", 0) == 0 || key.rfind("pad2_key_", 0) == 0;
 }
 
 [[nodiscard]] PadKey parse_pad_key(const std::string& key, const std::string& value,
@@ -365,6 +373,16 @@ enum class PadKey { NotPad, Unknown, BadValue, Set };
     const bool is_button = key.compare(4, 8, "_button_") == 0;
     const usize player = key[3] == '2' ? 1 : 0;
     const auto  result = [](bool ok) { return ok ? PadKey::Set : PadKey::BadValue; };
+    if (key.compare(4, 5, "_key_") == 0) {
+        const std::string role = key.substr(std::strlen("pad1_key_"));
+        for (u32 r = 0; r < Config::kPadRoleCount; ++r) {
+            if (role == kPadRoleNames[r]) {
+                layout->keys[player][r] = value;
+                return PadKey::Set;
+            }
+        }
+        return PadKey::Unknown;
+    }
     if (is_button) {
         const std::string role = key.substr(std::strlen("pad1_button_"));
         for (u32 r = 0; r < Config::kPadRoleCount; ++r) {
@@ -389,12 +407,23 @@ enum class PadKey { NotPad, Unknown, BadValue, Set };
     return PadKey::Unknown;
 }
 
-void write_pad_layout(std::ostream& out, const Config::PadLayout& layout)
+/// `base` is the layout a [family] section starts from, nullptr for [gamepad]:
+/// a key is written when bound, or to unbind one the base has.
+void write_pad_layout(std::ostream& out, const Config::PadLayout& layout,
+                      const Config::PadLayout* base = nullptr)
 {
     for (u32 p = 0; p < 2; ++p) {
         for (u32 r = 0; r < Config::kPadRoleCount; ++r) {
             out << "pad" << (p + 1) << "_button_" << kPadRoleNames[r] << " = "
                 << layout.buttons[p][r] << "\n";
+        }
+    }
+    for (u32 p = 0; p < 2; ++p) {
+        for (u32 r = 0; r < Config::kPadRoleCount; ++r) {
+            if (!layout.keys[p][r].empty() || (base != nullptr && !base->keys[p][r].empty())) {
+                out << "pad" << (p + 1) << "_key_" << kPadRoleNames[r] << " = "
+                    << layout.keys[p][r] << "\n";
+            }
         }
     }
     for (u32 p = 0; p < 2; ++p) {
@@ -924,6 +953,15 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_bool(value, &out->scrape_artwork)) {
                 bad_value();
             }
+        } else if (key.rfind("wheel_key_", 0) == 0) {
+            const std::string role = key.substr(std::strlen("wheel_key_"));
+            const auto found = std::find(kWheelRoleNames.begin(), kWheelRoleNames.end(), role);
+            if (found != kWheelRoleNames.end()) {
+                out->wheel_keys[static_cast<usize>(found - kWheelRoleNames.begin())] = value;
+            } else {
+                problems->push_back(path + ":" + std::to_string(number)
+                                    + ": unknown setting '" + key + "'");
+            }
         } else if (key == "log_level") {
             log::Level level = log::Level::Info;
             if (parse_log_level(value, &level)) {
@@ -1212,6 +1250,16 @@ bool save_config(const std::string& path, const Config& config)
         << "wheel_button_gear_3 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Gear3)] << "\n"
         << "wheel_button_gear_4 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Gear4)] << "\n"
         << "wheel_button_gear_neutral = " << config.wheel_buttons[cfg_role(Config::WheelRole::GearNeutral)] << "\n"
+        << "# A keyboard key per control too, alongside the button: wheel_key_ and\n"
+        << "# the name after wheel_button_, set to an SDL scancode name (the key's\n"
+        << "# place on a US keyboard: Z, 5, Left Ctrl, F1). A bound key leaves the\n"
+        << "# role it has by default. The same for gamepads: pad1_key_button1...\n";
+    for (u32 r = 0; r < Config::kWheelRoleCount; ++r) {
+        if (!config.wheel_keys[r].empty()) {
+            out << "wheel_key_" << kWheelRoleNames[r] << " = " << config.wheel_keys[r] << "\n";
+        }
+    }
+    out
         << "# With an H shifter bound: its lever in none of the gears is in neutral,\n"
         << "# as on the cabinet. Off, the last gear stays until another is chosen.\n"
         << "wheel_shifter_neutral = " << bool_text(config.wheel_shifter_neutral) << "\n"
@@ -1302,7 +1350,7 @@ bool save_config(const std::string& path, const Config& config)
     write_pad_layout(out, config.pad);
     for (const auto& [family, layout] : config.pad_layouts) {
         out << "\n[" << family << "]\n";
-        write_pad_layout(out, layout);
+        write_pad_layout(out, layout, &config.pad);
     }
 
     return out.good();

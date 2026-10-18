@@ -1299,6 +1299,8 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
     ImGui::Separator();
     ImGui::TextUnformatted(tr("Buttons"));
     ImGui::TextDisabled("%s", tr("Press Bind, then press the wheel button for that control."));
+    ImGui::TextDisabled("%s", tr("A key can be bound as well: it then leaves its default role.\n"
+                                 "The emulator's keys (Esc, F6 to F12, P, Tab, Backspace) cannot be."));
 
     struct ButtonRow { const char* name; Config::WheelRole role; };
     const ButtonRow button_rows[] = {
@@ -1326,22 +1328,26 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
     for (const ButtonRow& r : button_rows) {
         const u32 role_index = static_cast<u32>(r.role);
         ImGui::PushID(static_cast<int>(role_index));
-        const s32 bound = config.wheel_buttons[role_index];
+        const s32          bound = config.wheel_buttons[role_index];
+        const std::string& key   = config.wheel_keys[role_index];
         ImGui::TextUnformatted(tr(r.name));
         ImGui::SameLine(button_column);
-        if (bound < 0) {
-            ImGui::TextUnformatted(tr("unbound"));
-        } else {
-            ImGui::TextUnformatted(trf("button %d", bound).c_str());
+        std::string value = bound < 0 ? std::string() : trf("button %d", bound);
+        if (!key.empty()) {
+            value += (value.empty() ? "" : " + ") + trf("key %s", Input::key_label(key).c_str());
         }
+        ImGui::TextUnformatted(value.empty() ? tr("unbound") : value.c_str());
         ImGui::SameLine();
         const bool capturing = m_capture == Capture::Button && m_capture_role == role_index;
         if (capturing) {
-            ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "%s", tr("press a button..."));
+            ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "%s", tr("press a button or a key..."));
             if (input != nullptr) {
                 const s32 got = input->pressed_wheel_button();
                 if (got >= 0) {
                     config.wheel_buttons[role_index] = got;
+                    m_capture = Capture::None;
+                } else if (const s32 got_key = input->captured_key(); got_key >= 0) {
+                    config.wheel_keys[role_index] = Input::key_name(got_key);
                     m_capture = Capture::None;
                 }
             }
@@ -1352,10 +1358,14 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
         } else if (ImGui::SmallButton(tr_id("Bind"))) {
             m_capture      = Capture::Button;
             m_capture_role = role_index;
+            if (input != nullptr) {
+                input->key_capture_begin();
+            }
         }
         ImGui::SameLine();
         if (ImGui::SmallButton(tr_id("clear"))) {
             config.wheel_buttons[role_index] = -1;
+            config.wheel_keys[role_index].clear();
         }
         ImGui::PopID();
     }
@@ -1621,6 +1631,7 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
             binds->axes[p]            = defaults.axes[p];
             binds->axis_invert[p]     = defaults.axis_invert[p];
             binds->axis_buttons[p]    = defaults.axis_buttons[p];
+            binds->keys[p]            = defaults.keys[p];
             m_pad_capture_player      = -1;
             m_pad_axis_capture_player = -1;
         }
@@ -1738,8 +1749,15 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
         ImU32       colour = IM_COL32(150, 185, 235, 255);
         bool        capturing;
         if (!is_axis) {
-            const s32 bound = binds->buttons[p][slot.role];
-            value           = bound < 0 ? tr("unbound") : Input::pad_button_name(bound);
+            const s32          bound = binds->buttons[p][slot.role];
+            const std::string& key   = binds->keys[p][slot.role];
+            value = bound < 0 ? std::string() : Input::pad_button_name(bound);
+            if (!key.empty()) {
+                value += (value.empty() ? "" : " + ") + trf("key %s", Input::key_label(key).c_str());
+            }
+            if (value.empty()) {
+                value = tr("unbound");
+            }
             target          = art_binding_point(layout, bound);
             colour          = button_colour(bound);
             capturing       = m_pad_capture_player == edit && m_pad_capture_role == slot.role;
@@ -1773,13 +1791,16 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
         ImGui::SetCursorScreenPos(pos);
         ImGui::InvisibleButton("slot", ImVec2(slot_w, slot_h));
         const bool hovered = ImGui::IsItemHovered();
-        if (hovered) {
+        if (hovered && slot.kind == Kind::Button) {
+            const std::string text = std::string(tr("Click, then press a button or pull a trigger.\n"
+                                                    "Right-click to unbind."))
+                                   + "\n" + tr("A key works too, and leaves its default role.");
+            tooltip(text.c_str());
+        } else if (hovered) {
             tooltip(slot.kind == Kind::Stick ? tr("Click, then push a stick.\n"
                                                   "Right-click to go back to the default.")
-                    : slot.kind == Kind::Pedal ? tr("Click, then pull the trigger, push a stick\n"
-                                                    "or press a button. Right-click for the default.")
-                                               : tr("Click, then press a button or pull a trigger.\n"
-                                                    "Right-click to unbind."));
+                                             : tr("Click, then pull the trigger, push a stick\n"
+                                                  "or press a button. Right-click for the default."));
         }
         if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
             if (capturing) {
@@ -1798,6 +1819,7 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
                 m_pad_capture_role        = slot.role;
                 if (input != nullptr) {
                     input->pad_axis_baseline(static_cast<u32>(edit), m_pad_axis_baseline.data());
+                    input->key_capture_begin();
                 }
             }
             capturing = !capturing;
@@ -1814,6 +1836,7 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
                 binds->axis_buttons[p][slot.role] = -1;
             } else {
                 binds->buttons[p][slot.role] = -1;
+                binds->keys[p][slot.role].clear();
             }
         }
 
@@ -1828,7 +1851,7 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
         draw->PushClipRect(pos, end, true);
         draw->AddText(ImVec2(pos.x + 10.0f * s, text_y), IM_COL32(230, 232, 236, 255), tr(slot.name));
         if (capturing) {
-            value = is_axis ? tr("operate it...") : tr("press a button...");
+            value = is_axis ? tr("operate it...") : tr("press a button or a key...");
         }
         const ImU32 value_col = capturing ? IM_COL32(140, 190, 255, 255) : IM_COL32(170, 176, 186, 255);
         const float value_w   = ImGui::CalcTextSize(value.c_str()).x;
@@ -1892,6 +1915,9 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
                 if (got >= 0) {
                     binds->buttons[p][slot.role] = got;
                     m_pad_capture_player              = -1;
+                } else if (const s32 key = input->captured_key(); key >= 0) {
+                    binds->keys[p][slot.role] = Input::key_name(key);
+                    m_pad_capture_player      = -1;
                 }
             }
         }

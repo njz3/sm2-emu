@@ -136,6 +136,8 @@ public:
         /// -1 unbinds. Set by the GUI, since numbering differs between wheels.
         std::array<s32, Config::kWheelRoleCount> buttons =
             Config{}.wheel_buttons;
+        /// A key per role too, by SDL scancode name; empty for none.
+        std::array<std::string, Config::kWheelRoleCount> keys{};
 
         /// An H shifter's lever in none of the gears is in neutral; and how
         /// long, in ms, a sequential shift between two gears shows neutral.
@@ -193,6 +195,18 @@ public:
     /// main loop to toggle the overlay. Edge-triggered, so a held button fires
     /// once. Returns false when no wheel is connected or Menu is unbound.
     [[nodiscard]] bool menu_button_pressed();
+
+    /// Key capture for the binding UI: begin() notes the keys already held,
+    /// so captured_key() returns one pressed since, as an SDL_Scancode, or -1.
+    /// The emulator's own keys are never captured.
+    void key_capture_begin();
+    [[nodiscard]] s32 captured_key();
+
+    /// A key's SDL scancode name, as the config stores it.
+    [[nodiscard]] static std::string key_name(s32 key);
+
+    /// A stored key's name on this keyboard's layout, for the settings UI.
+    [[nodiscard]] static std::string key_label(const std::string& name);
 
     /// Emulator shortcuts on a pad's Guide button, laid out as Batocera's
     /// hotkeys: Guide+A menu, Guide+X / Guide+Y quick save / load, Guide+Start
@@ -340,13 +354,7 @@ public:
     static constexpr usize kPadAxes  = Config::kPadAxisCount;
 
     /// The running game's gamepad layout, pushed from the config each frame.
-    void set_pad_layout(const Config::PadLayout& layout)
-    {
-        m_pad_buttons      = layout.buttons;
-        m_pad_axes         = layout.axes;
-        m_pad_axis_invert  = layout.axis_invert;
-        m_pad_axis_buttons = layout.axis_buttons;
-    }
+    void set_pad_layout(const Config::PadLayout& layout);
 
     /// Whether the physical SDL `button` is down on `player`'s pad.
     [[nodiscard]] bool pad_physical_down(u32 player, s32 button) const;
@@ -498,6 +506,18 @@ private:
     /// Give the open wheel's axes their roles: calibrated, or auto-detected.
     void assign_wheel_axes();
 
+    /// The bound keys' scancodes from their names, and the keys taken from
+    /// the default key map.
+    void resolve_keys();
+
+    /// The keyboard as the default key map reads it: a key bound to a role
+    /// leaves its default one. Fills `buffer`; nullptr without a keyboard.
+    [[nodiscard]] const bool* default_keys(std::array<bool, SDL_SCANCODE_COUNT>* buffer,
+                                           int* count) const;
+
+    /// Whether a bound key is held; false for SDL_SCANCODE_UNKNOWN (none).
+    [[nodiscard]] static bool key_down(SDL_Scancode key);
+
 
     /// Read one driving control straight off the wheel, or a sentinel byte when
     /// the wheel has no axis for it. Steering is centred, pedals rest low.
@@ -549,6 +569,16 @@ private:
     mutable bool m_pad_gear_up_held   = false;
     mutable bool m_pad_gear_down_held = false;
     bool         m_menu_held       = false;  ///< edge state for the Menu-bound wheel button.
+
+    /// The keys bound beside the wheel's and the pads' buttons, per role, and
+    /// their names as last resolved; the keys they take from the default map.
+    std::array<SDL_Scancode, Config::kWheelRoleCount>          m_wheel_keys{};
+    std::array<std::array<SDL_Scancode, kPadRoles>, 2>         m_pad_keys{};
+    std::array<std::string, Config::kWheelRoleCount>           m_wheel_key_names{};
+    std::array<std::array<std::string, kPadRoles>, 2>          m_pad_key_names{};
+    std::array<bool, SDL_SCANCODE_COUNT>                       m_key_taken{};
+    /// Keys held when a capture began, not taken for the binding.
+    std::array<bool, SDL_SCANCODE_COUNT>                       m_key_capture_held{};
 
     /// Desert Tank's forward/reverse shift.
     mutable bool m_desert_shift      = false;  ///< latched forward(false)/reverse(true).

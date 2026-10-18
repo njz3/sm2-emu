@@ -281,6 +281,11 @@ struct Config {
         -1,  // GearNeutral
     };
 
+    /// A keyboard key per role too, alongside the wheel button: its SDL scancode
+    /// name ("Z", "Left Ctrl"), empty for none. A bound key leaves the role it
+    /// has by default; the emulator's own keys cannot be bound.
+    std::array<std::string, kWheelRoleCount> wheel_keys{};
+
     /// With an H shifter, holding no gear means neutral. When off, the last
     /// gear stays engaged.
     bool wheel_shifter_neutral = true;
@@ -385,6 +390,10 @@ struct Config {
             { -1, -1, -1, -1, -1, -1 },
             { -1, -1, -1, -1, -1, -1 },
         }};
+
+        /// A keyboard key per role too, per player, alongside the button: its
+        /// SDL scancode name, empty for none (see wheel_keys).
+        std::array<std::array<std::string, kPadRoleCount>, 2> keys{};
 
         bool operator==(const PadLayout&) const = default;
     };
