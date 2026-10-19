@@ -19,6 +19,7 @@
 #include "osd/daytona_board.h"
 #include "osd/drive_command.h"
 #include "osd/indy_board.h"
+#include "render/backend.h"
 #include "rom/game.h"
 
 #include <SDL3/SDL.h>
@@ -304,6 +305,7 @@ public:
         bool  calibrating = false;
         float win_x       = 0.5f;
         float win_y       = 0.5f;
+        bool  idle        = false;
     };
     [[nodiscard]] const std::array<GunAim, kPlayers>& gun_aims() const { return m_gun_aims; }
 
@@ -387,10 +389,12 @@ public:
     /// Present-stage placement, pushed from the config each frame, so the gun /
     /// mouse pointer maps onto the same letterbox rectangle the backend draws
     /// the image into. A mismatch would offset every shot from the cursor.
-    void set_present_placement(AspectMode aspect, ScalingMethod method)
+    void set_present_placement(AspectMode aspect, ScalingMethod method,
+                               render::PictureArea area = {})
     {
         m_present_aspect = aspect;
         m_present_method = method;
+        m_present_area   = area;
     }
 
     /// Widescreen columns each side of the 4:3 screen, 0 for none: a gun can
@@ -611,6 +615,14 @@ private:
     /// Written by gather_lightguns, read by the GUI. Mutable for the same reason.
     mutable std::array<GunAim, kPlayers> m_gun_aims{};
 
+    /// Each player's last raw aim and when it last moved or fired, for GunAim::idle.
+    /// A gun counts as idle until it is first used.
+    mutable std::array<bool, kPlayers>  m_gun_sampled{};
+    mutable std::array<bool, kPlayers>  m_gun_used{};
+    mutable std::array<float, kPlayers> m_gun_prev_x{};
+    mutable std::array<float, kPlayers> m_gun_prev_y{};
+    mutable std::array<u64, kPlayers>   m_gun_last_use_ms{};
+
     /// Recoil settings and the previous trigger level per gun, so a pulse fires
     /// once on the press edge rather than every frame the trigger is held.
     /// Sized to LightGuns::kMaxGuns (which is forward-declared here) plus slack.
@@ -676,6 +688,7 @@ private:
     AspectMode    m_present_aspect = AspectMode::FourThree;
     u32           m_wide_columns   = 0;
     ScalingMethod m_present_method = ScalingMethod::SharpBilinear;
+    render::PictureArea m_present_area;
     bool          m_sinden_border  = false;
 
     bool             m_started = false;

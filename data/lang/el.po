@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-18 15:17+1000\n"
+"POT-Creation-Date: 2026-10-19 22:31+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -318,6 +318,24 @@ msgstr "Καμπυλότητα"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Bezel"
+msgstr "Πλαίσιο"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"In fullscreen, frame the 4:3 picture with an image from\n"
+"the bezels directory (Paths tab): <game>.png, the parent\n"
+"set's, or default.png. The picture fills the image's\n"
+"transparent window."
+msgstr ""
+"Σε πλήρη οθόνη, πλαισιώνει την εικόνα 4:3 με μια εικόνα από\n"
+"τον φάκελο πλαισίων (καρτέλα Διαδρομές): <game>.png, του\n"
+"γονικού σετ ή default.png. Η εικόνα γεμίζει το\n"
+"διάφανο παράθυρο του πλαισίου."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Enhancement (cosmetic, beyond the original hardware)"
 msgstr "Βελτίωση (διακοσμητική, πέρα από το αρχικό υλικό)"
 
@@ -517,6 +535,40 @@ msgstr "Φάκελος στιγμιοτύπων"
 #, no-c-format
 msgid "Where F12 screenshots are written."
 msgstr "Πού γράφονται τα στιγμιότυπα οθόνης του F12."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bezels directory"
+msgstr "Φάκελος πλαισίων"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Bezel images: <game>.png, the parent set's, or default.png.\n"
+"Empty means a bezels folder beside sm2-emu.ini."
+msgstr ""
+"Εικόνες πλαισίου: <game>.png, του γονικού σετ ή default.png.\n"
+"Κενό σημαίνει φάκελο bezels δίπλα στο sm2-emu.ini."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crosshairs directory"
+msgstr "Φάκελος σταυρονήματος"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+"<game>.png for both, then the parent set's, then default.\n"
+"Drawn at their own size on a 1080-line picture. Without\n"
+"one the built-in crosshair is drawn.\n"
+"Empty means a crosshairs folder beside sm2-emu.ini."
+msgstr ""
+"Εικόνες σταυρονήματος: <game>-p1.png (-p2 για τον παίκτη 2) ή\n"
+"<game>.png και για τους δύο, μετά του γονικού σετ, μετά default.\n"
+"Σχεδιάζονται στο δικό τους μέγεθος σε εικόνα 1080 γραμμών. Χωρίς\n"
+"εικόνα σχεδιάζεται το ενσωματωμένο σταυρόνημα.\n"
+"Κενό σημαίνει φάκελο crosshairs δίπλα στο sm2-emu.ini."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -729,6 +781,68 @@ msgstr ""
 #, no-c-format
 msgid "Resistance"
 msgstr "Αντίσταση"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"Ενίσχυση σε κάθε δύναμη της πλακέτας κίνησης. Στο 100 %, η\n"
+"πλήρης ισχύς της πλακέτας (63) δίνει την πλήρη δύναμη του\n"
+"τιμονιού, κάθε δύναμη αναλογικά. Το 200 % διπλασιάζει κάθε\n"
+"δύναμη: όσες ξεπερνούν το μισό της ισχύος της πλακέτας (32,\n"
+"η ισχυρότερη ροπή του Sega Rally) τότε κορέννυνται."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Panel spring"
+msgstr "Ελατήριο πάνελ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The centring spring of the Sega Rally Championship and\n"
+"Daytona USA cabinets: very light, it brings the wheel\n"
+"back and is barely felt when held against. A share of\n"
+"the resistance above. The other games' cabinets drive\n"
+"the wheel with no spring, and ignore this setting."
+msgstr ""
+"Το ελατήριο κεντραρίσματος των μηχανημάτων Sega Rally\n"
+"Championship και Daytona USA: πολύ ελαφρύ, επαναφέρει το\n"
+"τιμόνι και μόλις γίνεται αισθητό όταν το κρατάς. Μέρος της\n"
+"αντίστασης παραπάνω. Τα μηχανήματα των άλλων παιχνιδιών\n"
+"κινούν το τιμόνι χωρίς ελατήριο και αγνοούν τη ρύθμιση."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Sega Rally Championship and Daytona USA only, all versions."
+msgstr "Μόνο Sega Rally Championship και Daytona USA, όλες οι εκδόσεις."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Drive board DIP strength"
+msgstr "Ισχύς DIP της πλακέτας κίνησης"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The motor strength set on the drive board's DIP switches,\n"
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
+msgstr ""
+"Η ισχύς του μοτέρ που ορίζεται με τους διακόπτες DIP της\n"
+"πλακέτας κίνησης, όσοι είναι ON μετρημένοι δυαδικά: 0 = όλοι\n"
+"OFF. Sega Rally: διακόπτες 1-3, 0 έως\n"
+"7 προστίθεται σε κάθε ροπή. Daytona USA: διακόπτες 1-3,\n"
+"τετραπλάσιο. Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"διακόπτες 1-1 έως 1-3, 0 έως 7 προστίθεται σε κάθε δύναμη."
 
 #: src/osd/gui.cpp
 #, no-c-format

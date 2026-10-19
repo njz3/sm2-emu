@@ -134,6 +134,10 @@ public:
     /// The running game's family, empty when none is loaded.
     void set_current_family(std::string key) { m_current_family = std::move(key); }
 
+    void set_current_game(std::string name) { m_current_game = std::move(name); }
+
+    [[nodiscard]] render::PictureArea picture_area() const { return m_present_area; }
+
     // -- save states -------------------------------------------------------
 
     /// One save-state slot for the States tab, fed each frame so the GUI need
@@ -271,11 +275,11 @@ private:
     void draw_status_bar(float measured_hz);
     void draw_fps_overlay(float measured_hz, const char* renderer_label);
     void draw_notification();
-    void draw_crosshairs(const class Input* input);
+    void draw_crosshairs(const Config& config, const class Input* input);
     void draw_calibration_markers(const class Input* input);
     void draw_sinden_border(const Config& config);
 
-    enum class DirPickerTarget { None, RomDir, NvramDir, ScreenshotDir };
+    enum class DirPickerTarget { None, RomDir, NvramDir, ScreenshotDir, BezelDir, CrosshairDir };
 
     void open_dir_picker(DirPickerTarget target, const std::string& initial);
 
@@ -307,6 +311,7 @@ private:
     AspectMode    m_present_aspect = AspectMode::FourThree;
     AspectMode    m_shown_aspect   = AspectMode::FourThree;
     ScalingMethod m_present_method = ScalingMethod::SharpBilinear;
+    render::PictureArea m_present_area;
 
     /// GPU capabilities for gating the enhancement options (set each frame).
     bool  m_caps_anisotropy     = false;
@@ -398,6 +403,35 @@ private:
     render::Backend* m_backend = nullptr;
     [[nodiscard]] const PadArt* pad_art();
     void                        release_pad_art();
+
+    // -- bezel -------------------------------------------------------------
+    struct Bezel {
+        std::string                    path;
+        render::Backend::TextureHandle handle = 0;
+        float                          w      = 0.0f;
+        float                          h      = 0.0f;
+        float                          window_x = 0.0f;
+        float                          window_y = 0.0f;
+        float                          window_w = 0.0f;
+        float                          window_h = 0.0f;
+    };
+    Bezel       m_bezel;
+    std::string m_bezel_lookup;
+    std::string m_current_game;
+    void draw_bezel(const Config& config);
+    void load_bezel(const std::string& path);
+    void release_bezel();
+
+    struct CrosshairImage {
+        std::string                    path;
+        render::Backend::TextureHandle handle = 0;
+        float                          w      = 0.0f;
+        float                          h      = 0.0f;
+    };
+    std::array<CrosshairImage, 2> m_crosshair_images;
+    std::string                   m_crosshair_lookup;
+    void update_crosshair_images(const Config& config);
+    void release_crosshair_images();
 
     // -- game picker state -------------------------------------------------
     bool                       m_picker_enabled = false;

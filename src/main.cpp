@@ -1001,6 +1001,9 @@ int main(int argc, char** argv)
     options.config.crt_mask_strength     = from_file.crt_mask_strength;
     options.config.crt_glow_strength     = from_file.crt_glow_strength;
     options.config.crt_curvature         = from_file.crt_curvature;
+    options.config.bezel                 = from_file.bezel;
+    options.config.bezel_dir             = from_file.bezel_dir;
+    options.config.crosshair_dir         = from_file.crosshair_dir;
 
     options.config.texture_filter = from_file.texture_filter;
     options.config.anisotropy     = from_file.anisotropy;
@@ -2710,7 +2713,8 @@ int main(int argc, char** argv)
                 input.set_pad_rumble(options.config.pad_rumble,
                                      options.config.pad_rumble_strength,
                                      options.config.pad_rumble_cornering);
-                input.set_present_placement(shown_aspect(), options.config.scaling_method);
+                input.set_present_placement(shown_aspect(), options.config.scaling_method,
+                                            gui.picture_area());
                 input.set_sinden_border(options.config.sinden_border);
                 const auto drive_writes = machine_iface->take_drive_board_writes();
                 input.update_drive_board(loaded->game, drive_writes.view());
@@ -3062,6 +3066,7 @@ int main(int argc, char** argv)
                 render::PresentOptions present;
                 present.scaling_method        = options.config.scaling_method;
                 present.aspect_mode           = shown_aspect();
+                present.picture_area          = gui.picture_area();
                 present.crt_enabled           = options.config.crt_enabled;
                 present.crt_scanline_strength = options.config.crt_scanline_strength;
                 present.crt_mask_strength     = options.config.crt_mask_strength;
@@ -3133,6 +3138,7 @@ int main(int argc, char** argv)
             } else {
                 gui.set_state_slots(machine_iface != nullptr, {});
             }
+            gui.set_current_game(loaded.has_value() ? loaded->game.name : std::string());
             gui.set_current_family(loaded.has_value() ? game_family(loaded->game)
                                                       : std::string());
             gui.set_shown_aspect(shown_aspect());

@@ -1903,7 +1903,7 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
     if (pointer.width > 1 && pointer.height > 1) {
         const render::Letterbox box = render::compute_game_rect(
             static_cast<u32>(pointer.width), static_cast<u32>(pointer.height),
-            m_present_aspect, m_present_method);
+            m_present_aspect, m_present_method, m_present_area);
         if (box.width > 0.0f && box.height > 0.0f) {
             ptr_fx = (pointer.x - box.x) / box.width;
             ptr_fy = (pointer.y - box.y) / box.height;
@@ -2005,7 +2005,7 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
                     && win_w > 0 && win_h > 0 && display.w > 0 && display.h > 0);
             const render::Letterbox box = render::compute_game_rect(
                 static_cast<u32>(pix_w), static_cast<u32>(pix_h), m_present_aspect,
-                m_present_method);
+                m_present_method, m_present_area);
             if (placed && box.width > 0.0f && box.height > 0.0f) {
                 if (!fullscreen) {
                     screen_x = static_cast<float>(display.x - win_x) / static_cast<float>(win_w);
@@ -2175,8 +2175,26 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         return GunAim{active, mouse, std::clamp(g.x, -side, 1.0f + side),
                       std::clamp(g.y, 0.0f, 1.0f), g.calibrating, g.win_x, g.win_y};
     };
+    // A gun nobody is holding goes still, so its crosshair hides after a few seconds
+    constexpr u64 kIdleMs = 3000;
+    const u64     now     = SDL_GetTicks();
+    const auto    idle    = [&](usize player, const GunInput& g) {
+        const bool moved = m_gun_sampled[player]
+                        && (std::fabs(g.x - m_gun_prev_x[player]) > 0.002f
+                            || std::fabs(g.y - m_gun_prev_y[player]) > 0.002f);
+        m_gun_sampled[player] = true;
+        m_gun_prev_x[player]  = g.x;
+        m_gun_prev_y[player]  = g.y;
+        if (moved || g.trigger || g.reload || g.missile || on_mouse[player]) {
+            m_gun_used[player]        = true;
+            m_gun_last_use_ms[player] = now;
+        }
+        return !m_gun_used[player] || now - m_gun_last_use_ms[player] > kIdleMs;
+    };
     m_gun_aims[0] = record(!positional, on_mouse[0], p1);
     m_gun_aims[1] = record(p2_active && !positional, on_mouse[1], p2);
+    m_gun_aims[0].idle = idle(0, p1);
+    m_gun_aims[1].idle = idle(1, p2);
 
     if (positional) {
         // Positional gun: the aim is an analogue axis. Scale the mouse fraction

@@ -181,9 +181,20 @@ using GpuStageTimes = std::array<GpuStageTime, static_cast<usize>(GpuStage::kCou
 /// BackendConfig carry the same shape. All present-only: changing any of these
 /// touches sampler/shader/letterbox state, never a render target, so it applies
 /// live without a device or swapchain rebuild.
+/// Where the picture goes, as fractions of the window.
+struct PictureArea {
+    float x      = 0.0F;
+    float y      = 0.0F;
+    float width  = 1.0F;
+    float height = 1.0F;
+
+    bool operator==(const PictureArea&) const = default;
+};
+
 struct PresentOptions {
     ScalingMethod scaling_method = ScalingMethod::SharpBilinear;
     AspectMode    aspect_mode    = AspectMode::FourThree;
+    PictureArea   picture_area;
 
     bool crt_enabled           = false;
     u32  crt_scanline_strength = 40;

@@ -158,6 +158,9 @@ struct Config {
     u32  crt_glow_strength     = 20;
     u32  crt_curvature         = 0;
 
+    /// Bezel artwork in fullscreen.
+    bool bezel = false;
+
     /// Optional graphics enhancement beyond the original hardware, faithful by
     /// default and GPU-gated. anisotropy is the 2..16 tap ceiling, clamped to
     /// the GPU max. Live-switchable where the GPU supports them.
@@ -516,6 +519,12 @@ struct Config {
 
     /// F12 screenshots. Empty here; defaulted like nvram_dir.
     std::string screenshot_dir;
+
+    /// Empty means `bezels` beside the ini.
+    std::string bezel_dir;
+
+    /// Empty means `crosshairs` beside the ini.
+    std::string crosshair_dir;
 
     /// Game-picker art/metadata cache. Always derived as `<config dir>/artwork` by
     /// resolve_default_paths(). A runtime field only, for the picker to read.

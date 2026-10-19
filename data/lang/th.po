@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-18 15:17+1000\n"
+"POT-Creation-Date: 2026-10-19 22:31+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -319,6 +319,24 @@ msgstr "ความโค้ง"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Bezel"
+msgstr "กรอบ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"In fullscreen, frame the 4:3 picture with an image from\n"
+"the bezels directory (Paths tab): <game>.png, the parent\n"
+"set's, or default.png. The picture fills the image's\n"
+"transparent window."
+msgstr ""
+"ในโหมดเต็มหน้าจอ จะใส่กรอบภาพ 4:3 ด้วยภาพจาก\n"
+"ไดเรกทอรีกรอบ (แท็บพาธ): <game>.png, ภาพของชุด\n"
+"แม่ หรือ default.png ภาพเกมจะเติมเต็ม\n"
+"ช่องโปร่งใสของภาพกรอบ"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Enhancement (cosmetic, beyond the original hardware)"
 msgstr "การปรับปรุง (เพื่อความสวยงาม เกินกว่าฮาร์ดแวร์ดั้งเดิม)"
 
@@ -518,6 +536,40 @@ msgstr "ไดเรกทอรีภาพหน้าจอ"
 #, no-c-format
 msgid "Where F12 screenshots are written."
 msgstr "ตำแหน่งที่บันทึกภาพหน้าจอจาก F12"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bezels directory"
+msgstr "ไดเรกทอรีกรอบ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Bezel images: <game>.png, the parent set's, or default.png.\n"
+"Empty means a bezels folder beside sm2-emu.ini."
+msgstr ""
+"ภาพกรอบ: <game>.png, ภาพของชุดแม่ หรือ default.png\n"
+"เว้นว่างหมายถึงโฟลเดอร์ bezels ข้าง sm2-emu.ini"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crosshairs directory"
+msgstr "โฟลเดอร์เป้าเล็ง"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+"<game>.png for both, then the parent set's, then default.\n"
+"Drawn at their own size on a 1080-line picture. Without\n"
+"one the built-in crosshair is drawn.\n"
+"Empty means a crosshairs folder beside sm2-emu.ini."
+msgstr ""
+"ภาพเป้าเล็ง: <game>-p1.png (-p2 สำหรับผู้เล่น 2) หรือ\n"
+"<game>.png สำหรับทั้งคู่ แล้วของชุดหลัก แล้ว default\n"
+"วาดตามขนาดของภาพเองบนภาพ 1080 เส้น หากไม่มี\n"
+"จะวาดเป้าเล็งในตัว\n"
+"ว่างหมายถึงโฟลเดอร์ crosshairs ข้าง sm2-emu.ini"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -727,6 +779,66 @@ msgstr ""
 #, no-c-format
 msgid "Resistance"
 msgstr "แรงต้าน"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"อัตราขยายของทุกแรงจากบอร์ดขับ ที่ 100 % กำลังเต็มของบอร์ด\n"
+"(63) ให้แรงเต็มของพวงมาลัย ทุกแรงตามสัดส่วน 200 % เพิ่มทุกแรง\n"
+"เป็นสองเท่า: แรงที่เกินครึ่งหนึ่งของกำลังบอร์ด (32 แรงบิดที่แรง\n"
+"ที่สุดของ Sega Rally) จะอิ่มตัว"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Panel spring"
+msgstr "สปริงแผง"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The centring spring of the Sega Rally Championship and\n"
+"Daytona USA cabinets: very light, it brings the wheel\n"
+"back and is barely felt when held against. A share of\n"
+"the resistance above. The other games' cabinets drive\n"
+"the wheel with no spring, and ignore this setting."
+msgstr ""
+"สปริงดึงกลับศูนย์ของตู้ Sega Rally Championship และ\n"
+"Daytona USA: เบามาก ดึงพวงมาลัยกลับและแทบไม่รู้สึกเมื่อ\n"
+"ต้านไว้ เป็นสัดส่วนของแรงต้านด้านบน ตู้ของเกมอื่น\n"
+"ขับพวงมาลัยโดยไม่มีสปริงและไม่สนใจการตั้งค่านี้"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Sega Rally Championship and Daytona USA only, all versions."
+msgstr "เฉพาะ Sega Rally Championship และ Daytona USA ทุกเวอร์ชัน"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Drive board DIP strength"
+msgstr "ความแรง DIP ของบอร์ดขับ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The motor strength set on the drive board's DIP switches,\n"
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
+msgstr ""
+"ความแรงมอเตอร์ที่ตั้งด้วยสวิตช์ DIP ของบอร์ดขับ โดยนับ\n"
+"สวิตช์ที่เป็น ON แบบเลขฐานสอง: 0 = OFF ทั้งหมด\n"
+"Sega Rally: สวิตช์ 1-3 เพิ่ม 0 ถึง 7 ให้ทุกแรงบิด\n"
+"Daytona USA: สวิตช์ 1-3 สี่เท่าของค่านั้น Indy 500, Touring Car,\n"
+"Over Rev, Super GT 24h: สวิตช์ 1-1 ถึง 1-3 เพิ่ม 0 ถึง 7\n"
+"ให้ทุกแรง"
 
 #: src/osd/gui.cpp
 #, no-c-format

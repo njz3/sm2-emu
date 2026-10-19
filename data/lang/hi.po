@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-18 15:17+1000\n"
+"POT-Creation-Date: 2026-10-19 22:31+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -319,6 +319,24 @@ msgstr "वक्रता"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Bezel"
+msgstr "बेज़ल"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"In fullscreen, frame the 4:3 picture with an image from\n"
+"the bezels directory (Paths tab): <game>.png, the parent\n"
+"set's, or default.png. The picture fills the image's\n"
+"transparent window."
+msgstr ""
+"फ़ुलस्क्रीन में 4:3 चित्र को बेज़ल डायरेक्टरी (पाथ टैब)\n"
+"की एक इमेज से फ़्रेम करता है: <game>.png, पैरेंट सेट\n"
+"की इमेज, या default.png। चित्र इमेज की पारदर्शी\n"
+"खिड़की को भरता है।"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Enhancement (cosmetic, beyond the original hardware)"
 msgstr "सुधार (सजावटी, मूल हार्डवेयर से आगे)"
 
@@ -518,6 +536,40 @@ msgstr "स्क्रीनशॉट डायरेक्टरी"
 #, no-c-format
 msgid "Where F12 screenshots are written."
 msgstr "F12 स्क्रीनशॉट कहाँ लिखे जाते हैं।"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bezels directory"
+msgstr "बेज़ल डायरेक्टरी"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Bezel images: <game>.png, the parent set's, or default.png.\n"
+"Empty means a bezels folder beside sm2-emu.ini."
+msgstr ""
+"बेज़ल इमेज: <game>.png, पैरेंट सेट की इमेज, या default.png।\n"
+"खाली का अर्थ है sm2-emu.ini के पास bezels फ़ोल्डर।"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crosshairs directory"
+msgstr "क्रॉसहेयर फ़ोल्डर"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+"<game>.png for both, then the parent set's, then default.\n"
+"Drawn at their own size on a 1080-line picture. Without\n"
+"one the built-in crosshair is drawn.\n"
+"Empty means a crosshairs folder beside sm2-emu.ini."
+msgstr ""
+"क्रॉसहेयर चित्र: <game>-p1.png (खिलाड़ी 2 के लिए -p2) या\n"
+"दोनों के लिए <game>.png, फिर पैरेंट सेट का, फिर default।\n"
+"1080-लाइन चित्र पर अपने आकार में बनाए जाते हैं। इनके बिना\n"
+"बिल्ट-इन क्रॉसहेयर बनाया जाता है।\n"
+"खाली का अर्थ है sm2-emu.ini के पास crosshairs फ़ोल्डर।"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -727,6 +779,67 @@ msgstr ""
 #, no-c-format
 msgid "Resistance"
 msgstr "प्रतिरोध"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"ड्राइव बोर्ड के हर बल पर एक गेन। 100 % पर बोर्ड की पूरी शक्ति\n"
+"(63) व्हील का पूरा बल देती है, हर बल अनुपात में। 200 % हर बल\n"
+"को दोगुना करता है: बोर्ड की आधी शक्ति (32, Sega Rally का सबसे\n"
+"तेज़ टॉर्क) से ऊपर के बल तब संतृप्त हो जाते हैं।"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Panel spring"
+msgstr "पैनल स्प्रिंग"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The centring spring of the Sega Rally Championship and\n"
+"Daytona USA cabinets: very light, it brings the wheel\n"
+"back and is barely felt when held against. A share of\n"
+"the resistance above. The other games' cabinets drive\n"
+"the wheel with no spring, and ignore this setting."
+msgstr ""
+"Sega Rally Championship और Daytona USA कैबिनेट का\n"
+"सेंटरिंग स्प्रिंग: बहुत हल्का, यह व्हील को वापस लाता है और\n"
+"रोकने पर मुश्किल से महसूस होता है। ऊपर वाले प्रतिरोध का एक\n"
+"हिस्सा। दूसरे गेम के कैबिनेट बिना स्प्रिंग के व्हील चलाते हैं\n"
+"और इस सेटिंग को अनदेखा करते हैं।"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Sega Rally Championship and Daytona USA only, all versions."
+msgstr "केवल Sega Rally Championship और Daytona USA, सभी संस्करण।"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Drive board DIP strength"
+msgstr "ड्राइव बोर्ड की DIP शक्ति"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The motor strength set on the drive board's DIP switches,\n"
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
+msgstr ""
+"ड्राइव बोर्ड के DIP स्विच से तय मोटर की शक्ति, ON स्विच बाइनरी\n"
+"में गिने जाते हैं: 0 = सब OFF। Sega Rally:\n"
+"स्विच 1-3, हर टॉर्क में 0 से 7 जोड़ा जाता है। Daytona USA:\n"
+"स्विच 1-3, उसका 4 गुना। Indy 500, Touring Car, Over Rev,\n"
+"Super GT 24h: स्विच 1-1 से 1-3, हर बल में 0 से 7 जोड़ा\n"
+"जाता है।"
 
 #: src/osd/gui.cpp
 #, no-c-format

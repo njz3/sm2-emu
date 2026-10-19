@@ -178,9 +178,12 @@ void PresentPass::present(u32 window_width, u32 window_height)
     // constrains the fullscreen triangle to the letterbox rectangle, and the
     // clear above already covers the full window for the bars outside it.
     const render::Letterbox box = render::compute_letterbox(
-        window_width, window_height, m_options.aspect_mode, m_options.scaling_method);
-    Viewport(static_cast<GLint>(box.x), static_cast<GLint>(box.y),
-            static_cast<GLsizei>(box.width), static_cast<GLsizei>(box.height));
+        window_width, window_height, m_options.aspect_mode, m_options.scaling_method,
+        m_options.picture_area);
+    // GL's viewport origin is the bottom left.
+    Viewport(static_cast<GLint>(box.x),
+             static_cast<GLint>(static_cast<float>(window_height) - box.y - box.height),
+             static_cast<GLsizei>(box.width), static_cast<GLsizei>(box.height));
 
     // std140 layout of present.frag's Present block (see create_program()):
     // two vec2s, method, crt_enabled, four floats, padded to 48 bytes.

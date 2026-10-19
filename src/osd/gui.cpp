@@ -282,6 +282,8 @@ bool Gui::init(SDL_Window* window, const std::string& language)
 void Gui::shutdown()
 {
     release_pad_art();
+    release_bezel();
+    release_crosshair_images();
     if (!m_initialised) return;
 
     ImGui_ImplSDL3_Shutdown();
@@ -424,10 +426,18 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
         SDL_SetWindowMouseGrab(m_window, grab);
         m_mouse_grabbed = grab;
     }
+    m_present_area = {};
+    const bool fullscreen = m_window != nullptr
+                         && (SDL_GetWindowFlags(m_window) & SDL_WINDOW_FULLSCREEN) != 0;
+    if (config.bezel && fullscreen && !m_current_game.empty() && !m_picker_enabled
+        && m_present_aspect != AspectMode::Widescreen && m_present_aspect != AspectMode::Stretch) {
+        draw_bezel(config);
+    }
+
     if (config.lightgun && !m_picker_enabled) {
         draw_sinden_border(config);
         if (config.lightgun_crosshair) {
-            draw_crosshairs(input);
+            draw_crosshairs(config, input);
         }
         draw_calibration_markers(input);
     }
@@ -711,6 +721,16 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                 }
             }
 
+            ImGui::Checkbox(tr_id("Bezel"), &config.bezel);
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered()) {
+                tooltip(tr("In fullscreen, frame the 4:3 picture with an image from\n"
+                           "the bezels directory (Paths tab): <game>.png, the parent\n"
+                           "set's, or default.png. The picture fills the image's\n"
+                           "transparent window."));
+            }
+
             // Enhancement: opt-in quality beyond the original hardware, GPU-gated
             // and off by default. Applies live (main.cpp pushes it each frame).
             ImGui::Separator();
@@ -911,6 +931,19 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
             dir_field(N_("Screenshots directory"), "##shots", config.screenshot_dir,
                       DirPickerTarget::ScreenshotDir,
                       N_("Where F12 screenshots are written."));
+            ImGui::Spacing();
+            dir_field(N_("Bezels directory"), "##bezels", config.bezel_dir,
+                      DirPickerTarget::BezelDir,
+                      N_("Bezel images: <game>.png, the parent set's, or default.png.\n"
+                         "Empty means a bezels folder beside sm2-emu.ini."));
+            ImGui::Spacing();
+            dir_field(N_("Crosshairs directory"), "##crosshairs", config.crosshair_dir,
+                      DirPickerTarget::CrosshairDir,
+                      N_("Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+                         "<game>.png for both, then the parent set's, then default.\n"
+                         "Drawn at their own size on a 1080-line picture. Without\n"
+                         "one the built-in crosshair is drawn.\n"
+                         "Empty means a crosshairs folder beside sm2-emu.ini."));
 
             ImGui::Spacing();
             ImGui::Separator();
@@ -1518,6 +1551,184 @@ const Gui::PadArt* Gui::pad_art()
         }
     }
     return art.handle != 0 ? &art : nullptr;
+}
+
+namespace {
+
+bool find_bezel_window(const u8* rgba, int w, int h, int* x, int* y, int* ww, int* hh)
+{
+    const auto clear = [&](int px, int py) {
+        return rgba[(static_cast<usize>(py) * static_cast<usize>(w) + static_cast<usize>(px)) * 4 + 3]
+               < 128;
+    };
+    const int cx = w / 2;
+    const int cy = h / 2;
+    if (!clear(cx, cy)) {
+        return false;
+    }
+    int left = cx, right = cx, top = cy, bottom = cy;
+    while (left > 0 && clear(left - 1, cy)) --left;
+    while (right < w - 1 && clear(right + 1, cy)) ++right;
+    while (top > 0 && clear(cx, top - 1)) --top;
+    while (bottom < h - 1 && clear(cx, bottom + 1)) ++bottom;
+    *x  = left;
+    *y  = top;
+    *ww = right - left + 1;
+    *hh = bottom - top + 1;
+    return true;
+}
+
+}  // namespace
+
+void Gui::load_bezel(const std::string& path)
+{
+    release_bezel();
+    m_bezel.path = path;
+    if (path.empty() || m_backend == nullptr) {
+        return;
+    }
+    int            w = 0, h = 0, channels = 0;
+    unsigned char* rgba = stbi_load(path.c_str(), &w, &h, &channels, 4);
+    if (rgba == nullptr) {
+        SM2_WARN("bezel: could not read '%s'", path.c_str());
+        return;
+    }
+    int x = 0, y = 0, ww = 0, hh = 0;
+    if (!find_bezel_window(rgba, w, h, &x, &y, &ww, &hh)) {
+        SM2_WARN("bezel: '%s' has no transparent window in its centre", path.c_str());
+    } else {
+        m_bezel.handle   = m_backend->create_texture(static_cast<u32>(w), static_cast<u32>(h), rgba);
+        m_bezel.w        = static_cast<float>(w);
+        m_bezel.h        = static_cast<float>(h);
+        m_bezel.window_x = static_cast<float>(x);
+        m_bezel.window_y = static_cast<float>(y);
+        m_bezel.window_w = static_cast<float>(ww);
+        m_bezel.window_h = static_cast<float>(hh);
+        SM2_INFO("bezel: %s (%dx%d, window %dx%d at %d,%d)", path.c_str(), w, h, ww, hh, x, y);
+    }
+    stbi_image_free(rgba);
+}
+
+void Gui::release_bezel()
+{
+    if (m_bezel.handle != 0 && m_backend != nullptr) {
+        m_backend->destroy_texture(m_bezel.handle);
+    }
+    m_bezel = Bezel{};
+}
+
+void Gui::draw_bezel(const Config& config)
+{
+    namespace fs = std::filesystem;
+    const fs::path dir = config.bezel_dir.empty()
+                             ? fs::path(m_config_path.empty() ? default_config_path() : m_config_path)
+                                       .parent_path()
+                                   / "bezels"
+                             : fs::path(config.bezel_dir);
+    const std::string lookup = dir.string() + '\n' + m_current_game;
+    if (lookup != m_bezel_lookup) {
+        m_bezel_lookup = lookup;
+        std::string found;
+        for (const std::string& stem : {m_current_game, m_current_family, std::string("default")}) {
+            std::error_code error;
+            const fs::path  candidate = dir / (stem + ".png");
+            if (!stem.empty() && fs::exists(candidate, error)) {
+                found = candidate.string();
+                break;
+            }
+        }
+        if (found != m_bezel.path) {
+            load_bezel(found);
+        }
+    }
+    if (m_bezel.handle == 0) {
+        return;
+    }
+
+    const ImGuiIO& io = ImGui::GetIO();
+    if (io.DisplaySize.x < 1.0f || io.DisplaySize.y < 1.0f) {
+        return;
+    }
+    const float  scale = std::min(io.DisplaySize.x / m_bezel.w, io.DisplaySize.y / m_bezel.h);
+    const ImVec2 p0((io.DisplaySize.x - m_bezel.w * scale) * 0.5f,
+                    (io.DisplaySize.y - m_bezel.h * scale) * 0.5f);
+    const ImVec2 p1(p0.x + m_bezel.w * scale, p0.y + m_bezel.h * scale);
+    m_present_area.x      = (p0.x + m_bezel.window_x * scale) / io.DisplaySize.x;
+    m_present_area.y      = (p0.y + m_bezel.window_y * scale) / io.DisplaySize.y;
+    m_present_area.width  = m_bezel.window_w * scale / io.DisplaySize.x;
+    m_present_area.height = m_bezel.window_h * scale / io.DisplaySize.y;
+    ImGui::GetBackgroundDrawList()->AddImage(
+        reinterpret_cast<ImTextureID>(m_backend->texture_imgui_id(m_bezel.handle)), p0, p1);
+}
+
+void Gui::update_crosshair_images(const Config& config)
+{
+    namespace fs = std::filesystem;
+    const fs::path dir = config.crosshair_dir.empty()
+                             ? fs::path(m_config_path.empty() ? default_config_path() : m_config_path)
+                                       .parent_path()
+                                   / "crosshairs"
+                             : fs::path(config.crosshair_dir);
+    const std::string lookup = dir.string() + '\n' + m_current_game;
+    if (lookup == m_crosshair_lookup) {
+        return;
+    }
+    m_crosshair_lookup = lookup;
+    for (usize player = 0; player < m_crosshair_images.size(); ++player) {
+        const std::string suffix = "-p" + std::to_string(player + 1);
+        std::string       found;
+        for (const std::string& stem : {m_current_game, m_current_family, std::string("default")}) {
+            if (stem.empty()) {
+                continue;
+            }
+            for (const std::string& name : {stem + suffix, stem}) {
+                std::error_code error;
+                const fs::path  candidate = dir / (name + ".png");
+                if (fs::exists(candidate, error)) {
+                    found = candidate.string();
+                    break;
+                }
+            }
+            if (!found.empty()) {
+                break;
+            }
+        }
+        CrosshairImage& image = m_crosshair_images[player];
+        if (found == image.path) {
+            continue;
+        }
+        if (image.handle != 0 && m_backend != nullptr) {
+            m_backend->destroy_texture(image.handle);
+        }
+        image      = CrosshairImage{};
+        image.path = found;
+        if (found.empty() || m_backend == nullptr) {
+            continue;
+        }
+        int            w = 0, h = 0, channels = 0;
+        unsigned char* rgba = stbi_load(found.c_str(), &w, &h, &channels, 4);
+        if (rgba == nullptr) {
+            SM2_WARN("crosshair: could not read '%s'", found.c_str());
+            continue;
+        }
+        image.handle = m_backend->create_texture(static_cast<u32>(w), static_cast<u32>(h), rgba);
+        image.w      = static_cast<float>(w);
+        image.h      = static_cast<float>(h);
+        stbi_image_free(rgba);
+        SM2_INFO("crosshair: player %u %s (%dx%d)", static_cast<unsigned>(player + 1),
+                 found.c_str(), w, h);
+    }
+}
+
+void Gui::release_crosshair_images()
+{
+    for (CrosshairImage& image : m_crosshair_images) {
+        if (image.handle != 0 && m_backend != nullptr) {
+            m_backend->destroy_texture(image.handle);
+        }
+        image = CrosshairImage{};
+    }
+    m_crosshair_lookup.clear();
 }
 
 void Gui::release_pad_art()
@@ -2844,11 +3055,12 @@ void Gui::draw_notification()
 // Light-gun crosshairs
 // ---------------------------------------------------------------------------
 
-void Gui::draw_crosshairs(const Input* input)
+void Gui::draw_crosshairs(const Config& config, const Input* input)
 {
     if (input == nullptr) {
         return;
     }
+    update_crosshair_images(config);
 
     // Each aim is a 0..1 fraction of the game image. Map it back onto the same
     // letterboxed 4:3 rectangle the frame is presented into, so the crosshair
@@ -2859,7 +3071,7 @@ void Gui::draw_crosshairs(const Input* input)
     }
     const render::Letterbox box = render::compute_game_rect(
         static_cast<u32>(io.DisplaySize.x), static_cast<u32>(io.DisplaySize.y),
-        m_present_aspect, m_present_method);
+        m_present_aspect, m_present_method, m_present_area);
 
     // Distinct per player: green for 1, cyan for 2.
     static const std::array<ImU32, 2> colours = {
@@ -2880,7 +3092,7 @@ void Gui::draw_crosshairs(const Input* input)
 
     for (usize player = 0; player < aims.size(); ++player) {
         const Input::GunAim& aim = aims[player];
-        if (!aim.active || aim.calibrating) {
+        if (!aim.active || aim.calibrating || aim.idle) {
             continue;
         }
         float fx = aim.x;
@@ -2900,6 +3112,14 @@ void Gui::draw_crosshairs(const Input* input)
         }
         const float cx = box.x + fx * box.width;
         const float cy = box.y + fy * box.height;
+        if (player < m_crosshair_images.size() && m_crosshair_images[player].handle != 0) {
+            const CrosshairImage& image = m_crosshair_images[player];
+            const float           scale = box.height / 1080.0f;
+            const ImVec2          half(image.w * scale * 0.5f, image.h * scale * 0.5f);
+            list->AddImage(reinterpret_cast<ImTextureID>(m_backend->texture_imgui_id(image.handle)),
+                           ImVec2(cx - half.x, cy - half.y), ImVec2(cx + half.x, cy + half.y));
+            continue;
+        }
         const ImU32 colour = colours[player < colours.size() ? player : 0];
         list->AddCircle(ImVec2(cx, cy), radius, colour, 24, 2.0f);
         list->AddLine(ImVec2(cx - radius * 1.6f, cy), ImVec2(cx - radius * 0.4f, cy), colour, 2.0f);
@@ -2971,7 +3191,7 @@ void Gui::draw_sinden_border(const Config& config)
     // whole picture, side columns included, so a gun can aim into them.
     const render::Letterbox box = render::compute_letterbox(
         static_cast<u32>(io.DisplaySize.x), static_cast<u32>(io.DisplaySize.y),
-        m_present_aspect, m_present_method);
+        m_present_aspect, m_present_method, m_present_area);
 
     const u32   rgb = config.sinden_border_colour & 0xffffff;
     const ImU32 colour = IM_COL32((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);
@@ -3126,6 +3346,8 @@ void Gui::draw_dir_picker_popup(Config& config)
             case DirPickerTarget::RomDir:        config.rom_dir        = m_dir_picker_path; break;
             case DirPickerTarget::NvramDir:      config.nvram_dir      = m_dir_picker_path; break;
             case DirPickerTarget::ScreenshotDir: config.screenshot_dir = m_dir_picker_path; break;
+            case DirPickerTarget::BezelDir: config.bezel_dir = m_dir_picker_path; break;
+            case DirPickerTarget::CrosshairDir: config.crosshair_dir = m_dir_picker_path; break;
             case DirPickerTarget::None: break;
         }
         m_dir_picker_target = DirPickerTarget::None;

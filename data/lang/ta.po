@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-18 15:17+1000\n"
+"POT-Creation-Date: 2026-10-19 22:31+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -319,6 +319,24 @@ msgstr "வளைவு"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Bezel"
+msgstr "சட்டகம்"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"In fullscreen, frame the 4:3 picture with an image from\n"
+"the bezels directory (Paths tab): <game>.png, the parent\n"
+"set's, or default.png. The picture fills the image's\n"
+"transparent window."
+msgstr ""
+"முழுத்திரையில், 4:3 படத்தைச் சட்டக அடைவிலுள்ள\n"
+"(பாதைகள் தாவல்) ஒரு படத்தால் சூழும்: <game>.png, பெற்றோர்\n"
+"தொகுப்பின் படம், அல்லது default.png. விளையாட்டுப் படம்\n"
+"சட்டகத்தின் ஒளிபுகும் சாளரத்தை நிரப்பும்."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Enhancement (cosmetic, beyond the original hardware)"
 msgstr "மேம்பாடு (அலங்காரம், அசல் வன்பொருளுக்கு அப்பால்)"
 
@@ -518,6 +536,40 @@ msgstr "திரைப்பிடிப்பு அடைவு"
 #, no-c-format
 msgid "Where F12 screenshots are written."
 msgstr "F12 திரைப்பிடிப்புகள் எழுதப்படும் இடம்."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bezels directory"
+msgstr "சட்டக அடைவு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Bezel images: <game>.png, the parent set's, or default.png.\n"
+"Empty means a bezels folder beside sm2-emu.ini."
+msgstr ""
+"சட்டகப் படங்கள்: <game>.png, பெற்றோர் தொகுப்பின் படம், அல்லது default.png.\n"
+"காலியெனில் sm2-emu.ini அருகிலுள்ள bezels கோப்புறை."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crosshairs directory"
+msgstr "குறிவைப்பு கோப்புறை"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+"<game>.png for both, then the parent set's, then default.\n"
+"Drawn at their own size on a 1080-line picture. Without\n"
+"one the built-in crosshair is drawn.\n"
+"Empty means a crosshairs folder beside sm2-emu.ini."
+msgstr ""
+"குறிவைப்பு படங்கள்: <game>-p1.png (வீரர் 2-க்கு -p2) அல்லது\n"
+"இருவருக்கும் <game>.png, பின் மூல தொகுப்பினுடையது, பின் default.\n"
+"1080-வரி படத்தில் சொந்த அளவில் வரையப்படும். இல்லையெனில்\n"
+"உள்ளமைந்த குறிவைப்பு வரையப்படும்.\n"
+"காலியாக இருந்தால் sm2-emu.ini அருகே crosshairs கோப்புறை."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -727,6 +779,68 @@ msgstr ""
 #, no-c-format
 msgid "Resistance"
 msgstr "எதிர்ப்பு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"டிரைவ் போர்டின் ஒவ்வொரு விசைக்குமான ஒரு பெருக்கம். 100 %-இல்\n"
+"போர்டின் முழு சக்தி (63) ஸ்டீயரிங்கின் முழு விசையைத் தரும்,\n"
+"ஒவ்வொரு விசையும் விகிதத்தில். 200 % ஒவ்வொரு விசையையும்\n"
+"இரட்டிப்பாக்கும்: போர்டின் பாதி சக்திக்கு (32, Sega Rally-யின்\n"
+"வலிமையான டார்க்) மேலான விசைகள் அப்போது நிறைவுறும்."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Panel spring"
+msgstr "பேனல் ஸ்பிரிங்"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The centring spring of the Sega Rally Championship and\n"
+"Daytona USA cabinets: very light, it brings the wheel\n"
+"back and is barely felt when held against. A share of\n"
+"the resistance above. The other games' cabinets drive\n"
+"the wheel with no spring, and ignore this setting."
+msgstr ""
+"Sega Rally Championship மற்றும் Daytona USA கேபினட்டுகளின்\n"
+"மையப்படுத்தும் ஸ்பிரிங்: மிக லேசானது, ஸ்டீயரிங்கைத் திருப்பிக்\n"
+"கொண்டுவரும், பிடித்தால் அரிதாகவே உணரப்படும். மேலே உள்ள\n"
+"எதிர்ப்பின் ஒரு பங்கு. மற்ற விளையாட்டுகளின் கேபினட்டுகள்\n"
+"ஸ்பிரிங் இல்லாமல் இயக்குவதால் இந்த அமைப்பைப் புறக்கணிக்கும்."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Sega Rally Championship and Daytona USA only, all versions."
+msgstr "Sega Rally Championship மற்றும் Daytona USA மட்டும், அனைத்து பதிப்புகளும்."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Drive board DIP strength"
+msgstr "டிரைவ் போர்டின் DIP வலிமை"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The motor strength set on the drive board's DIP switches,\n"
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
+msgstr ""
+"டிரைவ் போர்டின் DIP சுவிட்சுகளால் அமைக்கப்படும் மோட்டார் வலிமை,\n"
+"ON சுவிட்சுகள் இருமத்தில் எண்ணப்படும்: 0 = அனைத்தும் OFF.\n"
+"Sega Rally: சுவிட்சுகள் 1-3, ஒவ்வொரு\n"
+"டார்க்கிலும் 0 முதல் 7 சேர்க்கப்படும். Daytona USA: சுவிட்சுகள்\n"
+"1-3, அதன் 4 மடங்கு. Indy 500, Touring Car, Over Rev, Super GT\n"
+"24h: சுவிட்சுகள் 1-1 முதல் 1-3, ஒவ்வொரு விசையிலும் 0 முதல் 7."
 
 #: src/osd/gui.cpp
 #, no-c-format

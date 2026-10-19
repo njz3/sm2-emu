@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-18 15:17+1000\n"
+"POT-Creation-Date: 2026-10-19 22:31+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: Spanish\n"
@@ -314,6 +314,24 @@ msgstr "Curvatura"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Bezel"
+msgstr "Bezel"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"In fullscreen, frame the 4:3 picture with an image from\n"
+"the bezels directory (Paths tab): <game>.png, the parent\n"
+"set's, or default.png. The picture fills the image's\n"
+"transparent window."
+msgstr ""
+"En pantalla completa, enmarca la imagen 4:3 con una imagen de\n"
+"la carpeta de bezels (pestaña Rutas): <game>.png, la del juego\n"
+"padre o default.png. La imagen llena la ventana\n"
+"transparente del bezel."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Enhancement (cosmetic, beyond the original hardware)"
 msgstr "Mejora (estética, más allá del hardware original)"
 
@@ -513,6 +531,40 @@ msgstr "Carpeta de capturas"
 #, no-c-format
 msgid "Where F12 screenshots are written."
 msgstr "Donde se guardan las capturas de F12."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bezels directory"
+msgstr "Carpeta de bezels"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Bezel images: <game>.png, the parent set's, or default.png.\n"
+"Empty means a bezels folder beside sm2-emu.ini."
+msgstr ""
+"Imágenes de bezel: <game>.png, la del juego padre o default.png.\n"
+"Vacío significa una carpeta bezels junto a sm2-emu.ini."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crosshairs directory"
+msgstr "Carpeta de miras"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+"<game>.png for both, then the parent set's, then default.\n"
+"Drawn at their own size on a 1080-line picture. Without\n"
+"one the built-in crosshair is drawn.\n"
+"Empty means a crosshairs folder beside sm2-emu.ini."
+msgstr ""
+"Imágenes de mira: <game>-p1.png (-p2 para el jugador 2) o\n"
+"<game>.png para ambos, luego las del juego padre, luego default.\n"
+"Se dibujan a su tamaño en una imagen de 1080 líneas. Sin\n"
+"ninguna, se dibuja la mira integrada.\n"
+"Vacío significa una carpeta crosshairs junto a sm2-emu.ini."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -723,6 +775,68 @@ msgstr ""
 #, no-c-format
 msgid "Resistance"
 msgstr "Resistencia"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"Una ganancia sobre cada fuerza de la placa motriz. Al 100 %,\n"
+"la potencia máxima de la placa (63) da la fuerza máxima del\n"
+"volante, cada fuerza en proporción. El 200 % duplica cada\n"
+"fuerza: las que superan la mitad de la potencia de la placa\n"
+"(32, el par más fuerte de Sega Rally) se saturan entonces."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Panel spring"
+msgstr "Muelle del panel"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The centring spring of the Sega Rally Championship and\n"
+"Daytona USA cabinets: very light, it brings the wheel\n"
+"back and is barely felt when held against. A share of\n"
+"the resistance above. The other games' cabinets drive\n"
+"the wheel with no spring, and ignore this setting."
+msgstr ""
+"El muelle de centrado de las máquinas de Sega Rally\n"
+"Championship y Daytona USA: muy suave, devuelve el volante\n"
+"y apenas se nota al sujetarlo. Una parte de la resistencia\n"
+"de arriba. Las máquinas de los demás juegos mueven el\n"
+"volante sin muelle e ignoran este ajuste."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Sega Rally Championship and Daytona USA only, all versions."
+msgstr "Solo Sega Rally Championship y Daytona USA, todas las versiones."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Drive board DIP strength"
+msgstr "Fuerza DIP de la placa motriz"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The motor strength set on the drive board's DIP switches,\n"
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
+msgstr ""
+"La fuerza del motor fijada con los interruptores DIP de la\n"
+"placa motriz, los que están en ON contados en binario: 0 = todos\n"
+"en OFF. Sega Rally: interruptores 1-3, de 0 a\n"
+"7 sumado a cada par. Daytona USA: interruptores 1-3, 4 veces\n"
+"eso. Indy 500, Touring Car, Over Rev, Super GT 24h: interruptores\n"
+"1-1 a 1-3, de 0 a 7 sumado a cada fuerza."
 
 #: src/osd/gui.cpp
 #, no-c-format

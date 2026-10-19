@@ -290,6 +290,11 @@ in the settings overlay (`F10`):
   calibration tool that holds `KEY_CONFIG` (Batocera's gun calibrators) gets
   its targets drawn on screen, so a gun can be recalibrated without leaving
   the game.
+  The crosshairs can be your own PNGs: put them in the crosshairs directory
+  (Paths tab; by default a `crosshairs` folder beside `sm2-emu.ini`), named
+  `hotd-p1.png` and `hotd-p2.png` per player or `hotd.png` for both, with the
+  parent set's or `default.png` as the fallback. They are drawn at their own
+  size on a 1080-line picture and scale with it.
 - **Gamepad rumble** on the driving games, driven from the emulated drive board.
 
 #### Over Rev and Super GT 24h: the drive board and the test menu
@@ -387,6 +392,14 @@ all applied live:
   stretch (fill the window).
 - **CRT filter** — an optional cosmetic arcade-monitor look (scanlines, shadow
   mask, glow, curvature), off by default.
+- **Bezel** — frames the 4:3 picture with artwork. Put PNGs in the bezels
+  directory (Paths tab; by default a `bezels` folder beside `sm2-emu.ini`),
+  named after the set (`daytona.png`), its parent, or `default.png` for
+  everything else. The image needs a transparent window in its centre, and
+  the game is drawn inside it. A full-height 4:3 window (1440×1080 in a
+  1920×1080 image) leaves the game exactly where it is without a bezel.
+  Bezels only work in fullscreen, and obviously not when the aspect ratio is
+  16:9 or the picture is stretched.
 
 ### Enhancement (optional, GPU-gated)
 

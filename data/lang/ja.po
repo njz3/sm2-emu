@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-18 15:17+1000\n"
+"POT-Creation-Date: 2026-10-19 22:31+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -317,6 +317,24 @@ msgstr "湾曲"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Bezel"
+msgstr "ベゼル"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"In fullscreen, frame the 4:3 picture with an image from\n"
+"the bezels directory (Paths tab): <game>.png, the parent\n"
+"set's, or default.png. The picture fills the image's\n"
+"transparent window."
+msgstr ""
+"フルスクリーン時、4:3 の画面をベゼルディレクトリ\n"
+"（パスタブ）の画像で囲みます: <game>.png、親セットの\n"
+"画像、または default.png。画面は画像の\n"
+"透明な窓部分に表示されます。"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Enhancement (cosmetic, beyond the original hardware)"
 msgstr "強化（見た目のみ、オリジナルハードウェアを超える）"
 
@@ -516,6 +534,40 @@ msgstr "スクリーンショットディレクトリ"
 #, no-c-format
 msgid "Where F12 screenshots are written."
 msgstr "F12 のスクリーンショットの保存先です。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bezels directory"
+msgstr "ベゼルディレクトリ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Bezel images: <game>.png, the parent set's, or default.png.\n"
+"Empty means a bezels folder beside sm2-emu.ini."
+msgstr ""
+"ベゼル画像: <game>.png、親セットの画像、または default.png。\n"
+"空の場合は sm2-emu.ini と同じ場所の bezels フォルダー。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crosshairs directory"
+msgstr "照準ディレクトリ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+"<game>.png for both, then the parent set's, then default.\n"
+"Drawn at their own size on a 1080-line picture. Without\n"
+"one the built-in crosshair is drawn.\n"
+"Empty means a crosshairs folder beside sm2-emu.ini."
+msgstr ""
+"照準画像: <game>-p1.png（プレイヤー2は -p2）または\n"
+"両方に <game>.png、次に親セットのもの、次に default。\n"
+"1080ラインの画面上で画像そのままの大きさで描画されます。\n"
+"画像がなければ内蔵の照準を描画します。\n"
+"空欄は sm2-emu.ini の隣の crosshairs フォルダーです。"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -727,6 +779,67 @@ msgstr ""
 #, no-c-format
 msgid "Resistance"
 msgstr "抵抗"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"ドライブボードのすべての力に掛けるゲイン。100 % では\n"
+"ボードの最大出力 (63) がハンドルの最大の力になり、各力は\n"
+"比例します。200 % ではすべての力が 2 倍になり、ボードの\n"
+"出力の半分 (32、Sega Rally の最も強いトルク) を超える力は\n"
+"飽和します。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Panel spring"
+msgstr "パネルのスプリング"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The centring spring of the Sega Rally Championship and\n"
+"Daytona USA cabinets: very light, it brings the wheel\n"
+"back and is barely felt when held against. A share of\n"
+"the resistance above. The other games' cabinets drive\n"
+"the wheel with no spring, and ignore this setting."
+msgstr ""
+"Sega Rally Championship と Daytona USA の筐体のセンタリング\n"
+"スプリング: ごく軽く、ハンドルを戻し、押さえてもほとんど\n"
+"感じません。上の抵抗に対する割合です。ほかのゲームの筐体は\n"
+"スプリングなしでハンドルを駆動するため、この設定は無視\n"
+"されます。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Sega Rally Championship and Daytona USA only, all versions."
+msgstr "Sega Rally Championship と Daytona USA のみ、全バージョン。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Drive board DIP strength"
+msgstr "ドライブボードの DIP 強度"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The motor strength set on the drive board's DIP switches,\n"
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
+msgstr ""
+"ドライブボードの DIP スイッチで設定するモーターの強さ。ON の\n"
+"スイッチを 2 進数で数えます: 0 = 全部 OFF。\n"
+"Sega Rally: スイッチ 1-3、各トルクに 0〜7 を加算。Daytona USA:\n"
+"スイッチ 1-3、その 4 倍。Indy 500、Touring Car、Over Rev、\n"
+"Super GT 24h: スイッチ 1-1〜1-3、各フォースに 0〜7 を加算。"
 
 #: src/osd/gui.cpp
 #, no-c-format

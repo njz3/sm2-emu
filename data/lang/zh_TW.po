@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-18 15:17+1000\n"
+"POT-Creation-Date: 2026-10-19 22:31+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -317,6 +317,24 @@ msgstr "彎曲度"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Bezel"
+msgstr "邊框"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"In fullscreen, frame the 4:3 picture with an image from\n"
+"the bezels directory (Paths tab): <game>.png, the parent\n"
+"set's, or default.png. The picture fills the image's\n"
+"transparent window."
+msgstr ""
+"全螢幕時，以邊框目錄（路徑分頁）中的圖片\n"
+"框住 4:3 畫面：<game>.png、父版本的圖片\n"
+"或 default.png。畫面會填滿圖片中的\n"
+"透明視窗。"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Enhancement (cosmetic, beyond the original hardware)"
 msgstr "強化（視覺效果，超越原始硬體）"
 
@@ -516,6 +534,40 @@ msgstr "螢幕截圖目錄"
 #, no-c-format
 msgid "Where F12 screenshots are written."
 msgstr "F12 螢幕截圖的儲存位置。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bezels directory"
+msgstr "邊框目錄"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Bezel images: <game>.png, the parent set's, or default.png.\n"
+"Empty means a bezels folder beside sm2-emu.ini."
+msgstr ""
+"邊框圖片：<game>.png、父版本的圖片或 default.png。\n"
+"留空表示 sm2-emu.ini 旁的 bezels 資料夾。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crosshairs directory"
+msgstr "準星目錄"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+"<game>.png for both, then the parent set's, then default.\n"
+"Drawn at their own size on a 1080-line picture. Without\n"
+"one the built-in crosshair is drawn.\n"
+"Empty means a crosshairs folder beside sm2-emu.ini."
+msgstr ""
+"準星圖片：<game>-p1.png（玩家 2 用 -p2）或\n"
+"兩人共用 <game>.png，其次是母版的，然後是 default。\n"
+"按圖片原尺寸繪製在 1080 行畫面上。\n"
+"沒有圖片時繪製內建準星。\n"
+"留空表示 sm2-emu.ini 旁的 crosshairs 資料夾。"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -725,6 +777,64 @@ msgstr ""
 #, no-c-format
 msgid "Resistance"
 msgstr "阻力"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"作用於驅動板所有力的增益。100 % 時，驅動板的滿功率 (63)\n"
+"對應方向盤的滿力，各力按比例。200 % 使每個力加倍：超過\n"
+"驅動板一半功率 (32，Sega Rally 最強的扭力) 的力隨之飽和。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Panel spring"
+msgstr "面板彈簧"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The centring spring of the Sega Rally Championship and\n"
+"Daytona USA cabinets: very light, it brings the wheel\n"
+"back and is barely felt when held against. A share of\n"
+"the resistance above. The other games' cabinets drive\n"
+"the wheel with no spring, and ignore this setting."
+msgstr ""
+"Sega Rally Championship 與 Daytona USA 機台的回正彈簧：\n"
+"非常輕，會把方向盤拉回，按住時幾乎感覺不到。為上方\n"
+"阻力的一部分。其他遊戲的機台不用彈簧驅動方向盤，\n"
+"會忽略此設定。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Sega Rally Championship and Daytona USA only, all versions."
+msgstr "僅 Sega Rally Championship 與 Daytona USA，所有版本。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Drive board DIP strength"
+msgstr "驅動板 DIP 力道"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The motor strength set on the drive board's DIP switches,\n"
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
+msgstr ""
+"由驅動板 DIP 開關設定的馬達力道，以二進位計算處於 ON 的\n"
+"開關：0 = 全部 OFF。Sega Rally：開關 1-3，\n"
+"每個扭力加 0 至 7。Daytona USA：開關 1-3，為其 4 倍。\n"
+"Indy 500、Touring Car、Over Rev、Super GT 24h：開關 1-1\n"
+"至 1-3，每個力加 0 至 7。"
 
 #: src/osd/gui.cpp
 #, no-c-format

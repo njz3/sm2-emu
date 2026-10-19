@@ -643,6 +643,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_u32(value, &out->crt_curvature)) {
                 bad_value();
             }
+        } else if (key == "bezel") {
+            if (!parse_bool(value, &out->bezel)) {
+                bad_value();
+            }
         } else if (key == "texture_filter") {
             if (!parse_texture_filter(value, &out->texture_filter)) {
                 bad_value();
@@ -949,6 +953,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             out->nvram_dir = value;
         } else if (key == "screenshot_dir") {
             out->screenshot_dir = value;
+        } else if (key == "bezel_dir") {
+            out->bezel_dir = value;
+        } else if (key == "crosshair_dir") {
+            out->crosshair_dir = value;
         } else if (key == "scrape_artwork") {
             if (!parse_bool(value, &out->scrape_artwork)) {
                 bad_value();
@@ -1103,6 +1111,9 @@ bool save_config(const std::string& path, const Config& config)
         << "crt_mask_strength = " << config.crt_mask_strength << "\n"
         << "crt_glow_strength = " << config.crt_glow_strength << "\n"
         << "crt_curvature = " << config.crt_curvature << "\n"
+        << "\n"
+        << "# Bezel artwork around the picture, in fullscreen.\n"
+        << "bezel = " << bool_text(config.bezel) << "\n"
         << "\n"
         << "# Opt-in graphics enhancement beyond the original hardware. Defaults\n"
         << "# match the arcade; each is GPU-gated and falls back to faithful.\n"
@@ -1315,6 +1326,12 @@ bool save_config(const std::string& path, const Config& config)
         << "\n"
         << "# Where F12 screenshots are written.\n"
         << "screenshot_dir = " << config.screenshot_dir << "\n"
+        << "\n"
+        << "# Empty means a bezels folder beside this file.\n"
+        << "bezel_dir = " << config.bezel_dir << "\n"
+        << "# Crosshair images: <game>-p1.png or <game>.png, the parent's, or\n"
+        << "# default-p1.png / default.png. Empty means a crosshairs folder beside this file.\n"
+        << "crosshair_dir = " << config.crosshair_dir << "\n"
         << "\n"
         << "# Let the game picker fetch box art and descriptions from ArcadeDB\n"
         << "# over the network. Off keeps the emulator offline: the picker still\n"

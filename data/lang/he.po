@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-18 15:17+1000\n"
+"POT-Creation-Date: 2026-10-19 22:31+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -314,6 +314,24 @@ msgstr "עקמומיות"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Bezel"
+msgstr "מסגרת"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"In fullscreen, frame the 4:3 picture with an image from\n"
+"the bezels directory (Paths tab): <game>.png, the parent\n"
+"set's, or default.png. The picture fills the image's\n"
+"transparent window."
+msgstr ""
+"במסך מלא, ממסגר את תמונת ה-4:3 בתמונה מתוך\n"
+"תיקיית המסגרות (לשונית נתיבים): <game>.png, של סט\n"
+"ההורה, או default.png. תמונת המשחק ממלאת את\n"
+"החלון השקוף של המסגרת."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Enhancement (cosmetic, beyond the original hardware)"
 msgstr "שיפור (קוסמטי, מעבר לחומרה המקורית)"
 
@@ -513,6 +531,40 @@ msgstr "תיקיית צילומי מסך"
 #, no-c-format
 msgid "Where F12 screenshots are written."
 msgstr "המקום שבו נכתבים צילומי המסך של F12."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bezels directory"
+msgstr "תיקיית מסגרות"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Bezel images: <game>.png, the parent set's, or default.png.\n"
+"Empty means a bezels folder beside sm2-emu.ini."
+msgstr ""
+"תמונות מסגרת: <game>.png, של סט ההורה, או default.png.\n"
+"ריק פירושו תיקיית bezels לצד sm2-emu.ini."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crosshairs directory"
+msgstr "תיקיית כוונות"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+"<game>.png for both, then the parent set's, then default.\n"
+"Drawn at their own size on a 1080-line picture. Without\n"
+"one the built-in crosshair is drawn.\n"
+"Empty means a crosshairs folder beside sm2-emu.ini."
+msgstr ""
+"תמונות כוונת: <game>-p1.png ‏(-p2 לשחקן 2) או\n"
+"<game>.png לשניהם, אחר כך של הסט האב, ואז default.\n"
+"מצוירות בגודלן על תמונה של 1080 שורות. בלעדיהן\n"
+"מצוירת הכוונת המובנית.\n"
+"ריק פירושו תיקיית crosshairs ליד sm2-emu.ini."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -722,6 +774,65 @@ msgstr ""
 #, no-c-format
 msgid "Resistance"
 msgstr "התנגדות"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"הגבר על כל כוח של לוח ההנעה. ב-100 %, ההספק המלא של הלוח\n"
+"(63) נותן את הכוח המלא של ההגה, כל כוח ביחס. 200 % מכפיל כל\n"
+"כוח: הכוחות שמעל מחצית ההספק של הלוח (32, המומנט החזק ביותר\n"
+"של Sega Rally) נכנסים אז לרוויה."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Panel spring"
+msgstr "קפיץ הלוח"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The centring spring of the Sega Rally Championship and\n"
+"Daytona USA cabinets: very light, it brings the wheel\n"
+"back and is barely felt when held against. A share of\n"
+"the resistance above. The other games' cabinets drive\n"
+"the wheel with no spring, and ignore this setting."
+msgstr ""
+"קפיץ המירכוז של מכונות Sega Rally Championship ו-\n"
+"Daytona USA: קל מאוד, מחזיר את ההגה ובקושי מורגש\n"
+"כשמחזיקים נגדו. חלק מההתנגדות שלמעלה. מכונות המשחקים\n"
+"האחרים מניעות את ההגה בלי קפיץ ומתעלמות מהגדרה זו."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Sega Rally Championship and Daytona USA only, all versions."
+msgstr "רק Sega Rally Championship ו-Daytona USA, כל הגרסאות."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Drive board DIP strength"
+msgstr "עוצמת DIP של לוח ההנעה"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The motor strength set on the drive board's DIP switches,\n"
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
+msgstr ""
+"עוצמת המנוע שנקבעת במתגי ה-DIP של לוח ההנעה, המתגים במצב\n"
+"ON נספרים בבינארי: 0 = כולם OFF. Sega Rally:\n"
+"מתגים 1-3, 0 עד 7 מתווסף לכל מומנט. Daytona USA: מתגים\n"
+"1-3, פי 4 מזה. Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"מתגים 1-1 עד 1-3, 0 עד 7 מתווסף לכל כוח."
 
 #: src/osd/gui.cpp
 #, no-c-format

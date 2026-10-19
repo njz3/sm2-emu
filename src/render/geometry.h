@@ -228,7 +228,8 @@ struct Letterbox {
 [[nodiscard]] Letterbox compute_letterbox(u32           window_width,
                                           u32           window_height,
                                           AspectMode    aspect = AspectMode::FourThree,
-                                          ScalingMethod method = ScalingMethod::Bilinear);
+                                          ScalingMethod method = ScalingMethod::Bilinear,
+                                          PictureArea   area   = {});
 
 /// The part of compute_letterbox()'s rectangle the game's own 4:3 raster
 /// fills: all of it, except in widescreen, where the added columns flank it.
@@ -236,6 +237,7 @@ struct Letterbox {
 [[nodiscard]] Letterbox compute_game_rect(u32           window_width,
                                           u32           window_height,
                                           AspectMode    aspect,
-                                          ScalingMethod method);
+                                          ScalingMethod method,
+                                          PictureArea   area = {});
 
 }  // namespace sm2::render

@@ -483,7 +483,8 @@ VkViewport PresentPass::letterbox() const
 {
     const VkExtent2D          extent = m_context->swapchain_extent();
     const render::Letterbox   box    = render::compute_letterbox(
-        extent.width, extent.height, m_options.aspect_mode, m_options.scaling_method);
+        extent.width, extent.height, m_options.aspect_mode, m_options.scaling_method,
+        m_options.picture_area);
 
     VkViewport viewport{};
     viewport.x        = box.x;

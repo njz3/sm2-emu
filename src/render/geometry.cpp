@@ -269,10 +269,11 @@ TriangulatedFrame triangulate(const hw::Model2MachineBase* machine,
 Letterbox compute_letterbox(u32           window_width,
                             u32           window_height,
                             AspectMode    aspect,
-                            ScalingMethod method)
+                            ScalingMethod method,
+                            PictureArea   area)
 {
-    const float width  = static_cast<float>(window_width);
-    const float height = static_cast<float>(window_height);
+    const float width  = static_cast<float>(window_width) * area.width;
+    const float height = static_cast<float>(window_height) * area.height;
 
     float target_width  = width;
     float target_height = height;
@@ -310,17 +311,17 @@ Letterbox compute_letterbox(u32           window_width,
     }
 
     Letterbox box{};
-    box.x      = (width - target_width) * 0.5F;
-    box.y      = (height - target_height) * 0.5F;
+    box.x      = static_cast<float>(window_width) * area.x + (width - target_width) * 0.5F;
+    box.y      = static_cast<float>(window_height) * area.y + (height - target_height) * 0.5F;
     box.width  = target_width;
     box.height = target_height;
     return box;
 }
 
 Letterbox compute_game_rect(u32 window_width, u32 window_height, AspectMode aspect,
-                            ScalingMethod method)
+                            ScalingMethod method, PictureArea area)
 {
-    Letterbox box = compute_letterbox(window_width, window_height, aspect, method);
+    Letterbox box = compute_letterbox(window_width, window_height, aspect, method, area);
     if (aspect == AspectMode::Widescreen) {
         const float inner = box.width * static_cast<float>(kNativeWidth)
                           / static_cast<float>(frame_width(kWideColumns));

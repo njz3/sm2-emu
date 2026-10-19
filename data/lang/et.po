@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-18 15:17+1000\n"
+"POT-Creation-Date: 2026-10-19 22:31+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -316,6 +316,24 @@ msgstr "Kumerus"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Bezel"
+msgstr "Raam"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"In fullscreen, frame the 4:3 picture with an image from\n"
+"the bezels directory (Paths tab): <game>.png, the parent\n"
+"set's, or default.png. The picture fills the image's\n"
+"transparent window."
+msgstr ""
+"Täisekraanil ümbritseb 4:3 pilti raamipilt\n"
+"raamide kaustast (vahekaart Teed): <game>.png, ülemkomplekti\n"
+"pilt või default.png. Pilt täidab raami\n"
+"läbipaistva akna."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Enhancement (cosmetic, beyond the original hardware)"
 msgstr "Täiustused (kosmeetilised, üle algse riistvara)"
 
@@ -515,6 +533,40 @@ msgstr "Ekraanipiltide kaust"
 #, no-c-format
 msgid "Where F12 screenshots are written."
 msgstr "Kuhu F12 ekraanipildid kirjutatakse."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bezels directory"
+msgstr "Raamide kaust"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Bezel images: <game>.png, the parent set's, or default.png.\n"
+"Empty means a bezels folder beside sm2-emu.ini."
+msgstr ""
+"Raamipildid: <game>.png, ülemkomplekti pilt või default.png.\n"
+"Tühi tähendab bezels kausta sm2-emu.ini kõrval."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crosshairs directory"
+msgstr "Sihikute kaust"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Crosshair images: <game>-p1.png (-p2 for player 2) or\n"
+"<game>.png for both, then the parent set's, then default.\n"
+"Drawn at their own size on a 1080-line picture. Without\n"
+"one the built-in crosshair is drawn.\n"
+"Empty means a crosshairs folder beside sm2-emu.ini."
+msgstr ""
+"Sihikupildid: <game>-p1.png (-p2 mängijale 2) või\n"
+"<game>.png mõlemale, siis vanemkomplekti oma, siis default.\n"
+"Joonistatakse oma suuruses 1080-realisele pildile. Ilma\n"
+"selleta joonistatakse sisseehitatud sihik.\n"
+"Tühi tähendab kausta crosshairs faili sm2-emu.ini kõrval."
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -725,6 +777,68 @@ msgstr ""
 #, no-c-format
 msgid "Resistance"
 msgstr "Takistus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gain on every force of the drive board. At 100 %, the\n"
+"board's full power (63) gives the wheel's full force, every\n"
+"force in proportion. 200 % doubles every force: those above\n"
+"half the board's power (32, Sega Rally's strongest torque)\n"
+"then saturate."
+msgstr ""
+"Võimendus ajamiplaadi igale jõule. 100 % juures annab plaadi\n"
+"täisvõimsus (63) rooli täisjõu, iga jõud proportsionaalselt.\n"
+"200 % kahekordistab iga jõu: plaadi poolest võimsusest (32,\n"
+"Sega Rally tugevaim pöördemoment) suuremad jõud küllastuvad\n"
+"siis."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Panel spring"
+msgstr "Paneeli vedru"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The centring spring of the Sega Rally Championship and\n"
+"Daytona USA cabinets: very light, it brings the wheel\n"
+"back and is barely felt when held against. A share of\n"
+"the resistance above. The other games' cabinets drive\n"
+"the wheel with no spring, and ignore this setting."
+msgstr ""
+"Sega Rally Championshipi ja Daytona USA automaatide\n"
+"tsentreeriv vedru: väga kerge, toob rooli tagasi ja on\n"
+"vastu hoides vaevu tuntav. Osa ülalolevast takistusest.\n"
+"Teiste mängude automaadid liigutavad rooli vedruta ega\n"
+"arvesta seda seadet."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Sega Rally Championship and Daytona USA only, all versions."
+msgstr "Ainult Sega Rally Championship ja Daytona USA, kõik versioonid."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Drive board DIP strength"
+msgstr "Ajamiplaadi DIP-tugevus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The motor strength set on the drive board's DIP switches,\n"
+"the switches ON counted in binary: 0 = all OFF.\n"
+"Sega Rally: switches 1-3, 0 to 7 added to every torque.\n"
+"Daytona USA: switches 1-3, 4 times that.\n"
+"Indy 500, Touring Car, Over Rev, Super GT 24h:\n"
+"switches 1-1 to 1-3, 0 to 7 added to every force."
+msgstr ""
+"Ajamiplaadi DIP-lülititega määratud mootori tugevus, ON-asendis\n"
+"lülitid kahendsüsteemis: 0 = kõik OFF. Sega Rally:\n"
+"lülitid 1-3, 0 kuni 7 lisatakse igale pöördemomendile. Daytona\n"
+"USA: lülitid 1-3, neli korda rohkem. Indy 500, Touring Car, Over\n"
+"Rev, Super GT 24h: lülitid 1-1 kuni 1-3, 0 kuni 7 lisatakse\n"
+"igale jõule."
 
 #: src/osd/gui.cpp
 #, no-c-format
