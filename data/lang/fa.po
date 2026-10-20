@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1328,6 +1328,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "ماشه"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "موشک"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "پر کردن اسلحه"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "عکس صفحه"
 
@@ -1525,6 +1540,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "هدف‌گیری مرکزی با استیک"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"استیک دسته به صفحه اشاره می‌کند: نشانگر هدف\n"
+"در حالت رها در مرکز است و با شیب کامل به لبه می‌رسد.\n"
+"خاموش، استیک نشانگر را مانند ماوس حرکت می‌دهد."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "پنهان کردن فلش شلیک"
 
@@ -1620,11 +1651,6 @@ msgstr "«تخصیص» را بزنید، سپس دکمه روی تفنگ آن ب
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "خشاب‌گذاری/موشک"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "ماشه"
 
 #: src/osd/gui.cpp
 #, no-c-format

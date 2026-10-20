@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1327,6 +1327,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "트리거"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "미사일"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "재장전"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "스크린샷"
 
@@ -1524,6 +1539,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "중앙 기준 스틱 조준"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"게임패드 스틱이 화면을 가리킵니다: 놓으면 조준선이\n"
+"가운데에 있고 끝까지 기울이면 가장자리에 닿습니다.\n"
+"끄면 스틱이 조준선을 마우스처럼 움직입니다."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "사격 섬광 숨기기"
 
@@ -1619,11 +1650,6 @@ msgstr "'할당'을 누른 뒤, 해당 플레이어 건의 버튼을 누르세�
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "재장전/미사일"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "트리거"
 
 #: src/osd/gui.cpp
 #, no-c-format

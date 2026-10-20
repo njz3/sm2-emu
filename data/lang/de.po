@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: German\n"
@@ -1329,6 +1329,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "Abzug"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "Rakete"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "Nachladen"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "Screenshot"
 
@@ -1530,6 +1545,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "Zentriertes Stick-Zielen"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"Der Stick des Gamepads zeigt auf den Bildschirm: das\n"
+"Fadenkreuz ist in Ruhe in der Mitte und bei vollem\n"
+"Ausschlag am Rand. Aus bewegt der Stick es wie eine Maus."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "Schussblitz ausblenden"
 
@@ -1625,11 +1656,6 @@ msgstr "Zuweisen drücken, dann die Taste an der Gun dieses Spielers drücken."
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "Nachladen/Rakete"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "Abzug"
 
 #: src/osd/gui.cpp
 #, no-c-format

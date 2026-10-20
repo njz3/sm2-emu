@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1335,6 +1335,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "Mēlīte"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "Raķete"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "Pārlādēšana"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "Ekrānuzņēmums"
 
@@ -1532,6 +1547,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "Centrēta tēmēšana ar sviru"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"Pults svira norāda uz ekrānu: tēmeklis miera\n"
+"stāvoklī ir centrā un pilnā noliecē sasniedz malu.\n"
+"Izslēgts, svira pārvieto tēmekli kā peli."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "Paslēpt šāviena zibsni"
 
@@ -1627,11 +1658,6 @@ msgstr "Nospiediet „Piesaistīt”, tad nospiediet pogu šī spēlētāja pist
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "Pārlādēt/raķete"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "Mēlīte"
 
 #: src/osd/gui.cpp
 #, no-c-format

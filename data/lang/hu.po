@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1336,6 +1336,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "Ravasz"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "Rakéta"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "Újratöltés"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "Képernyőkép"
 
@@ -1534,6 +1549,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "Középre állított karos célzás"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"A kontroller karja a képernyőre mutat: a célkereszt\n"
+"nyugalomban középen van, teljes kitérésnél a szélén.\n"
+"Kikapcsolva a kar egérként mozgatja a célkeresztet."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "Lövésvillanás elrejtése"
 
@@ -1630,11 +1661,6 @@ msgstr ""
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "Újratöltés/Rakéta"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "Ravasz"
 
 #: src/osd/gui.cpp
 #, no-c-format

@@ -210,6 +210,9 @@ constexpr int kStickThreshold = 16384;
 /// A pedal rests at zero, so it needs no centre band, only a floor under the noise.
 constexpr int kPedalFloor = 1024;
 
+/// How far a trigger is pulled before it fires a gun.
+constexpr int kTriggerPress = 8000;
+
 /// Lets a wheel that also carries a gamepad mapping win the device over the gamepad path.
 bool is_wheel_typed(SDL_JoystickID id)
 {
@@ -1103,6 +1106,24 @@ bool Input::pad_role_held(u32 player, Config::PadRole role) const
         }
     }
     return false;
+}
+
+bool Input::pad_pedal_pressed(SDL_Gamepad* pad, u32 player, Config::PadAxisRole role) const
+{
+    const auto r = static_cast<u32>(role);
+    if (const s32 button = m_pad_axis_buttons[player][r]; button >= 0) {
+        return binding_held(pad, button);
+    }
+    const s32  bound = m_pad_axes[player][r];
+    const auto axis  = bound >= 0 ? static_cast<SDL_GamepadAxis>(bound)
+                     : role == Config::PadAxisRole::Brake ? SDL_GAMEPAD_AXIS_LEFT_TRIGGER
+                                                          : SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
+    const bool stick = axis != SDL_GAMEPAD_AXIS_LEFT_TRIGGER && axis != SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
+    int reading = SDL_GetGamepadAxis(pad, axis);
+    if (m_pad_axis_invert[player][r]) {
+        reading = stick ? -reading : 32767 - reading;
+    }
+    return reading > (stick ? kStickThreshold : kTriggerPress);
 }
 
 bool Input::pad_physical_down(u32 player, s32 button) const
@@ -2080,8 +2101,9 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
 #endif
 
     // Keyboard/pad aiming fallback (mouse and dedicated guns stay preferred): a
-    // per-player cursor nudged by the pad right stick or keyboard arrows, fired
-    // with pad South / Left Ctrl, reload-or-missile on pad East / Right Alt. It
+    // per-player cursor nudged by the pad's sticks or the keyboard arrows, fired
+    // with the pad's Accelerator slot / Left Ctrl, reload-or-missile on its Brake
+    // slot / Right Alt. It
     // overrides the mouse aim only while actually driven, so the mouse is
     // untouched when the pad/keys are idle.
     {
@@ -2090,28 +2112,43 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
             float dx = 0.0f;
             float dy = 0.0f;
 
+            bool  centred = false;
+            float cx      = 0.0f;
+            float cy      = 0.0f;
             if (SDL_Gamepad* pad = pad_for(static_cast<u32>(player)); pad != nullptr) {
-                // Aim on either stick, fire on the right trigger; the left
-                // trigger is the missile (on titles that have one) or the
-                // off-screen reload otherwise.
+                // Aim on either stick.
                 for (const auto [ax, ay] : {std::pair{SDL_GAMEPAD_AXIS_RIGHTX, SDL_GAMEPAD_AXIS_RIGHTY},
                                             std::pair{SDL_GAMEPAD_AXIS_LEFTX, SDL_GAMEPAD_AXIS_LEFTY}}) {
-                    const int sx = SDL_GetGamepadAxis(pad, ax);
-                    const int sy = SDL_GetGamepadAxis(pad, ay);
-                    if (std::abs(sx) > kStickThreshold / 2 || std::abs(sy) > kStickThreshold / 2) {
+                    const s16 sx = SDL_GetGamepadAxis(pad, ax);
+                    const s16 sy = SDL_GetGamepadAxis(pad, ay);
+                    if (m_pad_aim_centred) {
+                        cx += centred_fraction(sx, m_pad_stick_dead, 1.0f, 1.0f) * 2.0f - 1.0f;
+                        cy += centred_fraction(sy, m_pad_stick_dead, 1.0f, 1.0f) * 2.0f - 1.0f;
+                    } else if (std::abs(sx) > kStickThreshold / 2 || std::abs(sy) > kStickThreshold / 2) {
                         dx += static_cast<float>(sx) / 32767.0f;
                         dy += static_cast<float>(sy) / 32767.0f;
                         active = true;
                     }
                 }
-                dx = std::clamp(dx, -1.0f, 1.0f);
-                dy = std::clamp(dy, -1.0f, 1.0f);
-                constexpr int kTriggerPress = 8000;
-                if (SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > kTriggerPress) {
+                dx      = std::clamp(dx, -1.0f, 1.0f);
+                dy      = std::clamp(dy, -1.0f, 1.0f);
+                cx      = std::clamp(cx, -1.0f, 1.0f);
+                cy      = std::clamp(cy, -1.0f, 1.0f);
+                centred = m_pad_aim_centred;
+                const u32 p = static_cast<u32>(player);
+                const auto& binds = m_pad_buttons[p];
+                if (binding_held(pad, binds[static_cast<u32>(Config::PadRole::Button1)])) {
+                    gi.trigger = true;
+                }
+                if (binding_held(pad, binds[static_cast<u32>(Config::PadRole::Button2)])) {
+                    if (has_missile) gi.missile = true;
+                    else { gi.trigger = true; gi.reload = true; }
+                }
+                if (pad_pedal_pressed(pad, p, Config::PadAxisRole::Accel)) {
                     gi.trigger = true;
                     active     = true;
                 }
-                if (SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > kTriggerPress) {
+                if (pad_pedal_pressed(pad, p, Config::PadAxisRole::Brake)) {
                     active = true;
                     if (has_missile) gi.missile = true;
                     else { gi.trigger = true; gi.reload = true; }
@@ -2136,7 +2173,12 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
                 }
             }
 
-            if (active) {
+            const bool keys_aim = dx != 0.0f || dy != 0.0f;
+            if (centred && (cx != 0.0f || cy != 0.0f || (m_gun_cursor_owns[player] && !keys_aim))) {
+                m_gun_cursor_owns[player] = true;
+                m_gun_cursor_x[player]    = 0.5f + cx * 0.5f;
+                m_gun_cursor_y[player]    = 0.5f + cy * 0.5f;
+            } else if (active) {
                 if (!m_gun_cursor_owns[player]) {
                     // Take over from wherever the mouse or gun was aiming.
                     m_gun_cursor_x[player]   = std::clamp(gi.x, 0.0f, 1.0f);
@@ -2371,6 +2413,12 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
     // the generic per-player layout.
     const bool is_desert = game.name == "desert" || game.parent == "desert";
 
+    const bool is_gun = game.lightgun.present
+                     || std::any_of(game.analog.begin(), game.analog.end(),
+                                    [](const rom::AnalogChannel& c) {
+                                        return c.control == rom::AnalogControl::Gun1X;
+                                    });
+
     for (const Pad& pad : m_pads) {
         if (!plays(pad) || pad.player >= kPlayers || is_von || is_desert
             || is_ski || is_wski || is_skytgt) {
@@ -2387,7 +2435,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         bool lb_bound = false;
         bool rb_bound = false;
         for (usize role = 0; role < std::size(kPadRoleBit); ++role) {
-            if (binding_held(pad.handle, binds[role])) {
+            const bool gun_role = is_gun && role <= static_cast<usize>(Config::PadRole::Button2);
+            if (!gun_role && binding_held(pad.handle, binds[role])) {
                 port &= static_cast<u8>(~kPadRoleBit[role]);
             }
             lb_bound |= binds[role] == SDL_GAMEPAD_BUTTON_LEFT_SHOULDER;

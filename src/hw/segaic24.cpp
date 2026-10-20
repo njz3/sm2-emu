@@ -270,7 +270,9 @@ void Segaic24Tile::draw(u32                  layer_and_category,
                         bool                 opaque,
                         std::span<const u32> pens,
                         u32*                 dest,
-                        u32                  dest_stride)
+                        u32                  dest_stride,
+                        u8*                  tag,
+                        u8                   tag_value)
 {
     if (m_tile_ram.empty() || dest == nullptr || pens.size() < 0x1000) {
         return;
@@ -292,6 +294,8 @@ void Segaic24Tile::draw(u32                  layer_and_category,
     state.pens        = pens;
     state.dest        = dest;
     state.dest_stride = dest_stride;
+    state.tag         = tag;
+    state.tag_value   = tag_value;
     // Pair A and pair B have separate window masks.
     state.mask_base = (packed & 4) != 0 ? kWindowMaskB : kWindowMaskA;
     // A pixel is drawn when its flag byte is exactly "opaque, this category".
@@ -479,6 +483,8 @@ void Segaic24Tile::draw_rect(const DrawState& state,
     const u8   match       = state.match;
     const bool opaque      = state.opaque;
     const bool win         = state.window;
+    u8* const  tag         = state.tag;
+    const u8   tag_value   = state.tag_value;
 
     // Both origins are fixed before xx1 is folded into the mask index below,
     // exactly as in the original.
@@ -519,6 +525,9 @@ void Segaic24Tile::draw_rect(const DrawState& state,
                     for (int x = 0; x < 128; ++x) {
                         if (flags[src] == match || opaque) {
                             dest[dst] = pen[pixels[src]];
+                            if (tag != nullptr) {
+                                tag[dst] = tag_value;
+                            }
                         }
                         ++src;
                         ++dst;
@@ -535,6 +544,9 @@ void Segaic24Tile::draw_rect(const DrawState& state,
                                 if (flags[src + static_cast<usize>(xx)] == match || opaque) {
                                     dest[dst + static_cast<usize>(xx)] =
                                         pen[pixels[src + static_cast<usize>(xx)]];
+                                    if (tag != nullptr) {
+                                        tag[dst + static_cast<usize>(xx)] = tag_value;
+                                    }
                                 }
                             }
                         }
@@ -550,6 +562,9 @@ void Segaic24Tile::draw_rect(const DrawState& state,
                     for (int x = cur_x; x < llx1; ++x) {
                         if (flags[src] == match || opaque) {
                             dest[dst] = pen[pixels[src]];
+                            if (tag != nullptr) {
+                                tag[dst] = tag_value;
+                            }
                         }
                         ++src;
                         ++dst;
@@ -562,6 +577,9 @@ void Segaic24Tile::draw_rect(const DrawState& state,
                         if ((flags[src] == match || opaque)
                             && (m & (0x8000 >> (x >> 3))) == 0) {
                             dest[dst] = pen[pixels[src]];
+                            if (tag != nullptr) {
+                                tag[dst] = tag_value;
+                            }
                         }
                         ++src;
                         ++dst;

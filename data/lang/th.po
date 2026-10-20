@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1329,6 +1329,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "ไก"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "ขีปนาวุธ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "บรรจุกระสุน"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "ภาพหน้าจอ"
 
@@ -1526,6 +1541,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "เล็งด้วยสติกแบบกึ่งกลาง"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"สติกของจอยชี้ไปที่หน้าจอ: เป้าเล็งอยู่กึ่งกลาง\n"
+"เมื่อปล่อย และถึงขอบจอเมื่อโยกสุด\n"
+"เมื่อปิด สติกจะเลื่อนเป้าเล็งเหมือนเมาส์"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "ซ่อนแสงวาบเมื่อยิง"
 
@@ -1617,11 +1648,6 @@ msgstr "กด ผูก แล้วกดปุ่มบนปืนของ�
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "บรรจุกระสุน/มิสไซล์"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "ไก"
 
 #: src/osd/gui.cpp
 #, no-c-format

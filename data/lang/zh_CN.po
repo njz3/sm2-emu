@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1325,6 +1325,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "扳机"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "导弹"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "装弹"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "截图"
 
@@ -1522,6 +1537,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "摇杆居中瞄准"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"手柄摇杆直接指向屏幕：松开时准星\n"
+"位于中央，推到底时到达屏幕边缘。\n"
+"关闭时摇杆像鼠标一样移动准星。"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "隐藏射击闪光"
 
@@ -1613,11 +1644,6 @@ msgstr "按下“绑定”，然后按下该玩家光枪上的按键。"
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "装弹/导弹"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "扳机"
 
 #: src/osd/gui.cpp
 #, no-c-format

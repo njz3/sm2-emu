@@ -35,20 +35,13 @@
 // one-pixel-at-a-time. The derivation, and why it is safe to fold four things
 // segaic24.cpp treats as separate rectangle calls into one per-pixel formula:
 //
-//   Layer priority. compose() calls draw() four times into `below` (layer 3
-//   opaque, layer 2 opaque, layer 1 category 0, layer 0 category 0) and four
-//   times into `above` (layers 3,2,1,0, all category 1). Each call is an
-//   unconditional last-write-wins overwrite wherever it draws at all
-//   (draw_rect never blends). Opaque mode draws literally every pixel of its
-//   region, including the "transparent" pen 0 entry, so layer 2's opaque call
-//   -- drawn after layer 3's -- always fully replaces it unless layer 2 itself
-//   is blanked. Reducing the four calls per surface to "last one that actually
-//   draws wins" gives a fixed priority order: for `below`, layer 0 (if it has
-//   an opaque, category-0 pixel here) beats layer 1 (same test) beats layer 2
-//   (opaque mode: draws unconditionally unless blanked) beats layer 3 (same,
-//   opaque). `above` is layer 0 beats 1 beats 2 beats 3, all under the
-//   category-1, non-opaque test. This is exactly evalLayer()'s call order in
-//   below()/above() at the bottom of this file.
+//   Layer priority. compose() draws layers 3, 2, 1, 0 into one surface, each
+//   as category 0 then category 1, pair B's category-0 call opaque, and keeps
+//   the category of whichever call drew a pixel last. Each call is a plain
+//   last-write-wins overwrite (draw_rect never blends), and an opaque call
+//   draws every pixel of its region, pen 0 included. So the first layer from
+//   0 up that draws here wins, its category picking below or above:
+//   compositeLayers() at the bottom of this file.
 //
 //   The window mask. Bit clear in the table selects the even ("screen") layer
 //   of a pair; bit set selects the odd ("window") layer -- i.e. the *raw* bit
@@ -490,21 +483,33 @@ uint mirrorOf(int sx)
 // Composite
 // ---------------------------------------------------------------------------
 
-/// Priority order derived in the file header: layer 0 beats 1 beats 2 beats 3.
-/// compose() only draws pair B (layers 2/3) opaque for `below` (category 0);
-/// for `above` (category 1) every layer uses the non-opaque, category-matched
-/// test. Returns premultiplied RGBA8 with alpha 0 where nothing drew, which is
-/// exactly what TilemapPass's fragment shader already expects (a pixel nothing
-/// wrote is all zeroes).
+/// The topmost layer wins whatever its category, layer 0 over 1 over 2 over 3,
+/// as compose() mixes them; that pixel's category then puts it in `below` or
+/// `above`. Within a layer a category-one texel beats pair B's opaque draw.
+/// Premultiplied RGBA8, all zeroes where nothing drew, which is what
+/// TilemapPass's fragment shader expects.
+void compositeLayers(uint dx, uint dy, out uint below, out uint above)
+{
+    below = 0u;
+    above = 0u;
+    uint pen;
+    for (uint layer = 0u; layer < 4u; ++layer) {
+        if (evalLayer(layer, 1u, false, dx, dy, pen)) {
+            above = uPens[pen];
+            return;
+        }
+        if (evalLayer(layer, 0u, layer >= 2u, dx, dy, pen)) {
+            below = uPens[pen];
+            return;
+        }
+    }
+}
+
 uint composite(uint category, uint dx, uint dy)
 {
-    bool pairBOpaque = category == 0u;
-    uint pen;
-    if (evalLayer(0u, category, false, dx, dy, pen)) return uPens[pen];
-    if (evalLayer(1u, category, false, dx, dy, pen)) return uPens[pen];
-    if (evalLayer(2u, category, pairBOpaque, dx, dy, pen)) return uPens[pen];
-    if (evalLayer(3u, category, pairBOpaque, dx, dy, pen)) return uPens[pen];
-    return 0u;
+    uint below, above;
+    compositeLayers(dx, dy, below, above);
+    return category == 0u ? below : above;
 }
 
 /// The front layers' colour at the screen's edge on row `dy` if the row is one
@@ -576,8 +581,10 @@ void main()
         if (pc.columns != 0u) {
             recordPanorama(dx, dy);
         }
-        uBelow[index] = composite(0u, dx, dy);
-        uAbove[index] = composite(1u, dx, dy);
+        uint below, above;
+        compositeLayers(dx, dy, below, above);
+        uBelow[index] = below;
+        uAbove[index] = above;
     } else {
         uint below = kOpaqueBlack;
         if (pc.wideBelow != 0u) {

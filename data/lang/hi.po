@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1331,6 +1331,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "ट्रिगर"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "मिसाइल"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "बंदूक रीलोड"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "स्क्रीनशॉट"
 
@@ -1528,6 +1543,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "केंद्रित स्टिक निशाना"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"गेमपैड की स्टिक स्क्रीन की ओर इशारा करती है: आराम पर\n"
+"क्रॉसहेयर केंद्र में रहता है, पूरा झुकाने पर किनारे तक।\n"
+"बंद होने पर स्टिक क्रॉसहेयर को माउस की तरह चलाती है।"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "गोली की चमक छिपाएँ"
 
@@ -1622,11 +1653,6 @@ msgstr "बाइंड दबाएँ, फिर उस खिलाड़ी 
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "रीलोड/मिसाइल"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "ट्रिगर"
 
 #: src/osd/gui.cpp
 #, no-c-format

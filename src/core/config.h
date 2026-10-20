@@ -122,6 +122,10 @@ struct Config {
     /// Hide the white flash the gun games show on each shot.
     bool lightgun_hide_flash = false;
 
+    /// A gamepad's stick points at the screen, centred at rest, instead of
+    /// moving the crosshair like a mouse.
+    bool lightgun_pad_centred = false;
+
     /// Fire the gun's recoil / rumble motor on each shot, for guns that have one
     /// (Sinden and similar, exposed as a force-feedback device). No effect on a
     /// gun without a motor. Strength is 0..100 percent.

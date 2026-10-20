@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 12:00+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1333,6 +1333,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "トリガー"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "ミサイル"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "リロード"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "スクリーンショット"
 
@@ -1531,6 +1546,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "スティック中央照準"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"ゲームパッドのスティックが画面を指します: 離すと照準は\n"
+"中央に戻り、いっぱいに倒すと画面の端に届きます。\n"
+"オフではスティックが照準をマウスのように動かします。"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "射撃フラッシュを隠す"
 
@@ -1627,11 +1658,6 @@ msgstr ""
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "リロード/ミサイル"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "トリガー"
 
 #: src/osd/gui.cpp
 #, no-c-format

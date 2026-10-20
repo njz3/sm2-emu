@@ -1102,6 +1102,7 @@ int main(int argc, char** argv)
 
     options.config.lightgun_crosshair       = from_file.lightgun_crosshair;
     options.config.lightgun_hide_flash      = from_file.lightgun_hide_flash;
+    options.config.lightgun_pad_centred     = from_file.lightgun_pad_centred;
     options.config.lightgun_recoil          = from_file.lightgun_recoil;
     options.config.lightgun_recoil_strength = from_file.lightgun_recoil_strength;
     options.config.sinden_border            = from_file.sinden_border;
@@ -2092,6 +2093,7 @@ int main(int argc, char** argv)
             // run (`preliminary` includes DOA, which does).
             static const std::set<std::string> kNoVolume = {"rascot2"};
             std::map<std::string, std::string> titles;
+            std::map<std::string, std::pair<bool, bool>> guns;
             for (const rom::GameSpec& game : database.games()) {
                 const std::string family = game_family(game);
                 if (kNoVolume.count(family) != 0) {
@@ -2100,11 +2102,21 @@ int main(int argc, char** argv)
                 if (game.name == family || titles.find(family) == titles.end()) {
                     titles[family] = game.title;
                 }
+                const bool gun = game.lightgun.present
+                              || std::any_of(game.analog.begin(), game.analog.end(),
+                                             [](const rom::AnalogChannel& c) {
+                                                 return c.control == rom::AnalogControl::Gun1X;
+                                             });
+                if (gun) {
+                    guns[family] = {true, game.gun_missile};
+                }
             }
             std::vector<osd::Gui::GameFamily> families;
             for (auto& [key, title] : titles) {
                 const std::string shown = game_title_without_cabinet(title);
-                families.push_back({key, shown.empty() ? key : shown});
+                const auto        gun   = guns.find(key);
+                families.push_back({key, shown.empty() ? key : shown, gun != guns.end(),
+                                    gun != guns.end() && gun->second.second});
             }
             std::sort(families.begin(), families.end(),
                       [](const osd::Gui::GameFamily& a, const osd::Gui::GameFamily& b) {
@@ -2707,6 +2719,7 @@ int main(int argc, char** argv)
                 input.set_recoil(options.config.lightgun_recoil,
                                  options.config.lightgun_recoil_strength);
                 input.set_gun_buttons(options.config.gun_buttons);
+                input.set_pad_aim_centred(options.config.lightgun_pad_centred);
                 input.set_pad_layout(options.config.pad_layout_for(game_family(loaded->game)));
                 input.set_pad_stick_sensitivity(options.config.pad_stick_sensitivity);
                 input.set_pad_stick_deadzone(options.config.pad_stick_deadzone);

@@ -195,6 +195,8 @@ private:
 
     std::vector<u32> m_below;
     std::vector<u32> m_above;
+    /// Per pixel, whether the topmost tile layer drew it in front of the 3D.
+    std::vector<u8> m_front;
 
     /// MAME's defaults, which correspond to no sync register having been written.
     s16 m_crtc_x_offset = 84;

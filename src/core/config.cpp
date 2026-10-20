@@ -558,6 +558,10 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             if (!parse_bool(value, &out->lightgun_crosshair)) {
                 bad_value();
             }
+        } else if (key == "lightgun_pad_centred") {
+            if (!parse_bool(value, &out->lightgun_pad_centred)) {
+                bad_value();
+            }
         } else if (key == "lightgun_hide_flash") {
             if (!parse_bool(value, &out->lightgun_hide_flash)) {
                 bad_value();
@@ -1077,6 +1081,7 @@ bool save_config(const std::string& path, const Config& config)
         << "lightgun = " << bool_text(config.lightgun) << "\n"
         << "lightgun_crosshair = " << bool_text(config.lightgun_crosshair) << "\n"
         << "lightgun_hide_flash = " << bool_text(config.lightgun_hide_flash) << "\n"
+        << "lightgun_pad_centred = " << bool_text(config.lightgun_pad_centred) << "\n"
         << "lightgun_recoil = " << bool_text(config.lightgun_recoil) << "\n"
         << "lightgun_recoil_strength = " << config.lightgun_recoil_strength << "\n"
         << "sinden_border = " << bool_text(config.sinden_border) << "\n"

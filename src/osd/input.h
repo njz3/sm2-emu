@@ -328,6 +328,8 @@ public:
         m_recoil_strength = strength;
     }
 
+    void set_pad_aim_centred(bool centred) { m_pad_aim_centred = centred; }
+
     /// Gamepad rumble settings, pushed from the GUI/config each frame.
     void set_pad_rumble(bool enabled, u32 strength, bool cornering)
     {
@@ -548,6 +550,7 @@ private:
     [[nodiscard]] static bool operator_chord(const Pad& pad, u8* port0);
     /// Whether the button bound to `role` is held on `player`'s pad.
     [[nodiscard]] bool pad_role_held(u32 player, Config::PadRole role) const;
+    [[nodiscard]] bool pad_pedal_pressed(SDL_Gamepad* pad, u32 player, Config::PadAxisRole role) const;
 
     /// Sample one logical control and scale it into an analogue channel's own
     /// calibrated range, with the stick deadzone and curve shaping a stick axis.
@@ -628,6 +631,7 @@ private:
     /// Sized to LightGuns::kMaxGuns (which is forward-declared here) plus slack.
     static constexpr usize kMaxGuns = 8;
     bool                             m_recoil_enabled  = true;
+    bool                             m_pad_aim_centred = false;
     u32                              m_recoil_strength = 60;
 
     /// The drive board's current force command, and Sega Rally's chop setting:

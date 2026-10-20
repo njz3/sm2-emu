@@ -120,6 +120,8 @@ public:
     struct GameFamily {
         std::string key;    ///< parent set name, the per-game settings key
         std::string title;  ///< the parent's title, shown in lists
+        bool        gun     = false;
+        bool        missile = false;
     };
 
     void set_game_families(std::vector<GameFamily> families)

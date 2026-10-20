@@ -53,6 +53,7 @@ Model2Video::Model2Video()
     , m_gamma(256, 0)
     , m_below(static_cast<usize>(kWidth) * kHeight, 0)
     , m_above(static_cast<usize>(kWidth) * kHeight, 0)
+    , m_front(static_cast<usize>(kWidth) * kHeight, 0)
 {
     // Black at 40, higher crushes shadow detail.
     for (u32 index = 0; index < 256; ++index) {
@@ -213,26 +214,24 @@ void Model2Video::compose()
 
     std::fill(m_below.begin(), m_below.end(), 0u);
     std::fill(m_above.begin(), m_above.end(), 0u);
+    std::fill(m_front.begin(), m_front.end(), u8{0});
 
-    // Composition order, from MAME's model2_state::screen_update.
-    //
-    // Pair B, the second pair, is drawn opaque: it is the backdrop, so its
-    // transparent pen is written as a colour and its priority category is
-    // ignored. Pair A is then drawn over it with the transparent pen honoured.
-    // Layers descend so that layer 0 ends up on top within each pair.
-    for (u32 layer = kTileLayers; layer-- > 2;) {
-        m_tiles.draw(layer << 1, /*opaque=*/true, m_pens, m_below.data(), kWidth);
-    }
-    for (u32 layer = 2; layer-- > 0;) {
-        m_tiles.draw(layer << 1, /*opaque=*/false, m_pens, m_below.data(), kWidth);
-    }
-
-    // Everything with category one, in front of the 3D output. Pair B takes part
-    // here too, and because it was already drawn opaque below, a game that marks
-    // its backdrop as category one ends up covering the scene. MAME behaves the
-    // same way and records it as an open problem for one of the light gun games.
+    // The layers are mixed among themselves first, back to front, so layer 0
+    // ends up on top whatever the categories. Pair B is drawn opaque: it is the
+    // backdrop. The category of the pixel that ends up on top then puts it
+    // behind or in front of the 3D. The vcop2 stage select needs this: pair B
+    // there is category one, yet "SHOOT TO SELECT" on pair A stays over it.
     for (u32 layer = kTileLayers; layer-- > 0;) {
-        m_tiles.draw((layer << 1) | 1, /*opaque=*/false, m_pens, m_above.data(), kWidth);
+        m_tiles.draw(layer << 1, /*opaque=*/layer >= 2, m_pens, m_below.data(), kWidth,
+                     m_front.data(), 0);
+        m_tiles.draw((layer << 1) | 1, /*opaque=*/false, m_pens, m_below.data(), kWidth,
+                     m_front.data(), 1);
+    }
+    for (usize i = 0; i < m_below.size(); ++i) {
+        if (m_front[i] != 0) {
+            m_above[i] = m_below[i];
+            m_below[i] = 0;
+        }
     }
 
     m_last_compose_ns = static_cast<u64>(

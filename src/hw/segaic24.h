@@ -129,11 +129,16 @@ public:
     /// `pens` holds premultiplied-nothing RGBA8 colours, 0x1000 of them; a
     /// drawn pixel is written with alpha 0xff so the compositor can tell it
     /// apart from a pixel nothing touched.
+    ///
+    /// `tag`, when given, is a byte per destination pixel set to `tag_value`
+    /// wherever a pixel is drawn.
     void draw(u32                  layer_and_category,
               bool                 opaque,
               std::span<const u32> pens,
               u32*                 dest,
-              u32                  dest_stride);
+              u32                  dest_stride,
+              u8*                  tag       = nullptr,
+              u8                   tag_value = 0);
 
     /// Draw pair A as if its window mask were clear. Tile RAM is not changed.
     void set_window_mask_a_hidden(bool hidden) { m_window_mask_a_hidden = hidden; }
@@ -157,6 +162,8 @@ private:
         std::span<const u32> pens;
         u32*                 dest        = nullptr;
         u32                  dest_stride = 0;
+        u8*                  tag         = nullptr;
+        u8                   tag_value   = 0;
         u32                  mask_base   = 0;   ///< Tile RAM word index of the mask.
         u8                   match       = 0;   ///< Flag byte a drawn pixel must have.
         bool                 opaque      = false;

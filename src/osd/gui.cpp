@@ -1936,6 +1936,12 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
     int          rows[4]   = {0, 0, 0, 0};
     const std::span<const Slot> slots =
         m_pad_shortcuts_view ? std::span<const Slot>{} : std::span<const Slot>(kSlots);
+    const GameFamily* gun_family = nullptr;
+    for (const GameFamily& family : m_families) {
+        if (family.key == m_pad_family && family.gun) {
+            gun_family = &family;
+        }
+    }
     for (const Slot& slot : slots) {
         const int row = rows[slot.column]++;
         ImVec2    pos;
@@ -2060,7 +2066,13 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
         draw->AddRect(pos, end, border, 6.0f * s, 0, 1.5f);
         const float text_y = pos.y + (slot_h - font) * 0.5f;
         draw->PushClipRect(pos, end, true);
-        draw->AddText(ImVec2(pos.x + 10.0f * s, text_y), IM_COL32(230, 232, 236, 255), tr(slot.name));
+        const char* name = slot.name;
+        if (gun_family != nullptr && slot.kind == Kind::Pedal) {
+            name = slot.role == static_cast<u32>(Config::PadAxisRole::Accel) ? N_("Trigger")
+                 : gun_family->missile                                       ? N_("Missile")
+                                                                              : N_("Gun Reload");
+        }
+        draw->AddText(ImVec2(pos.x + 10.0f * s, text_y), IM_COL32(230, 232, 236, 255), tr(name));
         if (capturing) {
             value = is_axis ? tr("operate it...") : tr("press a button or a key...");
         }
@@ -2444,6 +2456,15 @@ void Gui::draw_lightgun_tab(Config& config, Input* input)
                    "titles always draw their own regardless."));
     }
     ImGui::EndDisabled();
+
+    ImGui::Checkbox(tr_id("Centred stick aim"), &config.lightgun_pad_centred);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        tooltip(tr("A gamepad's stick points at the screen: the crosshair\n"
+                   "sits in the centre at rest and reaches the edge at full\n"
+                   "tilt. Off, the stick moves the crosshair like a mouse."));
+    }
 
     ImGui::Checkbox(tr_id("Hide shot flash"), &config.lightgun_hide_flash);
     ImGui::SameLine();

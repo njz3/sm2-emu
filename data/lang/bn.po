@@ -9,7 +9,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1332,6 +1332,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "ট্রিগার"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "মিসাইল"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "বন্দুক রিলোড"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "স্ক্রিনশট"
 
@@ -1529,6 +1544,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "কেন্দ্রিক স্টিক লক্ষ্য"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"গেমপ্যাডের স্টিক স্ক্রিনের দিকে নির্দেশ করে: বিশ্রামে\n"
+"ক্রসহেয়ার কেন্দ্রে থাকে, পুরো কাত করলে প্রান্তে পৌঁছায়।\n"
+"বন্ধ থাকলে স্টিক মাউসের মতো ক্রসহেয়ার সরায়।"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "গুলির ঝলক লুকান"
 
@@ -1623,11 +1654,6 @@ msgstr "বাঁধুন চাপুন, তারপর সেই খেল�
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "রিলোড/মিসাইল"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "ট্রিগার"
 
 #: src/osd/gui.cpp
 #, no-c-format

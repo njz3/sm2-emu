@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1333,6 +1333,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "டிரிகர்"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "ஏவுகணை"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "மீள்நிரப்பு"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "திரைப்பிடிப்பு"
 
@@ -1530,6 +1545,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "மைய குச்சி குறிவைப்பு"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"கேம்பேட் குச்சி திரையைச் சுட்டுகிறது: ஓய்வில் குறிவைப்பு\n"
+"மையத்தில் இருக்கும், முழுமையாகச் சாய்த்தால் விளிம்பை அடையும்.\n"
+"அணைத்தால் குச்சி குறிவைப்பை மவுஸ் போல நகர்த்தும்."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "சுடும் ஒளிர்வை மறை"
 
@@ -1625,11 +1656,6 @@ msgstr "இணை என்பதை அழுத்தி, பின் அந�
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "மீண்டும் நிரப்பு/ஏவுகணை"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "டிரிகர்"
 
 #: src/osd/gui.cpp
 #, no-c-format

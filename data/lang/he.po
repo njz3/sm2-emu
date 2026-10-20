@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sm2-emu\n"
 "Report-Msgid-Bugs-To: https://github.com/dmanlfc/sm2-emu/issues\n"
-"POT-Creation-Date: 2026-10-19 22:31+1000\n"
+"POT-Creation-Date: 2026-10-20 09:05+1000\n"
 "PO-Revision-Date: 2026-10-09 00:35+1000\n"
 "Last-Translator: machine translation, needs review\n"
 "Language-Team: none\n"
@@ -1324,6 +1324,21 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Trigger"
+msgstr "הדק"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Missile"
+msgstr "טיל"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Gun Reload"
+msgstr "טעינה מחדש"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Screenshot"
 msgstr "צילום מסך"
 
@@ -1521,6 +1536,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Centred stick aim"
+msgstr "כיוון ממורכז במקל"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"A gamepad's stick points at the screen: the crosshair\n"
+"sits in the centre at rest and reaches the edge at full\n"
+"tilt. Off, the stick moves the crosshair like a mouse."
+msgstr ""
+"המקל של בקר המשחק מצביע על המסך: הכוונת\n"
+"במרכז במנוחה ומגיעה לקצה בהטיה מלאה.\n"
+"כבוי, המקל מזיז את הכוונת כמו עכבר."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Hide shot flash"
 msgstr "הסתרת הבזק ירייה"
 
@@ -1614,11 +1645,6 @@ msgstr "לחצו על שיוך, ואז לחצו על הכפתור באקדח ש�
 #, no-c-format
 msgid "Reload/Missile"
 msgstr "טעינה מחדש/טיל"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Trigger"
-msgstr "הדק"
 
 #: src/osd/gui.cpp
 #, no-c-format
