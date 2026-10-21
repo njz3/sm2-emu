@@ -15,6 +15,7 @@
 #pragma once
 
 #include <atomic>
+#include <filesystem>
 #include <mutex>
 #include <queue>
 #include <string>
@@ -61,7 +62,10 @@ public:
 
     /// Start the worker. No thread is started when disabled or built without
     /// libcurl; the picker then relies on the cache and games.xml titles alone.
-    void start(std::string artwork_dir, std::vector<Entry> entries, bool enabled);
+    /// `fallback_dir`, read-only, is consulted after `artwork_dir` (--write-dir:
+    /// the artwork cached before it).
+    void start(std::string artwork_dir, std::vector<Entry> entries, bool enabled,
+               std::string fallback_dir = {});
 
     /// Stop and join the worker. Idempotent; bounded by the request timeout.
     void stop();
@@ -80,7 +84,11 @@ public:
 private:
     void run();
 
+    /// `file` in the artwork folder, else in the fallback one; empty if in neither.
+    [[nodiscard]] std::filesystem::path find_cached(const std::string& file) const;
+
     std::string        m_artwork_dir;
+    std::string        m_fallback_dir;
     std::vector<Entry> m_entries;
     bool               m_scraping = false;
 

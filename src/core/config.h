@@ -524,6 +524,13 @@ struct Config {
     /// F12 screenshots. Empty here; defaulted like nvram_dir.
     std::string screenshot_dir;
 
+    /// The one directory a run writes to (--write-dir), for a cabinet whose
+    /// disk is behind a write filter: the settings at its root, each game's
+    /// NVRAM, EEPROM, states, screenshots and texture dumps in
+    /// <write_dir>/<set>, the scraped artwork in <write_dir>/cache/artwork.
+    /// Relative to the executable's folder. Empty: the usual places.
+    std::string write_dir;
+
     /// Empty means `bezels` beside the ini.
     std::string bezel_dir;
 

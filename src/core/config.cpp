@@ -957,6 +957,8 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
             out->nvram_dir = value;
         } else if (key == "screenshot_dir") {
             out->screenshot_dir = value;
+        } else if (key == "write_dir") {
+            out->write_dir = value;
         } else if (key == "bezel_dir") {
             out->bezel_dir = value;
         } else if (key == "crosshair_dir") {
@@ -1331,6 +1333,14 @@ bool save_config(const std::string& path, const Config& config)
         << "\n"
         << "# Where F12 screenshots are written.\n"
         << "screenshot_dir = " << config.screenshot_dir << "\n"
+        << "\n"
+        << "# The one directory a run writes to, for a cabinet whose disk is behind\n"
+        << "# a write filter (--write-dir): these settings at its root, copied there\n"
+        << "# the first time; each game's NVRAM, EEPROM, states, screenshots and\n"
+        << "# texture dumps in <write_dir>/<set>; the scraped artwork in\n"
+        << "# <write_dir>/cache/artwork. What it does not hold yet is read from the\n"
+        << "# places above. Relative to the executable's folder. Empty: those places.\n"
+        << "write_dir = " << config.write_dir << "\n"
         << "\n"
         << "# Empty means a bezels folder beside this file.\n"
         << "bezel_dir = " << config.bezel_dir << "\n"

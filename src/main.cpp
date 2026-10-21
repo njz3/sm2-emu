@@ -202,6 +202,7 @@ struct Options {
     bool        list_games = false;
     bool        list_gamepads = false;
     std::string config_path;
+    std::string write_dir;
     std::string game;
     std::string dump_roms;
     std::string dump_tilemap;
@@ -315,6 +316,11 @@ void print_usage()
         "  -h, --help          Show this message\n"
         "      --config <dir>  Directory holding sm2-emu.ini, used for both\n"
         "                      reading and saving settings\n"
+        "      --write-dir <dir>  The one directory this run writes to (a disk\n"
+        "                      behind a write filter): settings at its root,\n"
+        "                      each game's saves, states and screenshots in\n"
+        "                      <dir>/<set>; what it lacks is read from the usual\n"
+        "                      places. Relative to the executable's folder\n"
         "      --dump-textures Write every 3D texture to <saves>/textures/<game>/dump\n"
         "      --fullscreen    Start filling the screen\n"
         "      --game <name>   Load this set specifically, for archives that\n"
@@ -366,15 +372,121 @@ void print_usage()
     std::printf("\nNo ROM data is distributed with this software.\n");
 }
 
+/// --write-dir: the one directory this run writes to. Each game's saves go to
+/// <root>/<set>; what is not there yet is read from where it was without it.
+struct WriteDir {
+    std::filesystem::path root;     ///< empty when off
+    std::filesystem::path saves;    ///< the saves directory without it (NVRAM, EEPROM, textures)
+    std::filesystem::path states;   ///< the save states directory without it
+    std::filesystem::path artwork;  ///< the artwork cache without it
+
+    [[nodiscard]] bool on() const { return !root.empty(); }
+};
+WriteDir g_write_dir;
+
+/// A file of `game`'s from `from`, copied into `to` unless `to` has it already.
+void copy_in(const std::filesystem::path& from, const std::filesystem::path& to,
+             const std::string& file)
+{
+    std::error_code error;
+    if (std::filesystem::exists(to / file, error) || !std::filesystem::exists(from / file, error)) {
+        return;
+    }
+    std::filesystem::copy_file(from / file, to / file, error);
+    if (error) {
+        SM2_WARN("write-dir: could not copy '%s': %s", (from / file).string().c_str(),
+                 error.message().c_str());
+    } else {
+        SM2_INFO("write-dir: %s copied in from %s", file.c_str(), from.string().c_str());
+    }
+}
+
+/// Where a game's NVRAM and EEPROM are read and written: `nvram_dir`, or with
+/// --write-dir <root>/<set>, holding the files the game had without it the
+/// first time.
+[[nodiscard]] std::string game_saves_directory(const std::string& nvram_dir,
+                                               const std::string& game)
+{
+    if (!g_write_dir.on()) {
+        return nvram_dir;
+    }
+    const std::filesystem::path dir = g_write_dir.root / game;
+    std::error_code             error;
+    std::filesystem::create_directories(dir, error);
+    copy_in(g_write_dir.saves, dir, game + ".nv");
+    copy_in(g_write_dir.saves, dir, game + ".eeprom");
+    return dir.string();
+}
+
+/// Where a game's save states are written.
+[[nodiscard]] std::string states_directory(const sm2::Config& config, const std::string& game)
+{
+    return g_write_dir.on() ? (g_write_dir.root / game / "states").string() : config.states_dir;
+}
+
+/// A save state to read: with --write-dir, the one written there, else the one
+/// from before it.
+[[nodiscard]] std::string state_read_path(const sm2::Config& config, const std::string& game,
+                                          const std::string& slot)
+{
+    const std::string path = sm2::hw::state_slot_path(states_directory(config, game), game, slot);
+    std::error_code   error;
+    if (g_write_dir.on() && !std::filesystem::exists(path, error)) {
+        const std::string before = sm2::hw::state_slot_path(g_write_dir.states.string(), game, slot);
+        if (std::filesystem::exists(before, error)) {
+            return before;
+        }
+    }
+    return path;
+}
+
+/// A game's state slots, with --write-dir those from before it filling the
+/// empty ones.
+[[nodiscard]] std::vector<sm2::hw::SlotInfo> state_slots(const sm2::Config& config,
+                                                         const std::string& game)
+{
+    std::vector<sm2::hw::SlotInfo> slots =
+        sm2::hw::list_state_slots(states_directory(config, game), game);
+    if (g_write_dir.on()) {
+        const std::vector<sm2::hw::SlotInfo> before =
+            sm2::hw::list_state_slots(g_write_dir.states.string(), game);
+        for (sm2::hw::SlotInfo& slot : slots) {
+            for (const sm2::hw::SlotInfo& old : before) {
+                if (!slot.occupied && old.occupied && old.slot == slot.slot) {
+                    slot = old;
+                }
+            }
+        }
+    }
+    return slots;
+}
+
+/// Where a game's screenshots go.
+[[nodiscard]] std::string screenshot_directory(const sm2::Config& config, const std::string& game)
+{
+    return g_write_dir.on() ? (g_write_dir.root / game / "screenshots").string()
+                            : config.screenshot_dir;
+}
+
 [[nodiscard]] std::string texture_dump_directory(const sm2::Config& config,
                                                  const std::string& game)
 {
+    if (g_write_dir.on()) {
+        return (g_write_dir.root / game / "textures" / "dump").string();
+    }
     return (std::filesystem::path(config.nvram_dir) / "textures" / game / "dump").string();
 }
 
 [[nodiscard]] std::string texture_load_directory(const sm2::Config& config,
                                                  const std::string& game)
 {
+    if (g_write_dir.on()) {
+        const std::filesystem::path own = g_write_dir.root / game / "textures" / "load";
+        std::error_code             error;
+        return (std::filesystem::exists(own, error) ? own
+                                                    : g_write_dir.saves / "textures" / game / "load")
+            .string();
+    }
     return (std::filesystem::path(config.nvram_dir) / "textures" / game / "load").string();
 }
 
@@ -384,6 +496,12 @@ void print_usage()
         const char* arg = argv[index];
 
         const auto takes_value = [&](const char* name, std::string* target) {
+            // --name=value as well as --name value.
+            const std::size_t length = std::strlen(name);
+            if (std::strncmp(arg, name, length) == 0 && arg[length] == '=') {
+                *target = arg + length + 1;
+                return true;
+            }
             if (std::strcmp(arg, name) != 0) {
                 return false;
             }
@@ -636,6 +754,8 @@ void print_usage()
             out->given.log_level = true;
         } else if (takes_value("--config", &out->config_path)) {
             // handled
+        } else if (takes_value("--write-dir", &out->write_dir)) {
+            // handled
         } else if (takes_value("--game", &out->game)) {
             // handled
         } else if (takes_value("--dump-roms", &out->dump_roms)) {
@@ -858,7 +978,7 @@ struct LoadedMachine {
         static_cast<void>(scsp_board->set_scsp_core(scsp_core));
     }
 
-    out.machine_iface->set_nvram_directory(nvram_dir);
+    out.machine_iface->set_nvram_directory(game_saves_directory(nvram_dir, out.game.name));
     out.machine_iface->set_log_unmapped(log_unmapped);
     out.machine_iface->load_nvram();
     // init() resets before the NVRAM is in place, so reset again to let the
@@ -945,14 +1065,65 @@ int main(int argc, char** argv)
 #endif
 
     // --config names a directory; the file within it is always sm2-emu.ini.
-    const std::string config_path =
+    std::string config_path =
         options.config_path.empty()
             ? default_config_path()
             : (std::filesystem::path(options.config_path) / "sm2-emu.ini").string();
 
     Config                   from_file = defaults;
     std::vector<std::string> problems;
-    const bool               readable = load_config(config_path, &from_file, &problems);
+    bool                     readable = load_config(config_path, &from_file, &problems);
+
+    // The folder the bezels and crosshairs sit in by default, beside the ini
+    // the settings come from.
+    const std::string content_dir = [&] {
+        const std::filesystem::path parent = std::filesystem::path(config_path).parent_path();
+        return parent.empty() ? std::string(".") : parent.string();
+    }();
+
+    // --write-dir (or write_dir in this ini): this run writes to one directory.
+    // The settings move there, copied from this ini the first time; the saves
+    // from before it are still read until the game's own are there.
+    if (const std::string write_dir =
+            !options.write_dir.empty() ? options.write_dir : from_file.write_dir;
+        !write_dir.empty()) {
+        std::filesystem::path root(write_dir);
+        if (root.is_relative()) {
+            const char* base = SDL_GetBasePath();
+            root = (base != nullptr ? std::filesystem::path(base) : std::filesystem::current_path())
+                 / root;
+        }
+        root = root.lexically_normal();
+        std::error_code error;
+        std::filesystem::create_directories(root, error);
+        if (error) {
+            SM2_WARN("write-dir: could not create '%s' (%s); writing to the usual places",
+                     root.string().c_str(), error.message().c_str());
+        } else {
+            // Where the saves were, as this ini and the command line place them.
+            Config before = from_file;
+            if (options.given.nvram_dir) {
+                before.nvram_dir = options.config.nvram_dir;
+            }
+            resolve_default_paths(&before,
+                                  options.config_path.empty() && config_path == "sm2-emu.ini",
+                                  content_dir);
+            g_write_dir.root    = root;
+            g_write_dir.saves   = before.nvram_dir;
+            g_write_dir.states  = before.states_dir;
+            g_write_dir.artwork = before.artwork_dir;
+
+            const std::filesystem::path moved = root / "sm2-emu.ini";
+            if (!std::filesystem::exists(moved, error) && std::filesystem::exists(config_path, error)) {
+                std::filesystem::copy_file(config_path, moved, error);
+            }
+            SM2_INFO("write-dir: writing to %s only", root.string().c_str());
+            config_path = moved.string();
+            from_file   = defaults;
+            problems.clear();
+            readable = load_config(config_path, &from_file, &problems);
+        }
+    }
 
     if (!options.given.vsync) {
         options.config.vsync = from_file.vsync;
@@ -1146,7 +1317,7 @@ int main(int argc, char** argv)
             && !save_config(config_path, options.config)) {
             SM2_WARN("could not create '%s'", config_path.c_str());
         }
-        if (!options.config.nvram_dir.empty()) {
+        if (!options.config.nvram_dir.empty() && !g_write_dir.on()) {
             std::filesystem::create_directories(options.config.nvram_dir, error);
         }
     }
@@ -1439,7 +1610,8 @@ int main(int argc, char** argv)
         // states-dir derivation and the slot-path helper, not just temp files.
         {
             const std::string slot_path = hw::state_slot_path(
-                options.config.states_dir, loaded->game.name, hw::kQuickSlot);
+                states_directory(options.config, loaded->game.name), loaded->game.name,
+                hw::kQuickSlot);
             if (!machine_iface->save_state(slot_path)
                 || !machine_iface->load_state(slot_path)) {
                 SM2_ERROR("savestate-test: slot-path round trip failed (%s)",
@@ -2071,6 +2243,7 @@ int main(int argc, char** argv)
         // above owns whichever GPU API actually draws what it builds.
         osd::Gui gui;
         gui.set_config_path(config_path);
+        gui.set_content_dir(content_dir);
         gui.set_texture_backend(backend.get());
         // The renderers this build offers, most-preferred first. Software only
         // presents through a GPU backend, so it needs one present.
@@ -2187,8 +2360,14 @@ int main(int argc, char** argv)
             // stop() first so a second start() (return-to-picker) never
             // move-assigns over a still-joinable worker thread.
             scraper.stop();
-            scraper.start(options.config.artwork_dir, std::move(scrape_list),
-                          options.config.scrape_artwork);
+            if (g_write_dir.on()) {
+                scraper.start((g_write_dir.root / "cache" / "artwork").string(),
+                              std::move(scrape_list), options.config.scrape_artwork,
+                              g_write_dir.artwork.string());
+            } else {
+                scraper.start(options.config.artwork_dir, std::move(scrape_list),
+                              options.config.scrape_artwork);
+            }
             gui.enable_picker(std::move(entries), backend.get(), &scraper);
         };
 
@@ -3137,8 +3316,7 @@ int main(int argc, char** argv)
             // since listing them touches the filesystem).
             if (gui.visible() && machine_iface != nullptr && loaded.has_value()) {
                 std::vector<osd::Gui::StateSlot> gui_slots;
-                for (const hw::SlotInfo& s :
-                     hw::list_state_slots(options.config.states_dir, loaded->game.name)) {
+                for (const hw::SlotInfo& s : state_slots(options.config, loaded->game.name)) {
                     osd::Gui::StateSlot g;
                     g.label = (s.slot == hw::kQuickSlot) ? i18n::tr("Quick")
                                                        : i18n::trf("Slot %s", s.slot.c_str());
@@ -3321,10 +3499,9 @@ int main(int argc, char** argv)
             if (screenshot_requested) {
                 screenshot_requested = false;
                 backend->wait_idle();
-                const std::string shot = screenshot_path(options.config.screenshot_dir,
-                                                          loaded.has_value()
-                                                              ? loaded->game.name
-                                                              : "sm2");
+                const std::string shot_game = loaded.has_value() ? loaded->game.name : "sm2";
+                const std::string shot =
+                    screenshot_path(screenshot_directory(options.config, shot_game), shot_game);
                 if (backend->save_capture(shot)) {
                     SM2_INFO("screenshot written to %s", shot.c_str());
                 } else {
@@ -3337,8 +3514,11 @@ int main(int argc, char** argv)
             // m_in_frame guard also enforces this). The overlay and the F6/F7
             // hotkeys both route through state_action.
             if (state_action.has_value() && machine_iface != nullptr && loaded.has_value()) {
-                const std::string path = hw::state_slot_path(
-                    options.config.states_dir, loaded->game.name, state_action->slot);
+                const std::string path =
+                    state_action->op == StateOp::Load
+                        ? state_read_path(options.config, loaded->game.name, state_action->slot)
+                        : hw::state_slot_path(states_directory(options.config, loaded->game.name),
+                                              loaded->game.name, state_action->slot);
                 // The file's base name, e.g. "topskatr.quick.sm2state" — enough
                 // to identify what was written/read without a long full path.
                 const std::string file =
@@ -3363,7 +3543,7 @@ int main(int argc, char** argv)
                         gui.notify(i18n::trf("Load failed: %s (empty or incompatible)", file.c_str()));
                     }
                 } else {  // StateOp::Delete
-                    if (hw::delete_state_slot(options.config.states_dir,
+                    if (hw::delete_state_slot(states_directory(options.config, loaded->game.name),
                                               loaded->game.name, state_action->slot)) {
                         SM2_INFO("deleted state slot '%s'", state_action->slot.c_str());
                         gui.notify(i18n::trf("State deleted: %s", file.c_str()));

@@ -19,6 +19,7 @@
 #include "render/backend.h"
 
 #include <array>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <vector>
@@ -88,6 +89,10 @@ public:
     /// Where the Save button writes. Set to the path the config was loaded from
     /// so a saved file goes back to the same place (including a --config path).
     void set_config_path(std::string path) { m_config_path = std::move(path); }
+
+    /// Where the bezels and crosshairs folders sit when their settings are
+    /// empty: beside the ini, or beside the one --write-dir copied it from.
+    void set_content_dir(std::string dir) { m_content_dir = std::move(dir); }
 
     /// The renderer names this build offers, for the Settings dropdown.
     void set_available_renderers(std::vector<std::string> names)
@@ -290,6 +295,10 @@ private:
 
     SDL_Window* m_window      = nullptr;
     std::string m_config_path;  ///< where Save writes; empty -> default path.
+    std::string m_content_dir;  ///< bezels and crosshairs; empty -> beside the ini.
+
+    /// m_content_dir, or the config path's folder.
+    [[nodiscard]] std::filesystem::path content_dir() const;
     std::vector<std::string> m_available_renderers;  ///< for the Settings dropdown
     bool        m_visible     = false;
     bool        m_initialised = false;

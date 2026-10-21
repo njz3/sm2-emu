@@ -217,10 +217,12 @@ Scraper::~Scraper()
     stop();
 }
 
-void Scraper::start(std::string artwork_dir, std::vector<Entry> entries, bool enabled)
+void Scraper::start(std::string artwork_dir, std::vector<Entry> entries, bool enabled,
+                    std::string fallback_dir)
 {
-    m_artwork_dir = std::move(artwork_dir);
-    m_entries     = std::move(entries);
+    m_artwork_dir  = std::move(artwork_dir);
+    m_fallback_dir = std::move(fallback_dir);
+    m_entries      = std::move(entries);
 
 #if defined(SM2_HAVE_CURL)
     m_scraping = enabled;
@@ -268,15 +270,29 @@ std::vector<std::string> Scraper::take_ready()
     return ready;
 }
 
+std::filesystem::path Scraper::find_cached(const std::string& file) const
+{
+    for (const std::string* dir : {&m_artwork_dir, &m_fallback_dir}) {
+        if (dir->empty()) {
+            continue;
+        }
+        const std::filesystem::path path = std::filesystem::path(*dir) / file;
+        std::error_code             error;
+        if (std::filesystem::exists(path, error) && !error) {
+            return path;
+        }
+    }
+    return {};
+}
+
 Scraper::Metadata Scraper::load_metadata(const std::string& name,
                                          const std::string& fallback_title) const
 {
     Metadata meta;
     meta.title = fallback_title;
 
-    const std::filesystem::path json_path =
-        std::filesystem::path(m_artwork_dir) / (name + ".json");
-    const std::string json = read_file_text(json_path);
+    const std::filesystem::path json_path = find_cached(name + ".json");
+    const std::string json = json_path.empty() ? std::string() : read_file_text(json_path);
     if (json.empty()) {
         return meta;  // nothing cached yet
     }
@@ -300,9 +316,7 @@ Scraper::Metadata Scraper::load_metadata(const std::string& name,
             images.substr(start, comma == std::string::npos ? std::string::npos
                                                             : comma - start);
         if (!file.empty()) {
-            const std::filesystem::path path = std::filesystem::path(m_artwork_dir) / file;
-            std::error_code             error;
-            if (std::filesystem::exists(path, error) && !error) {
+            if (const std::filesystem::path path = find_cached(file); !path.empty()) {
                 meta.image_paths.push_back(path.string());
             }
         }
@@ -328,8 +342,7 @@ void Scraper::run()
         // A cached marker (done or recorded-missing) means leave it alone.
         const std::filesystem::path json_path =
             std::filesystem::path(m_artwork_dir) / (entry.name + ".json");
-        std::error_code error;
-        if (std::filesystem::exists(json_path, error) && !error) {
+        if (!find_cached(entry.name + ".json").empty()) {
             continue;
         }
 

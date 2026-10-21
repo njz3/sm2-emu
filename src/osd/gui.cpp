@@ -1617,14 +1617,20 @@ void Gui::release_bezel()
     m_bezel = Bezel{};
 }
 
+std::filesystem::path Gui::content_dir() const
+{
+    if (!m_content_dir.empty()) {
+        return m_content_dir;
+    }
+    return std::filesystem::path(m_config_path.empty() ? default_config_path() : m_config_path)
+        .parent_path();
+}
+
 void Gui::draw_bezel(const Config& config)
 {
     namespace fs = std::filesystem;
-    const fs::path dir = config.bezel_dir.empty()
-                             ? fs::path(m_config_path.empty() ? default_config_path() : m_config_path)
-                                       .parent_path()
-                                   / "bezels"
-                             : fs::path(config.bezel_dir);
+    const fs::path dir = config.bezel_dir.empty() ? content_dir() / "bezels"
+                                                  : fs::path(config.bezel_dir);
     const std::string lookup = dir.string() + '\n' + m_current_game;
     if (lookup != m_bezel_lookup) {
         m_bezel_lookup = lookup;
@@ -1664,11 +1670,8 @@ void Gui::draw_bezel(const Config& config)
 void Gui::update_crosshair_images(const Config& config)
 {
     namespace fs = std::filesystem;
-    const fs::path dir = config.crosshair_dir.empty()
-                             ? fs::path(m_config_path.empty() ? default_config_path() : m_config_path)
-                                       .parent_path()
-                                   / "crosshairs"
-                             : fs::path(config.crosshair_dir);
+    const fs::path dir = config.crosshair_dir.empty() ? content_dir() / "crosshairs"
+                                                      : fs::path(config.crosshair_dir);
     const std::string lookup = dir.string() + '\n' + m_current_game;
     if (lookup == m_crosshair_lookup) {
         return;
