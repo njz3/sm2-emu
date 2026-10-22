@@ -373,8 +373,6 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
 
     // Cache this frame's present placement so the crosshair and Sinden-border
     // helpers frame the same rectangle the backend presents into.
-    m_present_aspect = m_shown_aspect;
-    m_present_method = config.scaling_method;
 
     // Shown regardless of F10 when enabled, so the counter is visible whether or
     // not the settings overlay is open.
@@ -430,7 +428,9 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
     const bool fullscreen = m_window != nullptr
                          && (SDL_GetWindowFlags(m_window) & SDL_WINDOW_FULLSCREEN) != 0;
     if (config.bezel && fullscreen && !m_current_game.empty() && !m_picker_enabled
-        && m_present_aspect != AspectMode::Widescreen && m_present_aspect != AspectMode::Stretch) {
+        && m_shown_aspect != AspectMode::Widescreen && !m_present.window_stretch
+        && (m_present.aspect_ratio == AspectRatio::FourThree
+            || m_present.aspect_ratio == AspectRatio::Original)) {
         draw_bezel(config);
     }
 
@@ -675,24 +675,65 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                                "Applies live."));
                 }
 
-                static constexpr std::array<const char*, 4> kAspectLabels = {
-                    N_("4:3 (arcade)"), N_("Square pixels"), N_("16:9 (widescreen)"), N_("Stretch")};
-                int aspect_index =
-                    std::clamp(static_cast<int>(config.aspect_mode), 0, 3);
+                // The frame and how the picture fills it, in AspectRatio's
+                // order (linuxloader's ASPECT_RATIO, the same choices).
+                static constexpr std::array<const char*, 7> kAspectLabels = {
+                    N_("Original"),      N_("4:3 black bars"), N_("16:9 black bars"),
+                    N_("4:3 stretched"), N_("16:9 stretched"), N_("4:3 cropped"),
+                    N_("16:9 cropped")};
+                int aspect_index = std::clamp(static_cast<int>(config.aspect_ratio), 0, 6);
                 ImGui::SetNextItemWidth(160);
                 if (ImGui::Combo(tr_id("Aspect"), &aspect_index, tr_all(kAspectLabels).data(),
                                  static_cast<int>(kAspectLabels.size()))) {
-                    config.aspect_mode = static_cast<AspectMode>(aspect_index);
+                    config.aspect_ratio = static_cast<AspectRatio>(aspect_index);
                 }
                 ImGui::SameLine();
                 ImGui::TextDisabled("(?)");
                 if (ImGui::IsItemHovered()) {
-                    tooltip(tr("4:3 is the arcade monitor's shape (the default).\n"
-                               "Square pixels shows the raw 496x384 (slightly narrow).\n"
-                               "16:9 (experimental) draws the 3D wider, with the 2D in the middle.\n"
-                               "Stretch fills the whole window.\n"
-                               "GPU renderers only. Applies live."));
+                    tooltip(tr("The frame, and how the picture fills it. Original: the\n"
+                               "raw 496x384 shape. Black bars: the whole picture in the\n"
+                               "frame. Stretched: filling it, distorted. Cropped: filling\n"
+                               "it at its proportions, the rest cut. Applies live."));
                 }
+                if (config.aspect_ratio == AspectRatio::FourThreeCrop
+                    || config.aspect_ratio == AspectRatio::SixteenNineCrop) {
+                    int position = config.crop_position;
+                    ImGui::SetNextItemWidth(160);
+                    if (ImGui::SliderInt(tr_id("Crop position"), &position, -100, 100)) {
+                        config.crop_position = std::clamp(position, -100, 100);
+                    }
+                    ImGui::Checkbox(tr_id("Bend the cut parts onto the edges"), &config.crop_barrel);
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(?)");
+                    if (ImGui::IsItemHovered()) {
+                        tooltip(tr("Instead of cutting them, the parts left out are squeezed\n"
+                                   "onto the edges as on a cylinder seen face on: the whole\n"
+                                   "picture stays visible."));
+                    }
+                    if (config.crop_barrel) {
+                        int centre = static_cast<int>(config.barrel_center);
+                        ImGui::SetNextItemWidth(160);
+                        if (ImGui::SliderInt(tr_id("Undistorted middle"), &centre, 0, 100, "%d%%")) {
+                            config.barrel_center = static_cast<u32>(std::clamp(centre, 0, 100));
+                        }
+                        int radius = static_cast<int>(config.barrel_radius);
+                        ImGui::SetNextItemWidth(160);
+                        if (ImGui::SliderInt(tr_id("Curvature radius"), &radius, 10, 300, "%d%%")) {
+                            config.barrel_radius = static_cast<u32>(std::clamp(radius, 10, 300));
+                        }
+                    }
+                }
+                bool wide = config.aspect_mode == AspectMode::Widescreen;
+                if (ImGui::Checkbox(tr_id("Draw the 3D in 16:9"), &wide)) {
+                    config.aspect_mode = wide ? AspectMode::Widescreen : AspectMode::FourThree;
+                }
+                ImGui::SameLine();
+                ImGui::TextDisabled("(?)");
+                if (ImGui::IsItemHovered()) {
+                    tooltip(tr("Experimental: the 3D drawn wider, the 2D kept 4:3 in the\n"
+                               "middle; the picture is then 16:9. GPU renderers only."));
+                }
+                ImGui::Checkbox(tr_id("Stretch the frame to the window"), &config.display_stretch);
             }
 
             // CRT cosmetic filter. Off by default; all present-stage, live.
@@ -1063,13 +1104,40 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
         // Save button, on the tabs that carry settings but not on About.
         if (!on_about_tab) {
             ImGui::Separator();
-            if (ImGui::Button(tr_id("Save settings"))) {
-                const std::string path =
-                    m_config_path.empty() ? default_config_path() : m_config_path;
-                if (save_config(path, config)) {
-                    SM2_INFO("gui: settings saved to %s", path.c_str());
+            const std::string path =
+                m_config_path.empty() ? default_config_path() : m_config_path;
+            const auto save = [&](const std::string& to) {
+                const bool saved = m_save ? m_save(to, config) : save_config(to, config);
+                if (saved) {
+                    SM2_INFO("gui: settings saved to %s", to.c_str());
                 } else {
-                    SM2_ERROR("gui: could not save settings to %s", path.c_str());
+                    SM2_ERROR("gui: could not save settings to %s", to.c_str());
+                }
+                return saved;
+            };
+            if (ImGui::Button(tr_id("Save settings"))) {
+                (void)save(path);
+            }
+            // A game on the common settings: they become its own, <set>.ini
+            // beside them, read instead of them for it from then on.
+            if (!m_current_game.empty()) {
+                const std::string own =
+                    (std::filesystem::path(m_common_config_path.empty() ? path
+                                                                        : m_common_config_path)
+                         .parent_path()
+                     / (m_current_game + ".ini"))
+                        .string();
+                if (own != path) {
+                    ImGui::SameLine();
+                    if (ImGui::Button(tr_id("Save for this game")) && save(own)) {
+                        m_config_path = own;
+                    }
+                    if (ImGui::IsItemHovered()) {
+                        tooltip(trf("These settings in %s, beside the common file,\n"
+                                    "read instead of it for this game from now on.",
+                                    std::filesystem::path(own).filename().string().c_str())
+                                    .c_str());
+                    }
                 }
             }
             ImGui::SameLine();
@@ -1615,6 +1683,13 @@ void Gui::release_bezel()
         m_backend->destroy_texture(m_bezel.handle);
     }
     m_bezel = Bezel{};
+}
+
+render::FrameMap Gui::present_map(float width, float height) const
+{
+    render::PresentOptions present = m_present;
+    present.picture_area           = m_present_area;  // this frame's, the bezel's
+    return render::compute_frame_map(static_cast<u32>(width), static_cast<u32>(height), present);
 }
 
 std::filesystem::path Gui::content_dir() const
@@ -3093,9 +3168,8 @@ void Gui::draw_crosshairs(const Config& config, const Input* input)
     if (io.DisplaySize.x < 1.0f || io.DisplaySize.y < 1.0f) {
         return;
     }
-    const render::Letterbox box = render::compute_game_rect(
-        static_cast<u32>(io.DisplaySize.x), static_cast<u32>(io.DisplaySize.y),
-        m_present_aspect, m_present_method, m_present_area);
+    const render::FrameMap  map = present_map(io.DisplaySize.x, io.DisplaySize.y);
+    const render::Letterbox box = map.picture;
 
     // Distinct per player: green for 1, cyan for 2.
     static const std::array<ImU32, 2> colours = {
@@ -3131,11 +3205,13 @@ void Gui::draw_crosshairs(const Config& config, const Input* input)
             float mx = 0.0f;
             float my = 0.0f;
             SDL_GetMouseState(&mx, &my);
-            fx = std::clamp((mx - box.x) / box.width, 0.0f, 1.0f);
-            fy = std::clamp((my - box.y) / box.height, 0.0f, 1.0f);
+            map.window_to_game(mx, my, &fx, &fy);
+            fx = std::clamp(fx, 0.0f, 1.0f);
+            fy = std::clamp(fy, 0.0f, 1.0f);
         }
-        const float cx = box.x + fx * box.width;
-        const float cy = box.y + fy * box.height;
+        float cx = 0.0f;
+        float cy = 0.0f;
+        map.game_to_window(fx, fy, &cx, &cy);
         if (player < m_crosshair_images.size() && m_crosshair_images[player].handle != 0) {
             const CrosshairImage& image = m_crosshair_images[player];
             const float           scale = box.height / 1080.0f;
@@ -3213,9 +3289,7 @@ void Gui::draw_sinden_border(const Config& config)
     // Frame the letterboxed game image, not the raw window, so the border sits
     // on the picture the gun's camera actually sees. In widescreen that is the
     // whole picture, side columns included, so a gun can aim into them.
-    const render::Letterbox box = render::compute_letterbox(
-        static_cast<u32>(io.DisplaySize.x), static_cast<u32>(io.DisplaySize.y),
-        m_present_aspect, m_present_method, m_present_area);
+    const render::Letterbox box = present_map(io.DisplaySize.x, io.DisplaySize.y).view;
 
     const u32   rgb = config.sinden_border_colour & 0xffffff;
     const ImU32 colour = IM_COL32((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff, 255);

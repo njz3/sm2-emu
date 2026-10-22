@@ -2042,6 +2042,119 @@ msgstr "Récupération de la description..."
 msgid "No description available."
 msgstr "Aucune description disponible."
 
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Original"
+msgstr "Original"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "4:3 black bars"
+msgstr "4:3 bandes noires"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "16:9 black bars"
+msgstr "16:9 bandes noires"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "4:3 stretched"
+msgstr "4:3 étiré"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "16:9 stretched"
+msgstr "16:9 étiré"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "4:3 cropped"
+msgstr "4:3 recadré"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "16:9 cropped"
+msgstr "16:9 recadré"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The frame, and how the picture fills it. Original: the\n"
+"raw 496x384 shape. Black bars: the whole picture in the\n"
+"frame. Stretched: filling it, distorted. Cropped: filling\n"
+"it at its proportions, the rest cut. Applies live."
+msgstr ""
+"Le cadre, et comment l'image le remplit. Original : la\n"
+"forme brute 496x384. Bandes noires : toute l'image dans le\n"
+"cadre. Étiré : il est rempli, l'image déformée. Recadré : il\n"
+"est rempli aux proportions de l'image, le reste coupé.\n"
+"S'applique en direct."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Crop position"
+msgstr "Position du recadrage"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Bend the cut parts onto the edges"
+msgstr "Courber les parties coupées sur les bords"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Instead of cutting them, the parts left out are squeezed\n"
+"onto the edges as on a cylinder seen face on: the whole\n"
+"picture stays visible."
+msgstr ""
+"Au lieu d'être coupées, les parties hors du cadre sont tassées\n"
+"sur les bords, comme sur un cylindre vu de face : toute\n"
+"l'image reste visible."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Undistorted middle"
+msgstr "Milieu non déformé"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Curvature radius"
+msgstr "Rayon de courbure"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Draw the 3D in 16:9"
+msgstr "Dessiner la 3D en 16:9"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Experimental: the 3D drawn wider, the 2D kept 4:3 in the\n"
+"middle; the picture is then 16:9. GPU renderers only."
+msgstr ""
+"Expérimental : la 3D dessinée plus large, la 2D gardée en 4:3\n"
+"au milieu ; l'image est alors en 16:9. Rendus GPU seulement."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Stretch the frame to the window"
+msgstr "Étirer le cadre à la fenêtre"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Save for this game"
+msgstr "Enregistrer pour ce jeu"
+
+#: src/osd/gui.cpp
+#, c-format
+msgid ""
+"These settings in %s, beside the common file,\n"
+"read instead of it for this game from now on."
+msgstr ""
+"Ces paramètres dans %s, à côté du fichier commun,\n"
+"lu à sa place pour ce jeu désormais."
+
 #, no-c-format
 #~ msgid ""
 #~ "4:3 is the arcade monitor's shape (the default).\n"

@@ -131,6 +131,42 @@ constexpr u32 kMaxRenderScale = 8;
     return "4:3";
 }
 
+[[nodiscard]] bool parse_aspect_ratio(const std::string& value, AspectRatio* out)
+{
+    std::string text = value;
+    std::transform(text.begin(), text.end(), text.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    static const std::pair<const char*, AspectRatio> kNames[] = {
+        {"ORIGINAL", AspectRatio::Original},
+        {"4:3", AspectRatio::FourThree},           {"4:3_LETTERBOX", AspectRatio::FourThree},
+        {"16:9", AspectRatio::SixteenNine},        {"16:9_LETTERBOX", AspectRatio::SixteenNine},
+        {"4:3_STRETCH", AspectRatio::FourThreeStretch},
+        {"16:9_STRETCH", AspectRatio::SixteenNineStretch},
+        {"4:3_CROP", AspectRatio::FourThreeCrop},  {"16:9_CROP", AspectRatio::SixteenNineCrop},
+    };
+    for (const auto& [name, ratio] : kNames) {
+        if (text == name) {
+            *out = ratio;
+            return true;
+        }
+    }
+    return false;
+}
+
+[[nodiscard]] const char* aspect_ratio_name(AspectRatio ratio)
+{
+    switch (ratio) {
+        case AspectRatio::Original:           return "ORIGINAL";
+        case AspectRatio::FourThree:          return "4:3";
+        case AspectRatio::SixteenNine:        return "16:9";
+        case AspectRatio::FourThreeStretch:   return "4:3_STRETCH";
+        case AspectRatio::SixteenNineStretch: return "16:9_STRETCH";
+        case AspectRatio::FourThreeCrop:      return "4:3_CROP";
+        case AspectRatio::SixteenNineCrop:    return "16:9_CROP";
+    }
+    return "4:3";
+}
+
 [[nodiscard]] bool parse_texture_filter(const std::string& value, TextureFilter* out)
 {
     const std::string text = lowered(value);
@@ -447,6 +483,11 @@ void write_pad_layout(std::ostream& out, const Config::PadLayout& layout,
 
 }  // namespace
 
+namespace {
+bool load_config_stream(std::istream& file, const std::string& path, Config* out,
+                        std::vector<std::string>* problems);
+}
+
 bool load_config(const std::string& path, Config* out, std::vector<std::string>* problems)
 {
     std::error_code error;
@@ -458,7 +499,55 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     if (!file) {
         return false;
     }
+    return load_config_stream(file, path, out, problems);
+}
 
+namespace {
+
+/// The ini setting a --set key stands for, its gamepad section apart.
+[[nodiscard]] bool is_section_key(const std::string& key)
+{
+    return key.rfind("pad1_", 0) == 0 || key.rfind("pad2_", 0) == 0;
+}
+
+/// A --set's "SECTION.KEY=VALUE" split; false when it is not one.
+[[nodiscard]] bool split_override(const std::string& set, std::string* section, std::string* key,
+                                  std::string* value)
+{
+    const usize equals = set.find('=');
+    if (equals == std::string::npos) {
+        return false;
+    }
+    const std::string name = trim(set.substr(0, equals));
+    const usize       dot  = name.find('.');
+    *section = dot == std::string::npos ? std::string() : lowered(trim(name.substr(0, dot)));
+    *key     = lowered(trim(dot == std::string::npos ? name : name.substr(dot + 1)));
+    *value   = trim(set.substr(equals + 1));
+    return !key->empty();
+}
+
+/// The settings before the first [section], by key.
+[[nodiscard]] std::map<std::string, std::string> top_settings(std::istream& file)
+{
+    std::map<std::string, std::string> values;
+    std::string                        line;
+    while (std::getline(file, line)) {
+        const std::string trimmed = trim(line);
+        if (!trimmed.empty() && trimmed[0] == '[') {
+            break;
+        }
+        const usize equals = trimmed.find('=');
+        if (trimmed.empty() || trimmed[0] == '#' || trimmed[0] == ';' || equals == std::string::npos) {
+            continue;
+        }
+        values[lowered(trim(trimmed.substr(0, equals)))] = trim(trimmed.substr(equals + 1));
+    }
+    return values;
+}
+
+bool load_config_stream(std::istream& file, const std::string& path, Config* out,
+                        std::vector<std::string>* problems)
+{
     std::string line;
     u32         number = 0;
     std::string section;  // the game family a [section] names, empty before one
@@ -468,6 +557,9 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
         u32         line;
     };
     std::vector<FamilyKey> family_keys;
+    bool aspect_mode_read     = false;  ///< aspect_mode, aspect_ratio and display_stretch
+    bool aspect_ratio_read    = false;  ///< in this file (see the older-ini reading below)
+    bool display_stretch_read = false;
     while (std::getline(file, line)) {
         ++number;
 
@@ -624,7 +716,50 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
                 bad_value();
             }
         } else if (key == "aspect_mode") {
-            if (!parse_aspect_mode(value, &out->aspect_mode)) {
+            if (parse_aspect_mode(value, &out->aspect_mode)) {
+                aspect_mode_read = true;
+            } else {
+                bad_value();
+            }
+        } else if (key == "aspect_ratio") {
+            if (parse_aspect_ratio(value, &out->aspect_ratio)) {
+                aspect_ratio_read = true;
+            } else {
+                bad_value();
+            }
+        } else if (key == "crop_position") {
+            if (!parse_s32(value, &out->crop_position)) {
+                bad_value();
+            }
+        } else if (key == "crop_barrel") {
+            if (!parse_bool(value, &out->crop_barrel)) {
+                bad_value();
+            }
+        } else if (key == "barrel_center") {
+            if (!parse_u32(value, &out->barrel_center)) {
+                bad_value();
+            }
+        } else if (key == "barrel_radius") {
+            if (!parse_u32(value, &out->barrel_radius)) {
+                bad_value();
+            }
+        } else if (key == "display_stretch") {
+            if (parse_bool(value, &out->display_stretch)) {
+                display_stretch_read = true;
+            } else {
+                bad_value();
+            }
+        } else if (key == "display_mode") {
+            // linuxloader's: the window or the full screen, the frame stretched or not.
+            std::string mode = value;
+            std::transform(mode.begin(), mode.end(), mode.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+            if (mode == "WINDOW" || mode == "WINDOW_STRETCH" || mode == "FULLSCREEN"
+                || mode == "FULLSCREEN_STRETCH") {
+                out->fullscreen      = mode.rfind("FULLSCREEN", 0) == 0;
+                out->display_stretch = mode.find("_STRETCH") != std::string::npos;
+                display_stretch_read = true;
+            } else {
                 bad_value();
             }
         } else if (key == "crt_enabled") {
@@ -1007,6 +1142,27 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     out->window_width  = std::max(out->window_width, 256u);
     out->window_height = std::max(out->window_height, 192u);
     out->wheel_ffb_strength    = std::min(out->wheel_ffb_strength, 200u);
+
+    // An ini from before aspect_ratio: its aspect_mode's square pixels and
+    // stretch are aspect_ratio and display_stretch now, and aspect_mode keeps
+    // only the 16:9 3D.
+    if (aspect_mode_read && out->aspect_mode == AspectMode::SquarePixel) {
+        if (!aspect_ratio_read) {
+            out->aspect_ratio = AspectRatio::Original;
+        }
+        out->aspect_mode = AspectMode::FourThree;
+    } else if (aspect_mode_read && out->aspect_mode == AspectMode::Stretch) {
+        if (!display_stretch_read) {
+            out->display_stretch = true;
+        }
+        out->aspect_mode = AspectMode::FourThree;
+    } else if (aspect_mode_read && out->aspect_mode == AspectMode::Widescreen
+               && !aspect_ratio_read) {
+        out->aspect_ratio = AspectRatio::SixteenNine;
+    }
+    out->crop_position = std::clamp(out->crop_position, -100, 100);
+    out->barrel_center = std::min(out->barrel_center, 100u);
+    out->barrel_radius = std::clamp(out->barrel_radius, 10u, 300u);
     out->wheel_panel_spring    = std::min(out->wheel_panel_spring, 100u);
     out->wheel_indy_full_power = std::clamp(out->wheel_indy_full_power, 1u, 63u);
     out->wheel_indy_deadband   = std::min(out->wheel_indy_deadband, out->wheel_indy_full_power - 1);
@@ -1039,19 +1195,105 @@ bool load_config(const std::string& path, Config* out, std::vector<std::string>*
     return true;
 }
 
-bool save_config(const std::string& path, const Config& config)
+}  // namespace
+
+void apply_settings_overrides(const std::vector<std::string>& sets, Config* out,
+                              std::vector<std::string>* problems)
 {
-    const std::filesystem::path file(path);
-    if (file.has_parent_path()) {
-        std::error_code error;
-        std::filesystem::create_directories(file.parent_path(), error);
+    std::string top;
+    std::string sections;
+    for (const std::string& set : sets) {
+        std::string section;
+        std::string key;
+        std::string value;
+        if (!split_override(set, &section, &key, &value)) {
+            problems->push_back("--set '" + set + "' is not SECTION.KEY=VALUE");
+            continue;
+        }
+        if (is_section_key(key)) {
+            sections += "[" + (section.empty() ? std::string("gamepad") : section) + "]\n";
+            sections += key + " = " + value + "\n";
+        } else {
+            top += key + " = " + value + "\n";
+        }
     }
+    std::istringstream text(top + sections);
+    (void)load_config_stream(text, "--set", out, problems);
+}
 
+std::vector<std::string> overridden_settings(const std::vector<std::string>& sets)
+{
+    std::vector<std::string> keys;
+    for (const std::string& set : sets) {
+        std::string section;
+        std::string key;
+        std::string value;
+        if (!split_override(set, &section, &key, &value) || is_section_key(key)) {
+            continue;
+        }
+        if (key == "display_mode") {
+            keys.push_back("fullscreen");
+            keys.push_back("display_stretch");
+        } else if (key.rfind("net_outputs", 0) == 0) {
+            keys.push_back("outputs_network" + key.substr(std::strlen("net_outputs")));
+        } else {
+            keys.push_back(key);
+        }
+    }
+    return keys;
+}
+
+std::map<std::string, std::string> read_top_settings(const std::string& path)
+{
+    std::ifstream file(path);
+    return top_settings(file);
+}
+
+void restore_settings(const std::string& path, const std::vector<std::string>& keys,
+                      const std::map<std::string, std::string>& applied,
+                      const std::map<std::string, std::string>& values)
+{
+    std::ifstream            in(path);
+    std::vector<std::string> lines;
+    std::string              line;
+    bool                     top     = true;
+    bool                     changed = false;
+    while (std::getline(in, line)) {
+        const std::string trimmed = trim(line);
+        if (!trimmed.empty() && trimmed[0] == '[') {
+            top = false;
+        }
+        const usize equals = trimmed.find('=');
+        if (top && equals != std::string::npos && trimmed[0] != '#' && trimmed[0] != ';') {
+            const std::string key   = lowered(trim(trimmed.substr(0, equals)));
+            const auto        given = applied.find(key);
+            if (std::find(keys.begin(), keys.end(), key) != keys.end() && given != applied.end()
+                && given->second == trim(trimmed.substr(equals + 1))) {
+                changed = true;
+                const auto found = values.find(key);
+                if (found == values.end()) {
+                    continue;  // the file had none: its default again
+                }
+                line = trim(trimmed.substr(0, equals)) + " = " + found->second;
+            }
+        }
+        lines.push_back(line);
+    }
+    in.close();
+    if (!changed) {
+        return;
+    }
     std::ofstream out(path, std::ios::trunc);
-    if (!out) {
-        return false;
+    for (const std::string& kept : lines) {
+        out << kept << "\n";
     }
+}
 
+namespace {
+
+/// The ini text of `config`, as save_config writes it.
+void write_config(std::ostream& out, const Config& config)
+{
     out << "# sm2-emu settings.\n"
         << "#\n"
         << "# Every setting below is at its default. Anything given on the command\n"
@@ -1106,10 +1348,25 @@ bool save_config(const std::string& path, const Config& config)
         << "# Present-stage only, so it takes effect live.\n"
         << "scaling_method = " << scaling_method_name(config.scaling_method) << "\n"
         << "\n"
-        << "# Aspect the frame is presented at. One of: 4:3 (arcade monitor),\n"
-        << "# square (raw 496x384 square pixels), stretch (fill the window),\n"
-        << "# 16:9 (widescreen: the 3D drawn wider, GPU renderers only).\n"
+        << "# 4:3, or 16:9 to draw the 3D wider (experimental, GPU renderers only).\n"
         << "aspect_mode = " << aspect_mode_name(config.aspect_mode) << "\n"
+        << "# The frame and how the picture fills it, as linuxloader names them:\n"
+        << "# ORIGINAL (the render resolution's shape); 4:3 or 16:9 (the whole\n"
+        << "# picture inside at its proportions, black bars); 4:3_STRETCH or\n"
+        << "# 16:9_STRETCH (filling it, distorted); 4:3_CROP or 16:9_CROP (filling it\n"
+        << "# at its proportions, the rest cut). crop_position -100 (left or top) to\n"
+        << "# 100 (right or bottom). crop_barrel bends the cut parts onto the edges\n"
+        << "# instead: barrel_center is the undistorted middle (% of the frame),\n"
+        << "# barrel_radius the cylinder's radius (% of the frame, 10..300).\n"
+        << "# display_stretch stretches the frame to the window (display_mode\n"
+        << "# WINDOW, WINDOW_STRETCH, FULLSCREEN or FULLSCREEN_STRETCH sets it and\n"
+        << "# fullscreen).\n"
+        << "aspect_ratio = " << aspect_ratio_name(config.aspect_ratio) << "\n"
+        << "crop_position = " << config.crop_position << "\n"
+        << "crop_barrel = " << bool_text(config.crop_barrel) << "\n"
+        << "barrel_center = " << config.barrel_center << "\n"
+        << "barrel_radius = " << config.barrel_radius << "\n"
+        << "display_stretch = " << bool_text(config.display_stretch) << "\n"
         << "\n"
         << "# Optional CRT cosmetic filter over the finished frame. Strengths are\n"
         << "# 0..100; curvature 0 is flat. Live-switchable.\n"
@@ -1384,8 +1641,31 @@ bool save_config(const std::string& path, const Config& config)
         out << "\n[" << family << "]\n";
         write_pad_layout(out, layout, &config.pad);
     }
+}
 
+}  // namespace
+
+bool save_config(const std::string& path, const Config& config)
+{
+    const std::filesystem::path file(path);
+    if (file.has_parent_path()) {
+        std::error_code error;
+        std::filesystem::create_directories(file.parent_path(), error);
+    }
+
+    std::ofstream out(path, std::ios::trunc);
+    if (!out) {
+        return false;
+    }
+    write_config(out, config);
     return out.good();
+}
+
+std::map<std::string, std::string> written_settings(const Config& config)
+{
+    std::stringstream text;
+    write_config(text, config);
+    return top_settings(text);
 }
 
 }  // namespace sm2

@@ -193,8 +193,17 @@ struct PictureArea {
 
 struct PresentOptions {
     ScalingMethod scaling_method = ScalingMethod::SharpBilinear;
+    /// Widescreen when the 3D is drawn wide (the picture then 16:9), else 4:3.
     AspectMode    aspect_mode    = AspectMode::FourThree;
     PictureArea   picture_area;
+
+    /// The frame and how the picture fills it (see AspectRatio, compute_frame_map).
+    AspectRatio aspect_ratio   = AspectRatio::FourThree;
+    float       crop_position  = 0.0F;   ///< -1 left or top .. 1 right or bottom
+    bool        crop_barrel    = false;
+    float       barrel_center  = 0.6F;   ///< the undistorted middle, a fraction of the frame
+    float       barrel_radius  = 0.5F;   ///< in frame lengths
+    bool        window_stretch = false;  ///< the frame stretched to the window
 
     bool crt_enabled           = false;
     u32  crt_scanline_strength = 40;

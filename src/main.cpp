@@ -203,6 +203,8 @@ struct Options {
     bool        list_gamepads = false;
     std::string config_path;
     std::string write_dir;
+    /// --set SECTION.KEY=VALUE, over whichever settings file is read.
+    std::vector<std::string> sets;
     std::string game;
     std::string dump_roms;
     std::string dump_tilemap;
@@ -315,7 +317,11 @@ void print_usage()
         "Options:\n"
         "  -h, --help          Show this message\n"
         "      --config <dir>  Directory holding sm2-emu.ini, used for both\n"
-        "                      reading and saving settings\n"
+        "                      reading and saving settings; a game's own\n"
+        "                      <set>.ini there is read instead when there is one\n"
+        "      --set SECTION.KEY=VALUE  A setting over the file's, for this run\n"
+        "                      only; repeatable. The section is ignored but for\n"
+        "                      a gamepad's ([gamepad] or a family's)\n"
         "      --write-dir <dir>  The one directory this run writes to (a disk\n"
         "                      behind a write filter): settings at its root,\n"
         "                      each game's saves, states and screenshots in\n"
@@ -756,6 +762,10 @@ void copy_in(const std::filesystem::path& from, const std::filesystem::path& to,
             // handled
         } else if (takes_value("--write-dir", &out->write_dir)) {
             // handled
+        } else if (std::string set; takes_value("--set", &set)) {
+            if (!set.empty()) {
+                out->sets.push_back(std::move(set));
+            }
         } else if (takes_value("--game", &out->game)) {
             // handled
         } else if (takes_value("--dump-roms", &out->dump_roms)) {
@@ -1016,6 +1026,173 @@ void configure_cabinet_link(sm2::hw::Model2MachineBase& machine,
              config.link_next_port);
 }
 
+/// The settings a file gave into the run's, where the command line did not set
+/// them: at launch, and again when another file is read (a game's own).
+void merge_file_settings(Options* options, const sm2::Config& from_file)
+{
+    if (!options->given.vsync) {
+        options->config.vsync = from_file.vsync;
+    }
+    if (!options->given.throttle) {
+        options->config.throttle = from_file.throttle;
+    }
+    if (!options->given.fullscreen) {
+        options->config.fullscreen = from_file.fullscreen;
+    }
+    if (!options->given.lightgun) {
+        options->config.lightgun = from_file.lightgun;
+    }
+    if (!options->given.validation) {
+        options->config.validation = from_file.validation;
+    }
+    if (!options->given.gpu) {
+        options->config.gpu = from_file.gpu;
+    }
+    if (!options->given.rom_dir) {
+        options->config.rom_dir = from_file.rom_dir;
+    }
+    if (!options->given.nvram_dir) {
+        options->config.nvram_dir = from_file.nvram_dir;
+    }
+    if (!options->given.screenshot_dir) {
+        options->config.screenshot_dir = from_file.screenshot_dir;
+    }
+    options->config.artwork_dir    = from_file.artwork_dir;
+    // No CLI flag for scrape_artwork; the file value wins over the default.
+    options->config.scrape_artwork = from_file.scrape_artwork;
+    if (!options->given.log_level) {
+        options->config.log_level = from_file.log_level;
+    }
+    options->config.window_width  = from_file.window_width;
+    options->config.window_height = from_file.window_height;
+    if (!options->given.render_scale) {
+        options->config.render_scale = from_file.render_scale;
+    }
+    // Present-stage and enhancement options are GUI/config-only (no CLI flags),
+    // so the file value wins over the default, like window size above.
+    options->config.scaling_method        = from_file.scaling_method;
+    options->config.aspect_mode           = from_file.aspect_mode;
+    options->config.aspect_ratio          = from_file.aspect_ratio;
+    options->config.crop_position         = from_file.crop_position;
+    options->config.crop_barrel           = from_file.crop_barrel;
+    options->config.barrel_center         = from_file.barrel_center;
+    options->config.barrel_radius         = from_file.barrel_radius;
+    options->config.display_stretch       = from_file.display_stretch;
+    options->config.crt_enabled           = from_file.crt_enabled;
+    options->config.crt_scanline_strength = from_file.crt_scanline_strength;
+    options->config.crt_mask_strength     = from_file.crt_mask_strength;
+    options->config.crt_glow_strength     = from_file.crt_glow_strength;
+    options->config.crt_curvature         = from_file.crt_curvature;
+    options->config.bezel                 = from_file.bezel;
+    options->config.bezel_dir             = from_file.bezel_dir;
+    options->config.crosshair_dir         = from_file.crosshair_dir;
+
+    options->config.texture_filter = from_file.texture_filter;
+    options->config.anisotropy     = from_file.anisotropy;
+    options->config.upscale_2d     = from_file.upscale_2d;
+    options->config.translucency   = from_file.translucency;
+    options->config.extended_draw_distance = from_file.extended_draw_distance;
+    options->config.custom_textures = from_file.custom_textures;
+    options->config.dump_textures   = from_file.dump_textures;
+
+    // Renderer: --graphics-backend wins, else the saved choice selects it. The
+    // config string is kept populated either way so the GUI round-trips it.
+    if (options->given.graphics_backend) {
+        options->config.graphics_backend =
+            options->graphics_backend == GraphicsBackendChoice::Software ? "software"
+            : options->graphics_backend == GraphicsBackendChoice::Opengl ? "opengl"
+                                                                         : "vulkan";
+    } else {
+        options->config.graphics_backend = from_file.graphics_backend;
+        if (options->config.graphics_backend == "software") {
+            options->graphics_backend        = GraphicsBackendChoice::Software;
+            options->start_in_software_renderer = true;
+        } else if (options->config.graphics_backend == "opengl") {
+            options->graphics_backend = GraphicsBackendChoice::Opengl;
+        } else if (options->config.graphics_backend == "vulkan") {
+            options->graphics_backend = GraphicsBackendChoice::Vulkan;
+        }  // empty: keep kDefaultGraphicsBackend
+    }
+
+    // Settings with no command-line flag come straight from the file, so the
+    // GUI shows and round-trips what was saved.
+    options->config.show_fps            = from_file.show_fps;
+    options->config.software_async      = from_file.software_async;
+    options->config.software_slow_cores = from_file.software_slow_cores;
+    options->config.show_notifications  = from_file.show_notifications;
+    options->config.rewind              = from_file.rewind;
+    options->config.rewind_buffer_mb    = from_file.rewind_buffer_mb;
+    options->config.language            = from_file.language;
+    options->config.wheel_ffb           = from_file.wheel_ffb;
+    options->config.wheel_ffb_strength  = from_file.wheel_ffb_strength;
+    options->config.wheel_panel_spring  = from_file.wheel_panel_spring;
+    options->config.wheel_indy_deadband   = from_file.wheel_indy_deadband;
+    options->config.wheel_indy_full_power = from_file.wheel_indy_full_power;
+    options->config.wheel_drive_dip       = from_file.wheel_drive_dip;
+    options->config.wheel_ffb_invert    = from_file.wheel_ffb_invert;
+    options->config.input_background    = from_file.input_background;
+    options->config.wheel_steer_degrees = from_file.wheel_steer_degrees;
+    options->config.wheel_lock_degrees  = from_file.wheel_lock_degrees;
+    options->config.wheel_rumble          = from_file.wheel_rumble;
+    options->config.wheel_rumble_strength = from_file.wheel_rumble_strength;
+    options->config.wheel_rumble_engine   = from_file.wheel_rumble_engine;
+    options->config.wheel_buttons       = from_file.wheel_buttons;
+    options->config.wheel_keys          = from_file.wheel_keys;
+    options->config.wheel_shifter_neutral  = from_file.wheel_shifter_neutral;
+    options->config.wheel_shift_neutral_ms = from_file.wheel_shift_neutral_ms;
+    options->config.wheel_steer_axis    = from_file.wheel_steer_axis;
+    options->config.wheel_accel_axis    = from_file.wheel_accel_axis;
+    options->config.wheel_brake_axis    = from_file.wheel_brake_axis;
+    options->config.wheel_accel_invert  = from_file.wheel_accel_invert;
+    options->config.wheel_brake_invert  = from_file.wheel_brake_invert;
+    options->config.wheel_accel_half    = from_file.wheel_accel_half;
+    options->config.wheel_brake_half    = from_file.wheel_brake_half;
+
+    options->config.pad_rumble           = from_file.pad_rumble;
+    options->config.pad_rumble_strength  = from_file.pad_rumble_strength;
+    options->config.pad_rumble_cornering = from_file.pad_rumble_cornering;
+    options->config.pad_stick_sensitivity = from_file.pad_stick_sensitivity;
+    options->config.pad_stick_deadzone    = from_file.pad_stick_deadzone;
+    options->config.pad_shortcuts         = from_file.pad_shortcuts;
+    options->config.pad                   = from_file.pad;
+    options->config.pad_layouts           = from_file.pad_layouts;
+    options->config.wheel_steer_deadzone  = from_file.wheel_steer_deadzone;
+    options->config.game_volume           = from_file.game_volume;
+    options->config.game_volumes          = from_file.game_volumes;
+    if (!options->given.outputs_network) {
+        options->config.outputs_network = from_file.outputs_network;
+    }
+    options->config.outputs_network_port     = from_file.outputs_network_port;
+    options->config.telemetry_port =
+        options->telemetry_port != 0 ? options->telemetry_port : from_file.telemetry_port;
+    options->config.telemetry_forza =
+        !options->telemetry_forza.empty() ? options->telemetry_forza : from_file.telemetry_forza;
+    options->config.outputs_network_udp_port = from_file.outputs_network_udp_port;
+    options->config.outputs_windows          = from_file.outputs_windows;
+
+    options->config.link_enabled        = from_file.link_enabled;
+    options->config.link_local_ip       = from_file.link_local_ip;
+    options->config.link_subnet_mask    = from_file.link_subnet_mask;
+    options->config.link_port           = from_file.link_port;
+    options->config.link_next_ip        = from_file.link_next_ip;
+    options->config.link_next_port      = from_file.link_next_port;
+    options->config.link_cabinet_index  = from_file.link_cabinet_index;
+
+    if (!options->given.scsp_core) {
+        options->config.scsp_core = from_file.scsp_core;
+    }
+
+    options->config.lightgun_crosshair       = from_file.lightgun_crosshair;
+    options->config.lightgun_hide_flash      = from_file.lightgun_hide_flash;
+    options->config.lightgun_pad_centred     = from_file.lightgun_pad_centred;
+    options->config.lightgun_recoil          = from_file.lightgun_recoil;
+    options->config.lightgun_recoil_strength = from_file.lightgun_recoil_strength;
+    options->config.sinden_border            = from_file.sinden_border;
+    options->config.sinden_border_colour     = from_file.sinden_border_colour;
+    options->config.sinden_border_thickness  = from_file.sinden_border_thickness;
+    options->config.gun_buttons              = from_file.gun_buttons;
+}
+
 }  // namespace
 
 int main(int argc, char** argv)
@@ -1072,7 +1249,15 @@ int main(int argc, char** argv)
 
     Config                   from_file = defaults;
     std::vector<std::string> problems;
-    bool                     readable = load_config(config_path, &from_file, &problems);
+    bool                     readable = true;
+    // A settings file, and the --set overrides over it.
+    const auto read_settings = [&](const std::string& path) {
+        from_file = defaults;
+        problems.clear();
+        readable = load_config(path, &from_file, &problems);
+        apply_settings_overrides(options.sets, &from_file, &problems);
+    };
+    read_settings(config_path);
 
     // The folder the bezels and crosshairs sit in by default, beside the ini
     // the settings come from.
@@ -1119,183 +1304,79 @@ int main(int argc, char** argv)
             }
             SM2_INFO("write-dir: writing to %s only", root.string().c_str());
             config_path = moved.string();
-            from_file   = defaults;
-            problems.clear();
-            readable = load_config(config_path, &from_file, &problems);
+            read_settings(config_path);
         }
     }
 
-    if (!options.given.vsync) {
-        options.config.vsync = from_file.vsync;
+    // A game's own settings: <set>.ini beside the common file, read instead of
+    // it, whole (linuxloader's per-game file). Under --write-dir, one beside
+    // the ini it came from is copied in the first time.
+    const std::string common_config_path = config_path;
+    const auto game_config_path = [&](const std::string& game) {
+        if (game.empty()) {
+            return std::string();
+        }
+        const std::string           name = game + ".ini";
+        const std::filesystem::path own =
+            std::filesystem::path(common_config_path).parent_path() / name;
+        std::error_code error;
+        if (g_write_dir.on() && !std::filesystem::exists(own, error)) {
+            const std::filesystem::path before = std::filesystem::path(content_dir) / name;
+            if (std::filesystem::exists(before, error)) {
+                std::filesystem::copy_file(before, own, error);
+            }
+        }
+        return std::filesystem::exists(own, error) ? own.string() : std::string();
+    };
+    // The game asked for, by name or its archive's; the one loaded is checked
+    // once it is.
+    {
+        std::string guess = options.game;
+        if (guess.empty() && !options.rom_path.empty()) {
+            guess = std::filesystem::path(options.rom_path).stem().string();
+        }
+        if (const std::string own = game_config_path(guess); !own.empty()) {
+            config_path = own;
+            read_settings(config_path);
+        }
     }
-    if (!options.given.throttle) {
-        options.config.throttle = from_file.throttle;
-    }
-    if (!options.given.fullscreen) {
-        options.config.fullscreen = from_file.fullscreen;
-    }
-    if (!options.given.lightgun) {
-        options.config.lightgun = from_file.lightgun;
-    }
-    if (!options.given.validation) {
-        options.config.validation = from_file.validation;
-    }
-    if (!options.given.gpu) {
-        options.config.gpu = from_file.gpu;
-    }
-    if (!options.given.rom_dir) {
-        options.config.rom_dir = from_file.rom_dir;
-    }
-    if (!options.given.nvram_dir) {
-        options.config.nvram_dir = from_file.nvram_dir;
-    }
-    if (!options.given.screenshot_dir) {
-        options.config.screenshot_dir = from_file.screenshot_dir;
-    }
-    options.config.artwork_dir    = from_file.artwork_dir;
-    // No CLI flag for scrape_artwork; the file value wins over the default.
-    options.config.scrape_artwork = from_file.scrape_artwork;
-    if (!options.given.log_level) {
-        options.config.log_level = from_file.log_level;
-    }
-    options.config.window_width  = from_file.window_width;
-    options.config.window_height = from_file.window_height;
-    if (!options.given.render_scale) {
-        options.config.render_scale = from_file.render_scale;
-    }
-    // Present-stage and enhancement options are GUI/config-only (no CLI flags),
-    // so the file value wins over the default, like window size above.
-    options.config.scaling_method        = from_file.scaling_method;
-    options.config.aspect_mode           = from_file.aspect_mode;
-    options.config.crt_enabled           = from_file.crt_enabled;
-    options.config.crt_scanline_strength = from_file.crt_scanline_strength;
-    options.config.crt_mask_strength     = from_file.crt_mask_strength;
-    options.config.crt_glow_strength     = from_file.crt_glow_strength;
-    options.config.crt_curvature         = from_file.crt_curvature;
-    options.config.bezel                 = from_file.bezel;
-    options.config.bezel_dir             = from_file.bezel_dir;
-    options.config.crosshair_dir         = from_file.crosshair_dir;
+    // The file's own values of what --set overrides, for a save to keep them.
+    std::map<std::string, std::string> file_settings = read_top_settings(config_path);
 
-    options.config.texture_filter = from_file.texture_filter;
-    options.config.anisotropy     = from_file.anisotropy;
-    options.config.upscale_2d     = from_file.upscale_2d;
-    options.config.translucency   = from_file.translucency;
-    options.config.extended_draw_distance = from_file.extended_draw_distance;
-    options.config.custom_textures = from_file.custom_textures;
-    options.config.dump_textures   = from_file.dump_textures;
-
-    // Renderer: --graphics-backend wins, else the saved choice selects it. The
-    // config string is kept populated either way so the GUI round-trips it.
-    if (options.given.graphics_backend) {
-        options.config.graphics_backend =
-            options.graphics_backend == GraphicsBackendChoice::Software ? "software"
-            : options.graphics_backend == GraphicsBackendChoice::Opengl ? "opengl"
-                                                                        : "vulkan";
-    } else {
-        options.config.graphics_backend = from_file.graphics_backend;
-        if (options.config.graphics_backend == "software") {
-            options.graphics_backend        = GraphicsBackendChoice::Software;
-            options.start_in_software_renderer = true;
-        } else if (options.config.graphics_backend == "opengl") {
-            options.graphics_backend = GraphicsBackendChoice::Opengl;
-        } else if (options.config.graphics_backend == "vulkan") {
-            options.graphics_backend = GraphicsBackendChoice::Vulkan;
-        }  // empty: keep kDefaultGraphicsBackend
-    }
-
-    // Settings with no command-line flag come straight from the file, so the
-    // GUI shows and round-trips what was saved.
-    options.config.show_fps            = from_file.show_fps;
-    options.config.software_async      = from_file.software_async;
-    options.config.software_slow_cores = from_file.software_slow_cores;
-    options.config.show_notifications  = from_file.show_notifications;
-    options.config.rewind              = from_file.rewind;
-    options.config.rewind_buffer_mb    = from_file.rewind_buffer_mb;
-    options.config.language            = from_file.language;
-    options.config.wheel_ffb           = from_file.wheel_ffb;
-    options.config.wheel_ffb_strength  = from_file.wheel_ffb_strength;
-    options.config.wheel_panel_spring  = from_file.wheel_panel_spring;
-    options.config.wheel_indy_deadband   = from_file.wheel_indy_deadband;
-    options.config.wheel_indy_full_power = from_file.wheel_indy_full_power;
-    options.config.wheel_drive_dip       = from_file.wheel_drive_dip;
-    options.config.wheel_ffb_invert    = from_file.wheel_ffb_invert;
-    options.config.input_background    = from_file.input_background;
-    options.config.wheel_steer_degrees = from_file.wheel_steer_degrees;
-    options.config.wheel_lock_degrees  = from_file.wheel_lock_degrees;
-    options.config.wheel_rumble          = from_file.wheel_rumble;
-    options.config.wheel_rumble_strength = from_file.wheel_rumble_strength;
-    options.config.wheel_rumble_engine   = from_file.wheel_rumble_engine;
-    options.config.wheel_buttons       = from_file.wheel_buttons;
-    options.config.wheel_keys          = from_file.wheel_keys;
-    options.config.wheel_shifter_neutral  = from_file.wheel_shifter_neutral;
-    options.config.wheel_shift_neutral_ms = from_file.wheel_shift_neutral_ms;
-    options.config.wheel_steer_axis    = from_file.wheel_steer_axis;
-    options.config.wheel_accel_axis    = from_file.wheel_accel_axis;
-    options.config.wheel_brake_axis    = from_file.wheel_brake_axis;
-    options.config.wheel_accel_invert  = from_file.wheel_accel_invert;
-    options.config.wheel_brake_invert  = from_file.wheel_brake_invert;
-    options.config.wheel_accel_half    = from_file.wheel_accel_half;
-    options.config.wheel_brake_half    = from_file.wheel_brake_half;
-
-    options.config.pad_rumble           = from_file.pad_rumble;
-    options.config.pad_rumble_strength  = from_file.pad_rumble_strength;
-    options.config.pad_rumble_cornering = from_file.pad_rumble_cornering;
-    options.config.pad_stick_sensitivity = from_file.pad_stick_sensitivity;
-    options.config.pad_stick_deadzone    = from_file.pad_stick_deadzone;
-    options.config.pad_shortcuts         = from_file.pad_shortcuts;
-    options.config.pad                   = from_file.pad;
-    options.config.pad_layouts           = from_file.pad_layouts;
-    options.config.wheel_steer_deadzone  = from_file.wheel_steer_deadzone;
-    options.config.game_volume           = from_file.game_volume;
-    options.config.game_volumes          = from_file.game_volumes;
-    if (!options.given.outputs_network) {
-        options.config.outputs_network = from_file.outputs_network;
-    }
-    options.config.outputs_network_port     = from_file.outputs_network_port;
-    options.config.telemetry_port =
-        options.telemetry_port != 0 ? options.telemetry_port : from_file.telemetry_port;
-    options.config.telemetry_forza =
-        !options.telemetry_forza.empty() ? options.telemetry_forza : from_file.telemetry_forza;
-    options.config.outputs_network_udp_port = from_file.outputs_network_udp_port;
-    options.config.outputs_windows          = from_file.outputs_windows;
-
-    options.config.link_enabled        = from_file.link_enabled;
-    options.config.link_local_ip       = from_file.link_local_ip;
-    options.config.link_subnet_mask    = from_file.link_subnet_mask;
-    options.config.link_port           = from_file.link_port;
-    options.config.link_next_ip        = from_file.link_next_ip;
-    options.config.link_next_port      = from_file.link_next_port;
-    options.config.link_cabinet_index  = from_file.link_cabinet_index;
-
-    if (!options.given.scsp_core) {
-        options.config.scsp_core = from_file.scsp_core;
-    }
-
-    options.config.lightgun_crosshair       = from_file.lightgun_crosshair;
-    options.config.lightgun_hide_flash      = from_file.lightgun_hide_flash;
-    options.config.lightgun_pad_centred     = from_file.lightgun_pad_centred;
-    options.config.lightgun_recoil          = from_file.lightgun_recoil;
-    options.config.lightgun_recoil_strength = from_file.lightgun_recoil_strength;
-    options.config.sinden_border            = from_file.sinden_border;
-    options.config.sinden_border_colour     = from_file.sinden_border_colour;
-    options.config.sinden_border_thickness  = from_file.sinden_border_thickness;
-    options.config.gun_buttons              = from_file.gun_buttons;
+    merge_file_settings(&options, from_file);
 
     // Default saves/screenshots under the platform data dir; a cwd-ini dev tree
     // keeps them relative (see resolve_default_paths / data_directory). Artwork
     // goes beside the ini, so pass its directory.
     const bool config_in_cwd =
         options.config_path.empty()
-        && config_path == std::string("sm2-emu.ini");
+        && common_config_path == std::string("sm2-emu.ini");
     const std::string config_dir =
-        std::filesystem::path(config_path).parent_path().string();
+        std::filesystem::path(common_config_path).parent_path().string();
     resolve_default_paths(&options.config, config_in_cwd, config_dir);
+
+    // The settings as the overrides left them, to tell at a save which were
+    // changed since, in the GUI.
+    std::map<std::string, std::string> applied_settings = written_settings(options.config);
+    const std::vector<std::string>     overridden       = overridden_settings(options.sets);
+    // Every save of the settings: what --set gave and nothing changed since is
+    // for this run only, the file keeps its own.
+    const auto save_settings = [&](const std::string& path, const Config& config) {
+        if (!save_config(path, config)) {
+            return false;
+        }
+        if (!overridden.empty()) {
+            restore_settings(path, overridden, applied_settings, file_settings);
+        }
+        return true;
+    };
 
     log::Level level = log::Level::Info;
     (void)parse_log_level(options.config.log_level, &level);
     log::set_level(level);
 
     SM2_INFO("sm2-emu %s", SM2_VERSION);
+    SM2_INFO("settings: %s", config_path.c_str());
 
     // Platform sockets, once (a no-op except on Windows). The process reclaims
     // them at exit, so the early-return paths below need no matching shutdown.
@@ -1314,13 +1395,50 @@ int main(int argc, char** argv)
     {
         std::error_code error;
         if ((!std::filesystem::exists(config_path, error) || error)
-            && !save_config(config_path, options.config)) {
+            && !save_settings(config_path, options.config)) {
             SM2_WARN("could not create '%s'", config_path.c_str());
         }
         if (!options.config.nvram_dir.empty() && !g_write_dir.on()) {
             std::filesystem::create_directories(options.config.nvram_dir, error);
         }
     }
+
+    // Switch to `game`'s own settings, or back to the common ones (no game, or
+    // none of its own). Once `running`, the settings in use are saved first,
+    // as on exit, and the renderer stays as launched.
+    const auto use_settings_for = [&](const std::string& game, bool running) {
+        std::string wanted = game_config_path(game);
+        if (wanted.empty()) {
+            wanted = common_config_path;
+        }
+        if (wanted == config_path) {
+            return;
+        }
+        if (running && !save_settings(config_path, options.config)) {
+            SM2_WARN("could not save settings to '%s'", config_path.c_str());
+        }
+        Config                   next = defaults;
+        std::vector<std::string> found;
+        if (!load_config(wanted, &next, &found)) {
+            SM2_WARN("could not read '%s'; using defaults", wanted.c_str());
+        }
+        for (const std::string& problem : found) {
+            SM2_WARN("%s", problem.c_str());
+        }
+        apply_settings_overrides(options.sets, &next, &found);  // reported at launch
+        const GraphicsBackendChoice backend_choice = options.graphics_backend;
+        const bool                  software       = options.start_in_software_renderer;
+        merge_file_settings(&options, next);
+        if (running) {
+            options.graphics_backend           = backend_choice;
+            options.start_in_software_renderer = software;
+        }
+        resolve_default_paths(&options.config, config_in_cwd, config_dir);
+        file_settings    = read_top_settings(wanted);
+        applied_settings = written_settings(options.config);
+        config_path      = wanted;
+        SM2_INFO("settings: %s", config_path.c_str());
+    };
 
     if (options.list_gpus) {
 #if !defined(SM2_HAVE_VULKAN)
@@ -1463,6 +1581,7 @@ int main(int argc, char** argv)
         if (!loaded.has_value()) {
             return 1;
         }
+        use_settings_for(loaded->game.name, false);
         configure_cabinet_link(*loaded->machine_iface, options.config);
     } else {
         SM2_INFO("no ROM given; starting with the bring-up display only");
@@ -2167,6 +2286,12 @@ int main(int argc, char** argv)
         // renderer's uploaded frame -- no software special case.
         backend_config.present.scaling_method        = options.config.scaling_method;
         backend_config.present.aspect_mode           = options.config.aspect_mode;
+        backend_config.present.aspect_ratio          = options.config.aspect_ratio;
+        backend_config.present.crop_position  = static_cast<float>(options.config.crop_position) / 100.0F;
+        backend_config.present.crop_barrel    = options.config.crop_barrel;
+        backend_config.present.barrel_center  = static_cast<float>(options.config.barrel_center) / 100.0F;
+        backend_config.present.barrel_radius  = static_cast<float>(options.config.barrel_radius) / 100.0F;
+        backend_config.present.window_stretch = options.config.display_stretch;
         backend_config.present.crt_enabled           = options.config.crt_enabled;
         backend_config.present.crt_scanline_strength = options.config.crt_scanline_strength;
         backend_config.present.crt_mask_strength     = options.config.crt_mask_strength;
@@ -2243,6 +2368,8 @@ int main(int argc, char** argv)
         // above owns whichever GPU API actually draws what it builds.
         osd::Gui gui;
         gui.set_config_path(config_path);
+        gui.set_common_config_path(common_config_path);
+        gui.set_save_function(save_settings);
         gui.set_content_dir(content_dir);
         gui.set_texture_backend(backend.get());
         // The renderers this build offers, most-preferred first. Software only
@@ -2561,6 +2688,26 @@ int main(int argc, char** argv)
                        ? AspectMode::FourThree
                        : options.config.aspect_mode;
         };
+        // How the picture is presented: the backend draws it so, the guns and
+        // the GUI's crosshairs map through the same frame.
+        const auto present_options = [&]() {
+            render::PresentOptions present;
+            present.scaling_method        = options.config.scaling_method;
+            present.aspect_mode           = shown_aspect();
+            present.picture_area          = gui.picture_area();
+            present.aspect_ratio          = options.config.aspect_ratio;
+            present.crop_position         = static_cast<float>(options.config.crop_position) / 100.0F;
+            present.crop_barrel           = options.config.crop_barrel;
+            present.barrel_center         = static_cast<float>(options.config.barrel_center) / 100.0F;
+            present.barrel_radius         = static_cast<float>(options.config.barrel_radius) / 100.0F;
+            present.window_stretch        = options.config.display_stretch;
+            present.crt_enabled           = options.config.crt_enabled;
+            present.crt_scanline_strength = options.config.crt_scanline_strength;
+            present.crt_mask_strength     = options.config.crt_mask_strength;
+            present.crt_glow_strength     = options.config.crt_glow_strength;
+            present.crt_curvature         = options.config.crt_curvature;
+            return present;
+        };
         // Draw one frame behind on a second thread; off for captures, which
         // want the frame they asked for.
         const bool async_software = use_software_renderer && options.config.software_async
@@ -2624,8 +2771,15 @@ int main(int argc, char** argv)
         std::unique_ptr<render::TextureReplacements> replacements;
         std::string                                  replacements_game;
 
+        // The settings of `game` (none: the common ones), the GUI saving there.
+        const auto switch_settings = [&](const std::string& game) {
+            use_settings_for(game, true);
+            gui.set_config_path(config_path);
+        };
+
         // Make `next` the running game, from the picker or a dropped file.
         const auto adopt_game = [&](LoadedMachine&& next) {
+            switch_settings(next.game.name);
             async_soft.forget_machine();
             backend->wait_idle();
             loaded        = std::move(next);
@@ -2905,8 +3059,7 @@ int main(int argc, char** argv)
                 input.set_pad_rumble(options.config.pad_rumble,
                                      options.config.pad_rumble_strength,
                                      options.config.pad_rumble_cornering);
-                input.set_present_placement(shown_aspect(), options.config.scaling_method,
-                                            gui.picture_area());
+                input.set_present_placement(present_options());
                 input.set_sinden_border(options.config.sinden_border);
                 const auto drive_writes = machine_iface->take_drive_board_writes();
                 input.update_drive_board(loaded->game, drive_writes.view());
@@ -3255,16 +3408,9 @@ int main(int argc, char** argv)
             // takes effect immediately; both are shader/pass state, never a
             // reallocation.
             {
-                render::PresentOptions present;
-                present.scaling_method        = options.config.scaling_method;
-                present.aspect_mode           = shown_aspect();
-                present.picture_area          = gui.picture_area();
-                present.crt_enabled           = options.config.crt_enabled;
-                present.crt_scanline_strength = options.config.crt_scanline_strength;
-                present.crt_mask_strength     = options.config.crt_mask_strength;
-                present.crt_glow_strength     = options.config.crt_glow_strength;
-                present.crt_curvature         = options.config.crt_curvature;
+                const render::PresentOptions present = present_options();
                 backend->set_present_options(present);
+                gui.set_present_options(present);
 
                 render::EnhancementOptions enhancement;
                 enhancement.texture_filter = options.config.texture_filter;
@@ -3336,6 +3482,10 @@ int main(int argc, char** argv)
             const bool gui_active =
                 gui.draw(options.config, gpu_names, pacer.measured_hz(),
                         use_software_renderer ? "Software" : gpu_backend_name, &input);
+            // "Save for this game" makes the game's own file the one in use.
+            if (!gui.config_path().empty()) {
+                config_path = gui.config_path();
+            }
             // An overlay Save/Load/Delete button routes through the same
             // between-frames service path as the F6/F7 hotkeys.
             if (std::optional<osd::Gui::StateRequest> req = gui.take_pending_state_request()) {
@@ -3410,6 +3560,7 @@ int main(int argc, char** argv)
                 audio_paused_state = true;
                 input.release_force_feedback();
                 input.reset_drive_board();
+                switch_settings(std::string());
                 show_picker();
                 window.set_title(build_title());
                 pacer.resync();
@@ -3424,6 +3575,8 @@ int main(int argc, char** argv)
                 gui.release_picker_textures();
                 backend->wait_idle();
 
+                // Its own settings first: they may place its saves.
+                switch_settings(*pick);
                 std::optional<LoadedMachine> chosen;
                 rom::LoadError               load_error;
                 if (const std::optional<std::filesystem::path> archive =
@@ -3436,6 +3589,7 @@ int main(int argc, char** argv)
                 }
                 if (!chosen.has_value()) {
                     SM2_ERROR("picker: could not load '%s' from rom_dir", pick->c_str());
+                    switch_settings(std::string());
                     show_picker();
                     const rom::GameSpec* spec = database.find(*pick);
                     gui.show_load_error(spec != nullptr ? spec->title : *pick,
@@ -3768,7 +3922,7 @@ int main(int argc, char** argv)
 
         // Persist settings on exit, so changes made in the overlay (gun
         // bindings, wheel, video) stick without needing the Save button.
-        if (!save_config(config_path, options.config)) {
+        if (!save_settings(config_path, options.config)) {
             SM2_WARN("could not save settings to '%s'", config_path.c_str());
         }
 

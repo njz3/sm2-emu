@@ -20,11 +20,16 @@
 
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
 
 struct SDL_Window;
+
+namespace sm2::render {
+struct FrameMap;
+}
 
 namespace sm2::osd {
 
@@ -90,6 +95,19 @@ public:
     /// so a saved file goes back to the same place (including a --config path).
     void set_config_path(std::string path) { m_config_path = std::move(path); }
 
+    /// Where Save writes now: the common file, or the running game's own once
+    /// "Save for this game" made one.
+    [[nodiscard]] const std::string& config_path() const { return m_config_path; }
+
+    /// The common settings file, beside which a game's own <set>.ini goes.
+    void set_common_config_path(std::string path) { m_common_config_path = std::move(path); }
+
+    /// How the Save buttons write the settings; save_config when unset.
+    void set_save_function(std::function<bool(const std::string&, const Config&)> save)
+    {
+        m_save = std::move(save);
+    }
+
     /// Where the bezels and crosshairs folders sit when their settings are
     /// empty: beside the ini, or beside the one --write-dir copied it from.
     void set_content_dir(std::string dir) { m_content_dir = std::move(dir); }
@@ -137,6 +155,10 @@ public:
     /// The aspect the frame is shown at, which is 4:3 when 16:9 is chosen but
     /// the renderer cannot widen the frame.
     void set_shown_aspect(AspectMode aspect) { m_shown_aspect = aspect; }
+
+    /// How the backend presents the picture this frame, for the crosshairs and
+    /// the Sinden border to map through the same frame.
+    void set_present_options(const render::PresentOptions& present) { m_present = present; }
 
     /// The running game's family, empty when none is loaded.
     void set_current_family(std::string key) { m_current_family = std::move(key); }
@@ -295,6 +317,8 @@ private:
 
     SDL_Window* m_window      = nullptr;
     std::string m_config_path;  ///< where Save writes; empty -> default path.
+    std::string m_common_config_path;  ///< the file for every game; empty -> m_config_path.
+    std::function<bool(const std::string&, const Config&)> m_save;  ///< empty -> save_config.
     std::string m_content_dir;  ///< bezels and crosshairs; empty -> beside the ini.
 
     /// m_content_dir, or the config path's folder.
@@ -319,10 +343,12 @@ private:
     /// rectangle the backend draws the image into (see draw_crosshairs /
     /// draw_sinden_border). Kept in step with the one config value; a mismatch
     /// would drift the aim from the picture.
-    AspectMode    m_present_aspect = AspectMode::FourThree;
     AspectMode    m_shown_aspect   = AspectMode::FourThree;
-    ScalingMethod m_present_method = ScalingMethod::SharpBilinear;
+    render::PresentOptions m_present;
     render::PictureArea m_present_area;
+
+    /// The frame the picture is presented in, over a window of `width` x `height`.
+    [[nodiscard]] render::FrameMap present_map(float width, float height) const;
 
     /// GPU capabilities for gating the enhancement options (set each frame).
     bool  m_caps_anisotropy     = false;

@@ -42,6 +42,12 @@ struct PushConstants {
     float crt_mask;
     float crt_glow;
     float crt_curvature;
+    u32   crop_axis;
+    float crop_extent;
+    float crop_offset;
+    u32   crop_barrel;
+    float barrel_centre;
+    float barrel_radius;
 };
 
 /// The sampler slot a scaling method needs. Nearest and Integer sample point
@@ -482,9 +488,8 @@ void PresentPass::upload_from_host(std::span<const u32> pixels)
 VkViewport PresentPass::letterbox() const
 {
     const VkExtent2D          extent = m_context->swapchain_extent();
-    const render::Letterbox   box    = render::compute_letterbox(
-        extent.width, extent.height, m_options.aspect_mode, m_options.scaling_method,
-        m_options.picture_area);
+    const render::Letterbox   box    =
+        render::compute_frame_map(extent.width, extent.height, m_options).view;
 
     VkViewport viewport{};
     viewport.x        = box.x;
@@ -547,6 +552,13 @@ void PresentPass::record()
     push.crt_mask       = static_cast<float>(m_options.crt_mask_strength) / 100.0F;
     push.crt_glow       = static_cast<float>(m_options.crt_glow_strength) / 100.0F;
     push.crt_curvature  = static_cast<float>(m_options.crt_curvature) / 100.0F;
+    const render::FrameMap map = render::compute_frame_map(extent.width, extent.height, m_options);
+    push.crop_axis      = static_cast<u32>(map.axis);
+    push.crop_extent    = map.extent;
+    push.crop_offset    = map.offset;
+    push.crop_barrel    = map.barrel ? 1U : 0U;
+    push.barrel_centre  = map.centre;
+    push.barrel_radius  = map.radius;
 
     const usize slot = sampler_for(m_options.scaling_method);
 

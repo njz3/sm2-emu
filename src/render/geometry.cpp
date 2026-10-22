@@ -24,6 +24,7 @@
 #include "render/texture_replace.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <limits>
 
@@ -329,6 +330,204 @@ Letterbox compute_game_rect(u32 window_width, u32 window_height, AspectMode aspe
         box.width = inner;
     }
     return box;
+}
+
+
+namespace {
+
+constexpr float kHalfPi = 1.5707963F;
+
+/// How much of the picture a point `x` into an edge band shows: the band is
+/// `band` wide and `length` of picture is left on its side (see FrameMap).
+[[nodiscard]] float bend(float x, float length, float band, float radius)
+{
+    if (band <= 0.0F) {
+        return 0.0F;
+    }
+    if (length <= band) {
+        return length * x / band;
+    }
+    const float t = std::min(length / std::max(radius, 1e-4F), kHalfPi);
+    return length * std::asin(std::clamp(std::sin(t) * x / band, -1.0F, 1.0F)) / t;
+}
+
+/// bend()'s inverse: where in the band `s` of the picture shows.
+[[nodiscard]] float unbend(float s, float length, float band, float radius)
+{
+    if (band <= 0.0F || length <= 0.0F) {
+        return 0.0F;
+    }
+    if (length <= band) {
+        return s * band / length;
+    }
+    const float t = std::min(length / std::max(radius, 1e-4F), kHalfPi);
+    return band * std::sin(t * std::clamp(s / length, 0.0F, 1.0F)) / std::sin(t);
+}
+
+}  // namespace
+
+float FrameMap::to_picture(float f) const
+{
+    if (axis == 0) {
+        return f;
+    }
+    float g = offset + f;
+    if (barrel) {
+        const float band = (1.0F - centre) * 0.5F;
+        if (f < band) {
+            const float left = offset + band;
+            g = left - bend(band - f, left, band, radius);
+        } else if (f > 1.0F - band) {
+            const float right = extent - offset - 1.0F + band;
+            g = offset + 1.0F - band + bend(f - (1.0F - band), right, band, radius);
+        }
+    }
+    return g / extent;
+}
+
+float FrameMap::to_frame(float p) const
+{
+    if (axis == 0) {
+        return p;
+    }
+    const float g = p * extent;
+    if (barrel) {
+        const float band  = (1.0F - centre) * 0.5F;
+        const float left  = offset + band;
+        const float right = offset + 1.0F - band;
+        if (g < left) {
+            return band - unbend(left - g, left, band, radius);
+        }
+        if (g > right) {
+            return 1.0F - band + unbend(g - right, extent - right, band, radius);
+        }
+    }
+    return g - offset;
+}
+
+void FrameMap::window_to_game(float x, float y, float* u, float* v) const
+{
+    float pu = picture.width > 0.0F ? (x - picture.x) / picture.width : 0.5F;
+    float pv = picture.height > 0.0F ? (y - picture.y) / picture.height : 0.5F;
+    if (axis == 1 && frame.width > 0.0F) {
+        pu = to_picture((x - frame.x) / frame.width);
+    } else if (axis == 2 && frame.height > 0.0F) {
+        pv = to_picture((y - frame.y) / frame.height);
+    }
+    *u = side > 0.0F ? (pu - side) / (1.0F - 2.0F * side) : pu;
+    *v = pv;
+}
+
+void FrameMap::game_to_window(float u, float v, float* x, float* y) const
+{
+    const float pu = side > 0.0F ? side + u * (1.0F - 2.0F * side) : u;
+    *x = picture.x + pu * picture.width;
+    *y = picture.y + v * picture.height;
+    if (axis == 1) {
+        *x = frame.x + to_frame(pu) * frame.width;
+    } else if (axis == 2) {
+        *y = frame.y + to_frame(v) * frame.height;
+    }
+}
+
+FrameMap compute_frame_map(u32 window_width, u32 window_height, const PresentOptions& options)
+{
+    const bool  wide   = options.aspect_mode == AspectMode::Widescreen;
+    const float raster = static_cast<float>(frame_width(wide ? kWideColumns : 0))
+                       / static_cast<float>(kNativeHeight);
+    // The picture's own shape: the monitor's, or its raster's for Original.
+    float shape = wide ? 16.0F / 9.0F : kDisplayAspect;
+    float frame_shape = shape;
+    enum class Fill { Fit, Stretch, Crop } fill = Fill::Fit;
+    switch (options.aspect_ratio) {
+        case AspectRatio::Original:           frame_shape = shape = raster; break;
+        case AspectRatio::FourThree:          frame_shape = 4.0F / 3.0F; break;
+        case AspectRatio::SixteenNine:        frame_shape = 16.0F / 9.0F; break;
+        case AspectRatio::FourThreeStretch:   frame_shape = 4.0F / 3.0F;  fill = Fill::Stretch; break;
+        case AspectRatio::SixteenNineStretch: frame_shape = 16.0F / 9.0F; fill = Fill::Stretch; break;
+        case AspectRatio::FourThreeCrop:      frame_shape = 4.0F / 3.0F;  fill = Fill::Crop; break;
+        case AspectRatio::SixteenNineCrop:    frame_shape = 16.0F / 9.0F; fill = Fill::Crop; break;
+    }
+
+    FrameMap map;
+    map.side = wide ? static_cast<float>(kWideColumns) / static_cast<float>(frame_width(kWideColumns))
+                    : 0.0F;
+
+    // The frame: the largest of its shape in the picture area, or all of the
+    // area when it is stretched to the window.
+    const PictureArea& area = options.picture_area;
+    const float aw = static_cast<float>(window_width) * area.width;
+    const float ah = static_cast<float>(window_height) * area.height;
+    const float ax = static_cast<float>(window_width) * area.x;
+    const float ay = static_cast<float>(window_height) * area.y;
+    Letterbox frame{ax, ay, aw, ah};
+    if (!options.window_stretch) {
+        float fw = aw;
+        float fh = aw / frame_shape;
+        if (fh > ah) {
+            fh = ah;
+            fw = ah * frame_shape;
+        }
+        frame = Letterbox{ax + (aw - fw) * 0.5F, ay + (ah - fh) * 0.5F, fw, fh};
+    }
+    map.frame = frame;
+
+    switch (fill) {
+        case Fill::Fit: {
+            // The whole picture inside, at its shape (in the frame's own shape,
+            // so a frame stretched to the window stretches it too).
+            float w = 1.0F;
+            float h = 1.0F;
+            if (shape > frame_shape) {
+                h = frame_shape / shape;
+            } else {
+                w = shape / frame_shape;
+            }
+            Letterbox pic{frame.x + (1.0F - w) * 0.5F * frame.width,
+                          frame.y + (1.0F - h) * 0.5F * frame.height, w * frame.width,
+                          h * frame.height};
+            // Integer: the picture's height a whole multiple of the raster's,
+            // its width following, so the scanlines are pixel-perfect.
+            if (options.scaling_method == ScalingMethod::Integer && !options.window_stretch) {
+                const float native = static_cast<float>(kNativeHeight);
+                const float factor = std::max(std::floor(pic.height / native), 1.0F);
+                const float height = native * factor;
+                const float width  = pic.width * height / pic.height;
+                pic = Letterbox{pic.x + (pic.width - width) * 0.5F,
+                                pic.y + (pic.height - height) * 0.5F, width, height};
+            }
+            map.view    = pic;
+            map.picture = pic;
+            break;
+        }
+        case Fill::Stretch:
+            map.view    = frame;
+            map.picture = frame;
+            break;
+        case Fill::Crop: {
+            map.view    = frame;
+            map.picture = frame;
+            const float kept = (std::clamp(options.crop_position, -1.0F, 1.0F) + 1.0F) * 0.5F;
+            if (shape > frame_shape * 1.0001F) {
+                map.axis    = 1;
+                map.extent  = shape / frame_shape;
+                map.offset  = (map.extent - 1.0F) * kept;
+                map.picture = Letterbox{frame.x - map.offset * frame.width, frame.y,
+                                        map.extent * frame.width, frame.height};
+            } else if (shape * 1.0001F < frame_shape) {
+                map.axis    = 2;
+                map.extent  = frame_shape / shape;
+                map.offset  = (map.extent - 1.0F) * kept;
+                map.picture = Letterbox{frame.x, frame.y - map.offset * frame.height,
+                                        frame.width, map.extent * frame.height};
+            }
+            map.barrel = options.crop_barrel && map.axis != 0;
+            map.centre = std::clamp(options.barrel_center, 0.0F, 1.0F);
+            map.radius = std::max(options.barrel_radius, 0.01F);
+            break;
+        }
+    }
+    return map;
 }
 
 }  // namespace sm2::render

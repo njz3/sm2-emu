@@ -52,9 +52,63 @@ layout(push_constant) uniform Present {
     float crt_mask;
     float crt_glow;
     float crt_curvature;
+    // A crop (linuxloader's *_CROP): the cropped axis (0 none, 1 across, 2
+    // down), the picture's length along it and where the viewport, which is
+    // the frame, starts in it, both in frame lengths; bent onto the edges when
+    // crop_barrel is set, about an undistorted middle and a radius in frame
+    // lengths. render::FrameMap holds the same maths.
+    uint  crop_axis;
+    float crop_extent;
+    float crop_offset;
+    uint  crop_barrel;
+    float barrel_centre;
+    float barrel_radius;
 } pc;
 
 const uint kSharpBilinear = 2u;
+
+// How much of the picture a point `x` into an edge band shows: the band is
+// `band` wide and `len` of picture is left on its side.
+float bend(float x, float len, float band)
+{
+    if (band <= 0.0) {
+        return 0.0;
+    }
+    if (len <= band) {
+        return len * x / band;
+    }
+    float t = min(len / max(pc.barrel_radius, 1e-4), 1.5707963);
+    return len * asin(clamp(sin(t) * x / band, -1.0, 1.0)) / t;
+}
+
+// A frame coordinate along the cropped axis to the picture.
+float to_picture(float f)
+{
+    float g = pc.crop_offset + f;
+    if (pc.crop_barrel != 0u) {
+        float band = (1.0 - pc.barrel_centre) * 0.5;
+        if (f < band) {
+            float left = pc.crop_offset + band;
+            g = left - bend(band - f, left, band);
+        } else if (f > 1.0 - band) {
+            float right = pc.crop_extent - pc.crop_offset - 1.0 + band;
+            g = pc.crop_offset + 1.0 - band + bend(f - (1.0 - band), right, band);
+        }
+    }
+    return g / pc.crop_extent;
+}
+
+// The viewport's coordinate to the picture's: the same unless cropped.
+vec2 picture_uv(vec2 frame)
+{
+    if (pc.crop_axis == 1u) {
+        return vec2(to_picture(frame.x), frame.y);
+    }
+    if (pc.crop_axis == 2u) {
+        return vec2(frame.x, to_picture(frame.y));
+    }
+    return frame;
+}
 
 // Sample coordinate for the current scaling method (before any CRT warp).
 vec2 sample_uv(vec2 uv)
@@ -65,7 +119,14 @@ vec2 sample_uv(vec2 uv)
         // interpolate only within the one destination pixel that straddles a
         // texel boundary. Sharp like nearest, but without the shimmer nearest
         // shows when the magnification is not a whole number.
-        vec2 scale  = pc.target_size / pc.source_size;   // >= 1 in practice
+        // A crop magnifies its axis by the picture's length in frames.
+        vec2 target = pc.target_size;
+        if (pc.crop_axis == 1u) {
+            target.x *= pc.crop_extent;
+        } else if (pc.crop_axis == 2u) {
+            target.y *= pc.crop_extent;
+        }
+        vec2 scale  = target / pc.source_size;           // >= 1 in practice
         vec2 src    = uv * pc.source_size;               // texel space
         vec2 centre = floor(src) + 0.5;
         vec2 offset = clamp((src - centre) * scale, -0.5, 0.5);
@@ -90,7 +151,7 @@ void main()
 
     if (pc.crt_enabled == 0u) {
         // Plain present path -- no added work when the filter is off.
-        fragColour = vec4(texture(uLayer, sample_uv(frame)).rgb, 1.0);
+        fragColour = vec4(texture(uLayer, sample_uv(picture_uv(frame))).rgb, 1.0);
         return;
     }
 
@@ -104,16 +165,19 @@ void main()
         }
     }
 
-    vec3 colour = texture(uLayer, sample_uv(frame)).rgb;
+    // The picture's coordinate for the samples and its scanlines; the mask
+    // keeps the window's columns.
+    vec2 uv = picture_uv(frame);
+    vec3 colour = texture(uLayer, sample_uv(uv)).rgb;
 
     // Glow: a cheap 4-tap box around the sample, mixed back in, for the soft
     // bloom a tube's beam spreads. Radius is one native texel.
     if (pc.crt_glow > 0.0) {
         vec2 r = 1.0 / pc.source_size;
-        vec3 blur = texture(uLayer, sample_uv(frame) + vec2( r.x, 0.0)).rgb
-                  + texture(uLayer, sample_uv(frame) + vec2(-r.x, 0.0)).rgb
-                  + texture(uLayer, sample_uv(frame) + vec2(0.0,  r.y)).rgb
-                  + texture(uLayer, sample_uv(frame) + vec2(0.0, -r.y)).rgb;
+        vec3 blur = texture(uLayer, sample_uv(uv) + vec2( r.x, 0.0)).rgb
+                  + texture(uLayer, sample_uv(uv) + vec2(-r.x, 0.0)).rgb
+                  + texture(uLayer, sample_uv(uv) + vec2(0.0,  r.y)).rgb
+                  + texture(uLayer, sample_uv(uv) + vec2(0.0, -r.y)).rgb;
         colour = mix(colour, max(colour, blur * 0.25), pc.crt_glow);
     }
 
@@ -121,7 +185,7 @@ void main()
     // track the emulated 384-line image at any window scale. A raised-cosine
     // darkening between lines; crt_scanline sets the depth.
     if (pc.crt_scanline > 0.0) {
-        float line = frame.y * pc.source_size.y;
+        float line = uv.y * pc.source_size.y;
         float s    = 0.5 + 0.5 * cos(6.2831853 * line);
         colour *= 1.0 - pc.crt_scanline * s;
     }

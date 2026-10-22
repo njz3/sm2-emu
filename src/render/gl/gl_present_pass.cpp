@@ -140,7 +140,7 @@ bool PresentPass::create_program()
     // uint method (16), uint crt_enabled (20), then four floats (24..36) = 40
     // bytes, rounded up to a 16-byte multiple. Sized to the struct present()
     // writes (48 bytes with its trailing pad).
-    BufferData(GL_UNIFORM_BUFFER, 48, nullptr, GL_DYNAMIC_DRAW);
+    BufferData(GL_UNIFORM_BUFFER, 64, nullptr, GL_DYNAMIC_DRAW);
     return true;
 }
 
@@ -177,16 +177,16 @@ void PresentPass::present(u32 window_width, u32 window_height)
     // No glEnable(GL_SCISSOR_TEST) needed: the viewport alone already
     // constrains the fullscreen triangle to the letterbox rectangle, and the
     // clear above already covers the full window for the bars outside it.
-    const render::Letterbox box = render::compute_letterbox(
-        window_width, window_height, m_options.aspect_mode, m_options.scaling_method,
-        m_options.picture_area);
+    const render::FrameMap  map = render::compute_frame_map(window_width, window_height, m_options);
+    const render::Letterbox box = map.view;
     // GL's viewport origin is the bottom left.
     Viewport(static_cast<GLint>(box.x),
              static_cast<GLint>(static_cast<float>(window_height) - box.y - box.height),
              static_cast<GLsizei>(box.width), static_cast<GLsizei>(box.height));
 
     // std140 layout of present.frag's Present block (see create_program()):
-    // two vec2s, method, crt_enabled, four floats, padded to 48 bytes.
+    // two vec2s, method, crt_enabled, four floats, then the crop's six
+    // scalars: 64 bytes.
     struct PushBlock {
         float source_size[2];
         float target_size[2];
@@ -196,8 +196,14 @@ void PresentPass::present(u32 window_width, u32 window_height)
         float crt_mask;
         float crt_glow;
         float crt_curvature;
-        u32   pad[2];
+        u32   crop_axis;
+        float crop_extent;
+        float crop_offset;
+        u32   crop_barrel;
+        float barrel_centre;
+        float barrel_radius;
     } push{};
+    static_assert(sizeof(PushBlock) == 64);
     push.source_size[0] = static_cast<float>(m_native_width);
     push.source_size[1] = static_cast<float>(kHeight);
     push.target_size[0] = box.width;
@@ -208,6 +214,12 @@ void PresentPass::present(u32 window_width, u32 window_height)
     push.crt_mask       = static_cast<float>(m_options.crt_mask_strength) / 100.0F;
     push.crt_glow       = static_cast<float>(m_options.crt_glow_strength) / 100.0F;
     push.crt_curvature  = static_cast<float>(m_options.crt_curvature) / 100.0F;
+    push.crop_axis      = static_cast<u32>(map.axis);
+    push.crop_extent    = map.extent;
+    push.crop_offset    = map.offset;
+    push.crop_barrel    = map.barrel ? 1U : 0U;
+    push.barrel_centre  = map.centre;
+    push.barrel_radius  = map.radius;
 
     UseProgram(m_program);
     BindBuffer(GL_UNIFORM_BUFFER, m_push_ubo);

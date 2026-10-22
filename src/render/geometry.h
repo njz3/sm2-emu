@@ -231,6 +231,44 @@ struct Letterbox {
                                           ScalingMethod method = ScalingMethod::Bilinear,
                                           PictureArea   area   = {});
 
+/// Where the picture goes in the window, for the frame and fill the
+/// PresentOptions ask (AspectRatio, linuxloader's ASPECT_RATIO and its crop
+/// settings): the frame, the rectangle drawn, and along a cropped axis which
+/// part of the picture each point of the frame shows.
+///
+/// Along the cropped axis, in frame lengths: the picture is `extent` long
+/// (1/k, the crop keeping k of it) and the frame starts `offset` into it. Bent
+/// (crop_barrel), the middle `centre` of the frame shows the middle of the
+/// crop window at the crop's scale, and each edge band, D = (1 - centre) / 2
+/// wide, shows the L frame lengths of picture left on its side: a point x into
+/// the band shows s = L asin(sin(t) x / D) / t of them, t = min(L / R, pi/2), R
+/// the radius; L <= D is a plain stretch. present.frag does the same.
+struct FrameMap {
+    Letterbox frame;    ///< the frame in the window
+    Letterbox view;     ///< the rectangle drawn: the frame, or the picture fitted in it
+    Letterbox picture;  ///< the whole picture in the window, beyond `view` where cropped
+    int       axis   = 0;     ///< the cropped axis: 0 none, 1 across, 2 down
+    float     extent = 1.0F;  ///< the picture's length along it, in frame lengths
+    float     offset = 0.0F;  ///< where the frame starts in it, in frame lengths
+    bool      barrel = false;
+    float     centre = 0.6F;
+    float     radius = 0.5F;
+    float     side   = 0.0F;  ///< the 16:9 3D's added columns, a fraction of the picture each side
+
+    /// A point of the frame (0..1 along the cropped axis) to the picture (0..1).
+    [[nodiscard]] float to_picture(float f) const;
+    /// A point of the picture to the frame; outside 0..1 where it is cut.
+    [[nodiscard]] float to_frame(float p) const;
+
+    /// A window point to the game's own raster (0..1 each way; beyond it in the
+    /// 16:9 3D's side columns), and back.
+    void window_to_game(float x, float y, float* u, float* v) const;
+    void game_to_window(float u, float v, float* x, float* y) const;
+};
+
+[[nodiscard]] FrameMap compute_frame_map(u32 window_width, u32 window_height,
+                                         const PresentOptions& options);
+
 /// The part of compute_letterbox()'s rectangle the game's own 4:3 raster
 /// fills: all of it, except in widescreen, where the added columns flank it.
 /// Guns and crosshairs map onto this.

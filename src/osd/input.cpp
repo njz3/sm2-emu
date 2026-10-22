@@ -1922,12 +1922,10 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
     float ptr_fx = 0.5f;
     float ptr_fy = 0.5f;
     if (pointer.width > 1 && pointer.height > 1) {
-        const render::Letterbox box = render::compute_game_rect(
-            static_cast<u32>(pointer.width), static_cast<u32>(pointer.height),
-            m_present_aspect, m_present_method, m_present_area);
-        if (box.width > 0.0f && box.height > 0.0f) {
-            ptr_fx = (pointer.x - box.x) / box.width;
-            ptr_fy = (pointer.y - box.y) / box.height;
+        const render::FrameMap map = render::compute_frame_map(
+            static_cast<u32>(pointer.width), static_cast<u32>(pointer.height), m_present);
+        if (map.picture.width > 0.0f && map.picture.height > 0.0f) {
+            map.window_to_game(pointer.x, pointer.y, &ptr_fx, &ptr_fy);
         }
     }
 
@@ -2005,6 +2003,9 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         const float wide_edge = static_cast<float>(m_wide_columns)
                               / static_cast<float>(render::frame_width(m_wide_columns));
         render::Letterbox gun_box{wide_edge, 0.0f, 1.0f - 2.0f * wide_edge, 1.0f};
+        // The window's frame, when it is known: a crop's bent edges are not linear.
+        std::optional<render::FrameMap> gun_map;
+        std::pair<float, float>         gun_pixels{1.0f, 1.0f};
         SDL_Window* window = SDL_GetKeyboardFocus();
         if (window == nullptr) {
             window = SDL_GetMouseFocus();
@@ -2024,10 +2025,12 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
                     && SDL_GetWindowPosition(window, &win_x, &win_y)
                     && SDL_GetWindowSize(window, &win_w, &win_h)
                     && win_w > 0 && win_h > 0 && display.w > 0 && display.h > 0);
-            const render::Letterbox box = render::compute_game_rect(
-                static_cast<u32>(pix_w), static_cast<u32>(pix_h), m_present_aspect,
-                m_present_method, m_present_area);
+            const render::FrameMap map = render::compute_frame_map(
+                static_cast<u32>(pix_w), static_cast<u32>(pix_h), m_present);
+            const render::Letterbox& box = map.picture;
             if (placed && box.width > 0.0f && box.height > 0.0f) {
+                gun_map    = map;
+                gun_pixels = {static_cast<float>(pix_w), static_cast<float>(pix_h)};
                 if (!fullscreen) {
                     screen_x = static_cast<float>(display.x - win_x) / static_cast<float>(win_w);
                     screen_y = static_cast<float>(display.y - win_y) / static_cast<float>(win_h);
@@ -2049,8 +2052,13 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
             GunInput gi;
             gi.win_x = screen_x + g.x * screen_w;  // 0..1 across the window
             gi.win_y = screen_y + g.y * screen_h;
-            gi.x = (gi.win_x - gun_box.x) / gun_box.width;
-            gi.y = (gi.win_y - gun_box.y) / gun_box.height;
+            if (gun_map) {
+                gun_map->window_to_game(gi.win_x * gun_pixels.first, gi.win_y * gun_pixels.second,
+                                        &gi.x, &gi.y);
+            } else {
+                gi.x = (gi.win_x - gun_box.x) / gun_box.width;
+                gi.y = (gi.win_y - gun_box.y) / gun_box.height;
+            }
             // The backends clamp the raw aim to 0..1, so a value at either end
             // means the gun is pointing off the screen (or past the Sinden border).
             if (g.x <= 0.0f) gi.x = -1.0f; else if (g.x >= 1.0f) gi.x = 2.0f;

@@ -42,6 +42,21 @@ enum class ScalingMethod : u32 { Nearest, Bilinear, SharpBilinear, Integer };
 ///   Stretch     -- fill the whole window, ignore aspect (no bars).
 enum class AspectMode : u32 { FourThree, SquarePixel, Widescreen, Stretch };
 
+/// The frame the picture is shown in and how the picture fills it, as
+/// linuxloader's ASPECT_RATIO names them. The picture's own shape is 4:3 (16:9
+/// when the 3D is drawn wide), or its raster's for Original.
+///
+///   Original          -- the frame and the picture the render resolution's shape.
+///   FourThree, SixteenNine -- a frame of that shape, the whole picture inside
+///                        at its proportions, black bars where the shapes differ.
+///   *Stretch          -- the picture filling the frame, distorted.
+///   *Crop             -- the picture filling the frame at its proportions, what
+///                        spills out cut, or bent onto the edges (crop_barrel).
+enum class AspectRatio : u32 {
+    Original, FourThree, SixteenNine, FourThreeStretch, SixteenNineStretch,
+    FourThreeCrop, SixteenNineCrop,
+};
+
 /// 3D texture filtering. Faithful is the hardware-accurate in-shader filtering;
 /// Anisotropic sharpens obliquely-viewed surfaces. GPU-gated; falls back to
 /// Faithful where unsupported.
@@ -151,7 +166,25 @@ struct Config {
     /// render_scale). SharpBilinear is the default for crisp 2D text at the
     /// non-integer window scales that occur at almost every window size.
     ScalingMethod scaling_method = ScalingMethod::Nearest;
+    /// FourThree, or Widescreen to draw the 3D wider (16:9). An older ini's
+    /// SquarePixel and Stretch are read into aspect_ratio and display_stretch.
     AspectMode    aspect_mode    = AspectMode::FourThree;
+
+    /// The frame and how the picture fills it (linuxloader's ASPECT_RATIO and
+    /// its CROP_POSITION, CROP_BARREL, BARREL_CENTER, BARREL_RADIUS).
+    AspectRatio aspect_ratio = AspectRatio::FourThree;
+    /// The part a crop keeps: -100 left or top, 0 the middle, 100 right or bottom.
+    s32  crop_position = 0;
+    /// A crop's cut parts squeezed onto the edges, as on a cylinder seen face
+    /// on, instead of cut: the whole picture stays visible.
+    bool crop_barrel = false;
+    /// The barrel's middle shown undistorted, percent of the frame (0..100).
+    u32  barrel_center = 60;
+    /// The cylinder's radius, percent of the frame (10..300): small bends hard
+    /// near the edge, large squeezes almost evenly.
+    u32  barrel_radius = 50;
+    /// The frame stretched to the whole window (DISPLAY_MODE's *_STRETCH).
+    bool display_stretch = false;
 
     /// Optional CRT cosmetic filter over the finished frame (scanlines, mask,
     /// glow, curvature), off by default. Strengths are 0..100 percent;
@@ -587,6 +620,32 @@ void resolve_default_paths(Config* config, bool config_in_cwd,
 [[nodiscard]] bool load_config(const std::string&        path,
                                Config*                   out,
                                std::vector<std::string>* problems);
+
+/// Command-line overrides over what a file gave: each "SECTION.KEY=VALUE" (the
+/// --set form linuxloader also takes). The ini here is flat, so the section is
+/// ignored, except for a gamepad key, which goes to that [gamepad] or [family]
+/// section; the key is matched without case. Problems are reported as a
+/// file's are.
+void apply_settings_overrides(const std::vector<std::string>& sets, Config* out,
+                              std::vector<std::string>* problems);
+
+/// The keys those overrides set in the ini, a gamepad's left out, for the file
+/// to keep its own values when it is saved (display_mode sets fullscreen and
+/// display_stretch).
+[[nodiscard]] std::vector<std::string> overridden_settings(const std::vector<std::string>& sets);
+
+/// The values of a file's settings before its first [section], by key.
+[[nodiscard]] std::map<std::string, std::string> read_top_settings(const std::string& path);
+
+/// The same, of the file save_config would write for `config`.
+[[nodiscard]] std::map<std::string, std::string> written_settings(const Config& config);
+
+/// In the file at `path`, the settings `keys` that still read as `applied` (as
+/// the overrides set them) put back to `values` (the file's own before them),
+/// or dropped where it had none. One changed since, in the GUI, is kept.
+void restore_settings(const std::string& path, const std::vector<std::string>& keys,
+                      const std::map<std::string, std::string>& applied,
+                      const std::map<std::string, std::string>& values);
 
 /// Write `config` to `path`, creating the directory if need be.
 ///

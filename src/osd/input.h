@@ -389,15 +389,10 @@ public:
     [[nodiscard]] static std::string pad_axis_name(s32 axis);
 
     /// Present-stage placement, pushed from the config each frame, so the gun /
-    /// mouse pointer maps onto the same letterbox rectangle the backend draws
-    /// the image into. A mismatch would offset every shot from the cursor.
-    void set_present_placement(AspectMode aspect, ScalingMethod method,
-                               render::PictureArea area = {})
-    {
-        m_present_aspect = aspect;
-        m_present_method = method;
-        m_present_area   = area;
-    }
+    /// mouse pointer maps through the same frame the backend draws the image
+    /// into (render::compute_frame_map). A mismatch would offset every shot
+    /// from the cursor.
+    void set_present_placement(const render::PresentOptions& present) { m_present = present; }
 
     /// Widescreen columns each side of the 4:3 screen, 0 for none: a gun can
     /// then aim beside the screen, past its edge.
@@ -689,10 +684,8 @@ private:
                       GrHatUp, GrHatDown, GrHatLeft, GrHatRight };
 
     /// Present placement in effect, for the gun/pointer letterbox mapping.
-    AspectMode    m_present_aspect = AspectMode::FourThree;
+    render::PresentOptions m_present;
     u32           m_wide_columns   = 0;
-    ScalingMethod m_present_method = ScalingMethod::SharpBilinear;
-    render::PictureArea m_present_area;
     bool          m_sinden_border  = false;
 
     bool             m_started = false;
