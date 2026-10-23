@@ -72,8 +72,13 @@ bool Window::create(const WindowConfig& config)
     if (config.resizable) {
         flags |= SDL_WINDOW_RESIZABLE;
     }
-    if (config.fullscreen) {
+    // The screen switched to the window size: shown once the mode is set.
+    const bool exclusive = config.fullscreen && !config.borderless;
+    if (config.fullscreen && !exclusive) {
         flags |= SDL_WINDOW_FULLSCREEN;
+    }
+    if (exclusive) {
+        flags |= SDL_WINDOW_HIDDEN;
     }
 
     m_window = SDL_CreateWindow(config.title.c_str(),
@@ -85,7 +90,11 @@ bool Window::create(const WindowConfig& config)
         return false;
     }
 
-    m_fullscreen = config.fullscreen;
+    m_fullscreen = config.fullscreen && !exclusive;
+    if (exclusive) {
+        set_fullscreen(true, false, config.width, config.height);
+        SDL_ShowWindow(m_window);
+    }
 
     // Application icon. The pixels are a static constexpr array, so the surface
     // may reference them without copying; SDL_SetWindowIcon takes its own copy,
@@ -191,10 +200,36 @@ void Window::set_title(const std::string& title)
     }
 }
 
-void Window::set_fullscreen(bool enable)
+void Window::set_fullscreen(bool enable, bool borderless, u32 width, u32 height)
 {
-    if (m_window == nullptr || enable == m_fullscreen) {
+    const bool exclusive = enable && !borderless;
+    if (m_window == nullptr || (enable == m_fullscreen && exclusive == m_exclusive)) {
         return;
+    }
+    if (enable) {
+        // No mode is the desktop's, borderless. A mode applies at once when
+        // already in full screen.
+        SDL_DisplayMode        closest{};
+        const SDL_DisplayMode* mode = nullptr;
+        if (exclusive) {
+            if (SDL_GetClosestFullscreenDisplayMode(SDL_GetDisplayForWindow(m_window),
+                                                    static_cast<int>(width),
+                                                    static_cast<int>(height), 0.0F, true,
+                                                    &closest)) {
+                mode = &closest;
+                SM2_INFO("full screen: the screen switched to %dx%d at %.2f Hz", closest.w,
+                         closest.h, static_cast<double>(closest.refresh_rate));
+            } else {
+                SM2_WARN("full screen: no %ux%u mode (%s); the desktop's instead", width,
+                         height, SDL_GetError());
+            }
+        }
+        if (!SDL_SetWindowFullscreenMode(m_window, mode)) {
+            SM2_WARN("SDL_SetWindowFullscreenMode failed: %s", SDL_GetError());
+        }
+        m_exclusive = exclusive;  // asked for: not tried again each frame when refused
+    } else {
+        m_exclusive = false;
     }
     if (!SDL_SetWindowFullscreen(m_window, enable)) {
         SM2_WARN("SDL_SetWindowFullscreen failed: %s", SDL_GetError());

@@ -544,7 +544,37 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                            "Prevents tearing but adds up to one frame of latency."));
             }
 
-            ImGui::Checkbox(tr_id("Fullscreen"), &config.fullscreen);
+            // DISPLAY_MODE's: WINDOW, FULLSCREEN, BORDERLESS, each also
+            // stretched (the frame to the window or the screen).
+            {
+                static constexpr std::array<const char*, 6> kDisplayLabels = {
+                    N_("Window"),
+                    N_("Window, stretched"),
+                    N_("Full screen"),
+                    N_("Full screen, stretched"),
+                    N_("Borderless full screen"),
+                    N_("Borderless full screen, stretched")};
+                const int kind = !config.fullscreen ? 0 : config.borderless_fullscreen ? 2 : 1;
+                int       mode = kind * 2 + (config.display_stretch ? 1 : 0);
+                ImGui::SetNextItemWidth(260);
+                if (ImGui::Combo(tr_id("Display mode"), &mode, tr_all(kDisplayLabels).data(),
+                                 static_cast<int>(kDisplayLabels.size()))) {
+                    config.fullscreen = mode >= 2;
+                    if (config.fullscreen) {
+                        config.borderless_fullscreen = mode >= 4;
+                    }
+                    config.display_stretch = (mode % 2) != 0;
+                }
+                ImGui::SameLine();
+                ImGui::TextDisabled("(?)");
+                if (ImGui::IsItemHovered()) {
+                    tooltip(tr("Full screen switches the screen to the window size\n"
+                               "below (the closest mode it has). Borderless full\n"
+                               "screen covers it with a window at the desktop's\n"
+                               "resolution, without switching it. Stretched: the\n"
+                               "frame fills the window or the screen."));
+                }
+            }
             ImGui::Checkbox(tr_id("FPS counter"), &config.show_fps);
             ImGui::SameLine();
             ImGui::Checkbox(tr_id("Notifications"), &config.show_notifications);
@@ -613,8 +643,9 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                 }
             }
 
-            // Window size (only meaningful in windowed mode).
-            if (!config.fullscreen) {
+            // Window size: the window's, or the screen's in full screen that
+            // switches it.
+            if (!config.fullscreen || !config.borderless_fullscreen) {
                 ImGui::Separator();
                 ImGui::TextUnformatted(tr("Window size"));
                 int w = static_cast<int>(config.window_width);
@@ -733,7 +764,6 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                     tooltip(tr("Experimental: the 3D drawn wider, the 2D kept 4:3 in the\n"
                                "middle; the picture is then 16:9. GPU renderers only."));
                 }
-                ImGui::Checkbox(tr_id("Stretch the frame to the window"), &config.display_stretch);
             }
 
             // CRT cosmetic filter. Off by default; all present-stage, live.

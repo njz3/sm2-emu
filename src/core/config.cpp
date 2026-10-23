@@ -612,6 +612,10 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             if (!parse_bool(value, &out->throttle)) {
                 bad_value();
             }
+        } else if (key == "borderless_fullscreen") {
+            if (!parse_bool(value, &out->borderless_fullscreen)) {
+                bad_value();
+            }
         } else if (key == "fullscreen") {
             if (!parse_bool(value, &out->fullscreen)) {
                 bad_value();
@@ -754,10 +758,15 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             std::string mode = value;
             std::transform(mode.begin(), mode.end(), mode.begin(),
                            [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
-            if (mode == "WINDOW" || mode == "WINDOW_STRETCH" || mode == "FULLSCREEN"
-                || mode == "FULLSCREEN_STRETCH") {
-                out->fullscreen      = mode.rfind("FULLSCREEN", 0) == 0;
-                out->display_stretch = mode.find("_STRETCH") != std::string::npos;
+            // BORDERLESS as Supermodel's; WINDOW leaves the kind of full screen.
+            const bool stretch = mode.size() > 8 && mode.compare(mode.size() - 8, 8, "_STRETCH") == 0;
+            const std::string kind = stretch ? mode.substr(0, mode.size() - 8) : mode;
+            if (kind == "WINDOW" || kind == "FULLSCREEN" || kind == "BORDERLESS") {
+                out->fullscreen = kind != "WINDOW";
+                if (out->fullscreen) {
+                    out->borderless_fullscreen = kind == "BORDERLESS";
+                }
+                out->display_stretch = stretch;
                 display_stretch_read = true;
             } else {
                 bad_value();
@@ -1233,6 +1242,7 @@ std::vector<std::string> overridden_settings(const std::vector<std::string>& set
         }
         if (key == "display_mode") {
             keys.push_back("fullscreen");
+            keys.push_back("borderless_fullscreen");
             keys.push_back("display_stretch");
         } else if (key.rfind("net_outputs", 0) == 0) {
             keys.push_back("outputs_network" + key.substr(std::strlen("net_outputs")));
@@ -1309,6 +1319,9 @@ void write_config(std::ostream& out, const Config& config)
         << "throttle = " << bool_text(config.throttle) << "\n"
         << "\n"
         << "fullscreen = " << bool_text(config.fullscreen) << "\n"
+        << "# In full screen, a borderless window covering the screen at the\n"
+        << "# desktop's resolution; false switches the screen to the window size.\n"
+        << "borderless_fullscreen = " << bool_text(config.borderless_fullscreen) << "\n"
         << "show_fps = " << bool_text(config.show_fps) << "\n"
         << "# Software renderer: draw on a second thread, one frame behind.\n"
         << "software_async = " << bool_text(config.software_async) << "\n"
@@ -1359,8 +1372,8 @@ void write_config(std::ostream& out, const Config& config)
         << "# instead: barrel_center is the undistorted middle (% of the frame),\n"
         << "# barrel_radius the cylinder's radius (% of the frame, 10..300).\n"
         << "# display_stretch stretches the frame to the window (display_mode\n"
-        << "# WINDOW, WINDOW_STRETCH, FULLSCREEN or FULLSCREEN_STRETCH sets it and\n"
-        << "# fullscreen).\n"
+        << "# WINDOW, FULLSCREEN or BORDERLESS, each also with _STRETCH, sets it,\n"
+        << "# fullscreen and borderless_fullscreen).\n"
         << "aspect_ratio = " << aspect_ratio_name(config.aspect_ratio) << "\n"
         << "crop_position = " << config.crop_position << "\n"
         << "crop_barrel = " << bool_text(config.crop_barrel) << "\n"

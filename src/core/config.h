@@ -98,6 +98,11 @@ struct Config {
     bool throttle = true;
 
     bool fullscreen = false;
+    /// In full screen, a borderless window covering the screen at the desktop's
+    /// resolution (DISPLAY_MODE BORDERLESS, sm2-emu's full screen before there
+    /// was a choice, so the default); off, the screen switched to the window
+    /// size (DISPLAY_MODE FULLSCREEN, Supermodel's).
+    bool borderless_fullscreen = true;
 
     /// Show the FPS counter overlay in the top-right corner.
     bool show_fps = false;

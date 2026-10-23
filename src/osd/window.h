@@ -40,6 +40,9 @@ struct WindowConfig {
     u32         width       = kModel2Width * 2;
     u32         height      = kModel2Height * 2;
     bool        fullscreen  = false;
+    /// Full screen at the desktop's resolution, borderless; off, the screen
+    /// switched to width x height (the closest mode it has).
+    bool        borderless  = true;
     bool        resizable   = true;
     GraphicsApi graphics_api = GraphicsApi::Vulkan;
 };
@@ -79,7 +82,9 @@ public:
     [[nodiscard]] bool minimised() const;
 
     void set_title(const std::string& title);
-    void set_fullscreen(bool enable);
+    /// Full screen or not, borderless at the desktop's resolution or the screen
+    /// switched to width x height. Nothing to do when neither changed.
+    void set_fullscreen(bool enable, bool borderless, u32 width, u32 height);
     [[nodiscard]] bool fullscreen() const { return m_fullscreen; }
 
     [[nodiscard]] SDL_Window* handle() const { return m_window; }
@@ -87,6 +92,7 @@ public:
 private:
     SDL_Window* m_window      = nullptr;
     bool        m_fullscreen  = false;
+    bool        m_exclusive   = false;  ///< full screen with the screen's mode switched
     bool        m_owns_sdl    = false;
     GraphicsApi m_graphics_api = GraphicsApi::Vulkan;
 };

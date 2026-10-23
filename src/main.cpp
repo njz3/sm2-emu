@@ -1039,6 +1039,7 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
     if (!options->given.fullscreen) {
         options->config.fullscreen = from_file.fullscreen;
     }
+    options->config.borderless_fullscreen = from_file.borderless_fullscreen;
     if (!options->given.lightgun) {
         options->config.lightgun = from_file.lightgun;
     }
@@ -2262,6 +2263,7 @@ int main(int argc, char** argv)
         window_config.width      = options.config.window_width;
         window_config.height     = options.config.window_height;
         window_config.fullscreen = options.config.fullscreen;
+        window_config.borderless = options.config.borderless_fullscreen;
 
         // Which GPU backend presents. `software` only replaces the drawing,
         // so it presents through OpenGL where built, else Vulkan.
@@ -2854,7 +2856,10 @@ int main(int argc, char** argv)
                             // F11 everywhere, plus Cmd+F on macOS: the OS there
                             // reserves F11 (Show Desktop), so it never reaches us.
                             options.config.fullscreen = !window.fullscreen();
-                            window.set_fullscreen(options.config.fullscreen);
+                            window.set_fullscreen(options.config.fullscreen,
+                                                  options.config.borderless_fullscreen,
+                                                  options.config.window_width,
+                                                  options.config.window_height);
                         } else if (event.key.key == SDLK_F12 && !event.key.repeat) {
                             screenshot_requested = true;
                         } else if (!gui.visible()) {
@@ -3497,9 +3502,8 @@ int main(int argc, char** argv)
             }
             // Apply a fullscreen toggle from the Settings menu the moment it
             // changes, rather than only at the next launch.
-            if (options.config.fullscreen != window.fullscreen()) {
-                window.set_fullscreen(options.config.fullscreen);
-            }
+            window.set_fullscreen(options.config.fullscreen, options.config.borderless_fullscreen,
+                                  options.config.window_width, options.config.window_height);
             // Settings just closed with no game loaded: rescan rom_dir.
             if (settings_was_visible && !gui.visible() && machine_iface == nullptr) {
                 show_picker();

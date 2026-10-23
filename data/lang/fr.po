@@ -2138,11 +2138,6 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "Stretch the frame to the window"
-msgstr "Étirer le cadre à la fenêtre"
-
-#: src/osd/gui.cpp
-#, no-c-format
 msgid "Save for this game"
 msgstr "Enregistrer pour ce jeu"
 
@@ -2154,6 +2149,56 @@ msgid ""
 msgstr ""
 "Ces paramètres dans %s, à côté du fichier commun,\n"
 "lu à sa place pour ce jeu désormais."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Display mode"
+msgstr "Mode d'affichage"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Window"
+msgstr "Fenêtre"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Window, stretched"
+msgstr "Fenêtre étirée"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Full screen"
+msgstr "Plein écran"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Full screen, stretched"
+msgstr "Plein écran étiré"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Borderless full screen"
+msgstr "Plein écran fenêtré (sans bordure)"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Borderless full screen, stretched"
+msgstr "Plein écran fenêtré étiré"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Full screen switches the screen to the window size\n"
+"below (the closest mode it has). Borderless full\n"
+"screen covers it with a window at the desktop's\n"
+"resolution, without switching it. Stretched: the\n"
+"frame fills the window or the screen."
+msgstr ""
+"Plein écran passe l'écran à la taille de fenêtre\n"
+"ci-dessous (le mode le plus proche qu'il a). Plein écran\n"
+"fenêtré le couvre d'une fenêtre sans bordure à la\n"
+"résolution du bureau, sans la changer. Étiré : le cadre\n"
+"remplit la fenêtre ou l'écran."
 
 #, no-c-format
 #~ msgid ""
