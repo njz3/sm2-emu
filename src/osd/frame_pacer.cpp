@@ -94,6 +94,17 @@ u32 FramePacer::wait()
         return 0;
     }
 
+    if (m_relative) {
+        const u64 now = SDL_GetTicksNS();
+        if (now < m_next_ns) {
+            SDL_DelayPrecise(m_next_ns - now);
+        }
+        m_next_ns = SDL_GetTicksNS() + m_period_ns
+                  + static_cast<s64>(static_cast<double>(m_period_ns) * m_sync_adjust);
+        account_for_frame();
+        return 0;
+    }
+
     const u64 now = SDL_GetTicksNS();
 
     // Too far behind to make up. Write the debt off rather than running the game

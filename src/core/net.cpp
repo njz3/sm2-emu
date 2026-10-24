@@ -36,6 +36,7 @@
 #    include <net/if.h>
 #    include <netinet/in.h>
 #    include <netinet/tcp.h>
+#    include <sys/select.h>
 #    include <sys/socket.h>
 #    include <unistd.h>
 #endif
@@ -543,6 +544,246 @@ void TcpServer::flush()
             ++i;
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// TcpStream, TcpListener
+// ---------------------------------------------------------------------------
+
+namespace {
+
+#if defined(_WIN32)
+SOCKET raw_fd(std::uintptr_t fd) { return static_cast<SOCKET>(fd); }
+void set_blocking(std::uintptr_t fd, bool blocking)
+{
+    u_long nonblock = blocking ? 0 : 1;
+    ioctlsocket(raw_fd(fd), FIONBIO, &nonblock);
+}
+bool connect_in_progress() { return WSAGetLastError() == WSAEWOULDBLOCK; }
+constexpr int kNoSignal = 0;
+#else
+int raw_fd(int fd) { return fd; }
+void set_blocking(int fd, bool blocking)
+{
+    const int fl = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, blocking ? (fl & ~O_NONBLOCK) : (fl | O_NONBLOCK));
+}
+bool connect_in_progress() { return errno == EINPROGRESS; }
+#    if defined(MSG_NOSIGNAL)
+constexpr int kNoSignal = MSG_NOSIGNAL;
+#    else
+constexpr int kNoSignal = 0;
+#    endif
+#endif
+
+/// Whether fd becomes readable (or writable) within timeout_ms.
+template <typename Fd>
+bool wait_for(Fd fd, bool write, int timeout_ms)
+{
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(raw_fd(fd), &set);
+    timeval tv{};
+    tv.tv_sec  = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+    return ::select(static_cast<int>(raw_fd(fd)) + 1, write ? nullptr : &set,
+                    write ? &set : nullptr, nullptr, &tv)
+         > 0;
+}
+
+}  // namespace
+
+TcpStream::~TcpStream()
+{
+    close();
+}
+
+TcpStream::TcpStream(TcpStream&& other) noexcept
+    : m_fd(std::exchange(other.m_fd, kInvalid)), m_last_error(std::move(other.m_last_error))
+{
+}
+
+TcpStream& TcpStream::operator=(TcpStream&& other) noexcept
+{
+    if (this != &other) {
+        close();
+        m_fd         = std::exchange(other.m_fd, kInvalid);
+        m_last_error = std::move(other.m_last_error);
+    }
+    return *this;
+}
+
+void TcpStream::adopt(Fd fd)
+{
+    close();
+    set_blocking(fd, true);
+    const int yes = 1;
+    setsockopt(raw_fd(fd), IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&yes),
+               sizeof yes);
+#if defined(SO_NOSIGPIPE)
+    setsockopt(raw_fd(fd), SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof yes);
+#endif
+    m_fd = fd;
+}
+
+bool TcpStream::connect(const std::string& ip, u16 port, int timeout_ms)
+{
+    close();
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port   = htons(port);
+    if (ip.empty() || inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) != 1) {
+        m_last_error = "invalid address '" + ip + "'";
+        return false;
+    }
+#if defined(_WIN32)
+    const Fd fd = static_cast<Fd>(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    if (fd == static_cast<Fd>(INVALID_SOCKET)) {
+#else
+    const Fd fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (fd < 0) {
+#endif
+        m_last_error = last_socket_error();
+        return false;
+    }
+    // Connecting without blocking, so that a cabinet not there yet costs
+    // timeout_ms rather than the system's connect timeout.
+    set_blocking(fd, false);
+    if (::connect(raw_fd(fd), reinterpret_cast<sockaddr*>(&addr), sizeof addr) != 0) {
+        int       error = 0;
+        socklen_t size  = sizeof error;
+        if (!connect_in_progress() || !wait_for(fd, true, timeout_ms)
+            || getsockopt(raw_fd(fd), SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &size)
+                   != 0
+            || error != 0) {
+            m_last_error = "connect " + ip + ":" + std::to_string(port) + ": "
+                         + (error != 0 ? std::to_string(error) : last_socket_error());
+            close_fd(fd);
+            return false;
+        }
+    }
+    adopt(fd);
+    return true;
+}
+
+void TcpStream::close()
+{
+    if (m_fd != kInvalid) {
+        close_fd(m_fd);
+        m_fd = kInvalid;
+    }
+}
+
+bool TcpStream::send_all(std::span<const u8> data)
+{
+    usize sent = 0;
+    while (valid() && sent < data.size()) {
+        const int n = ::send(raw_fd(m_fd), reinterpret_cast<const char*>(data.data() + sent),
+                             static_cast<int>(data.size() - sent), kNoSignal);
+        if (n <= 0) {
+            m_last_error = last_socket_error();
+            close();
+            return false;
+        }
+        sent += static_cast<usize>(n);
+    }
+    return valid();
+}
+
+bool TcpStream::wait_readable(int timeout_ms) const
+{
+    return valid() && wait_for(m_fd, false, timeout_ms);
+}
+
+bool TcpStream::read_exact(u8* data, usize size, int timeout_ms)
+{
+    while (size > 0) {
+        if (!wait_readable(timeout_ms)) {
+            m_last_error = valid() ? "nothing to read" : m_last_error;
+            close();
+            return false;
+        }
+        const int n = ::recv(raw_fd(m_fd), reinterpret_cast<char*>(data), static_cast<int>(size), 0);
+        if (n <= 0) {
+            m_last_error = n == 0 ? "closed by the far end" : last_socket_error();
+            close();
+            return false;
+        }
+        data += n;
+        size -= static_cast<usize>(n);
+    }
+    return true;
+}
+
+TcpListener::~TcpListener()
+{
+    close();
+}
+
+bool TcpListener::open(const std::string& bind_ip, u16 port)
+{
+    close();
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port   = htons(port);
+    if (bind_ip.empty()) {
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    } else if (inet_pton(AF_INET, bind_ip.c_str(), &addr.sin_addr) != 1) {
+        m_last_error = "invalid bind address '" + bind_ip + "'";
+        return false;
+    }
+#if defined(_WIN32)
+    const Fd fd = static_cast<Fd>(::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    if (fd == static_cast<Fd>(INVALID_SOCKET)) {
+        m_last_error = last_socket_error();
+        return false;
+    }
+#else
+    const Fd fd = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (fd < 0) {
+        m_last_error = last_socket_error();
+        return false;
+    }
+    // Rebind straight away after a restart instead of waiting out TIME_WAIT.
+    const int reuse = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
+#endif
+    if (::bind(raw_fd(fd), reinterpret_cast<sockaddr*>(&addr), sizeof addr) != 0
+        || ::listen(raw_fd(fd), 4) != 0) {
+        m_last_error = "listen " + (bind_ip.empty() ? std::string("*") : bind_ip) + ":"
+                     + std::to_string(port) + ": " + last_socket_error();
+        close_fd(fd);
+        return false;
+    }
+    set_blocking(fd, false);
+    m_fd = fd;
+    return true;
+}
+
+void TcpListener::close()
+{
+    if (m_fd != kInvalid) {
+        close_fd(m_fd);
+        m_fd = kInvalid;
+    }
+}
+
+TcpStream TcpListener::accept()
+{
+    TcpStream stream;
+    if (m_fd == kInvalid) {
+        return stream;
+    }
+#if defined(_WIN32)
+    const Fd fd = static_cast<Fd>(::accept(raw_fd(m_fd), nullptr, nullptr));
+    if (fd != static_cast<Fd>(INVALID_SOCKET)) {
+#else
+    const Fd fd = ::accept(m_fd, nullptr, nullptr);
+    if (fd >= 0) {
+#endif
+        stream.adopt(fd);
+    }
+    return stream;
 }
 
 #if defined(_WIN32)

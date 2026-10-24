@@ -857,6 +857,13 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             if (!parse_u32(value, &out->link_cabinet_index)) {
                 bad_value();
             }
+        } else if (key == "link_mode") {
+            const std::string mode = lowered(value);
+            if (mode == "original" || mode == "buffered") {
+                out->link_mode = mode;
+            } else {
+                bad_value();
+            }
         } else if (key == "wheel_ffb") {
             if (!parse_bool(value, &out->wheel_ffb)) {
                 bad_value();
@@ -1454,6 +1461,11 @@ void write_config(std::ostream& out, const Config& config)
         << "link_next_port = " << config.link_next_port << "\n"
         << "# Where this cabinet sits in the ring, 0-based (bookkeeping only).\n"
         << "link_cabinet_index = " << config.link_cabinet_index << "\n"
+        << "# original: MAME's ring, frames at each vertical blank (UDP).\n"
+        << "# buffered: Supermodel's, every cabinet's data exchanged at the end\n"
+        << "# of each frame (TCP), the cabinets numbered in the ring's order.\n"
+        << "# Every cabinet of a ring needs the same.\n"
+        << "link_mode = " << config.link_mode << "\n"
         << "\n"
         << "# Wheels and gamepads keep working while the window is not in front.\n"
         << "# Keyboard and mouse still need the window in front.\n"

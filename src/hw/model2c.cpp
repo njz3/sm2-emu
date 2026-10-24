@@ -602,6 +602,8 @@ void Model2C::run_frame()
     ++m_frames;
 
     m_in_frame = false;
+    // The buffered cabinet link exchanges the frame's data now, after it.
+    m_comm.end_frame();
 }
 
 void Model2C::step_copro(u32 host_cycles)

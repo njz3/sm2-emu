@@ -449,6 +449,8 @@ void Model2Original::run_frame()
     m_frame_start += kCyclesPerFrame;
     ++m_frames;
     m_in_frame = false;
+    // The buffered cabinet link exchanges the frame's data now, after it.
+    m_comm.end_frame();
     if (m_widescreen_columns != 0) {
         update_sky();
     }

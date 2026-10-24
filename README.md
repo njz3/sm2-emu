@@ -464,6 +464,7 @@ Configure it from the **Network** tab in the settings overlay (`F10`), or in
 | `link_next_ip` | The next cabinet in the ring, i.e. where this machine sends. For two machines, the other machine's IP. Blank disables sending. |
 | `link_next_port` | UDP port of the next cabinet. Default `15112`. |
 | `link_cabinet_index` | This cabinet's 0-based position in the ring, for your own bookkeeping. |
+| `link_mode` | `original` (the default): MAME's ring simulation, each cabinet's frames sent at its vertical blank over UDP. `buffered`: Supermodel's simulated network board, every cabinet's data exchanged at the end of each frame over TCP, the cabinets numbered in the ring's order (the master 1, the next one 2...). Every cabinet of a ring needs the same. |
 
 A two-machine example, both running the same title, one at `192.168.1.10` and
 the other at `192.168.1.11`:
@@ -490,6 +491,29 @@ of *M*), and enabling or changing the link takes effect on the next game launch.
 Note that these are separate instances of the emulator with independent frame
 clocks, not a rollback-netplay implementation; it links the emulated comms
 board the way real cabinets were linked on a shared LAN.
+
+**Buffered link** (`link_mode = buffered`). Each cabinet listens for the previous
+one and connects to the next over TCP (the same ports; open them for TCP). Once
+every cabinet of the ring is there and its game has set its board up (about four
+seconds after enabling it, as MAME's board), a handshake numbers them in the
+ring's order; then, at the end of every frame, each cabinet's data goes round the
+whole ring, each cabinet waiting for the others, and the games read the whole
+ring's data of the frame before, as on the real ring. The cabinets keep in step
+(the frame pacer then waits one period after each frame rather than catching
+up). A cabinet that leaves tells the others, whose link then fails as on a real
+ring, and every cabinet has to be running for the ring to link: start the game
+on all of them at about the same time. Indy 500 needs this mode to link, and
+Touring Car and Super GT 24h need it with more than two cabinets.
+
+How many cabinets each title links, from its test menu:
+
+| Title | Cabinets |
+|-------|----------|
+| Daytona USA, Indy 500, Sega Touring Car | 8 |
+| Sega Rally, Super GT 24h, Over Rev | 4 |
+
+The board's window holds eight cabinets' data, so eight is the most for any
+title; more machines make separate rings, each a race of its own.
 
 ## Telemetry (motion simulators, dashboards)
 

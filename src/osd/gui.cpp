@@ -2792,6 +2792,26 @@ void Gui::draw_network_tab(Config& config)
         }
     }
 
+    {
+        static constexpr std::array<const char*, 2> kModeLabels = {N_("Original (MAME)"),
+                                                                   N_("Buffered (Supermodel)")};
+        int mode = config.link_mode == "buffered" ? 1 : 0;
+        ImGui::SetNextItemWidth(200.0f);
+        if (ImGui::Combo(tr_id("Link mode"), &mode, tr_all(kModeLabels).data(),
+                         static_cast<int>(kModeLabels.size()))) {
+            config.link_mode = mode == 1 ? "buffered" : "original";
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            tooltip(tr("Original: MAME's ring, each cabinet's frames sent at its\n"
+                       "vertical blank (UDP). Buffered: as Supermodel, every\n"
+                       "cabinet's data exchanged at the end of each frame (TCP),\n"
+                       "the cabinets numbered in the ring's order. Every cabinet\n"
+                       "of a ring needs the same. Applies to the next game."));
+        }
+    }
+
     ImGui::SeparatorText(tr("Next cabinet in the ring"));
 
     text_field(N_("Next IP"), config.link_next_ip, 180.0f);

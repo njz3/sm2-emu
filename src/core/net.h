@@ -165,6 +165,92 @@ private:
     bool                m_address_in_use = false;
 };
 
+// -- TCP connections --------------------------------------------------------
+
+/// A blocking TCP connection for a link whose small messages go back and forth
+/// each frame: sends are not held back to be grouped (Nagle's algorithm off),
+/// and a far end gone raises no signal. Errors surface through valid() and
+/// last_error(); a failed send or read closes the connection.
+class TcpStream {
+public:
+    TcpStream() = default;
+    ~TcpStream();
+
+    TcpStream(const TcpStream&)            = delete;
+    TcpStream& operator=(const TcpStream&) = delete;
+    TcpStream(TcpStream&& other) noexcept;
+    TcpStream& operator=(TcpStream&& other) noexcept;
+
+    /// Connect to ip:port, waiting timeout_ms at most. False when it cannot.
+    bool connect(const std::string& ip, u16 port, int timeout_ms);
+
+    void close();
+
+    [[nodiscard]] bool valid() const { return m_fd != kInvalid; }
+
+    /// Send all of data; false (the connection closed) when it cannot.
+    bool send_all(std::span<const u8> data);
+
+    /// Wait timeout_ms at most for something to read (or the far end gone);
+    /// 0 only looks.
+    [[nodiscard]] bool wait_readable(int timeout_ms) const;
+
+    /// Read exactly size bytes, each part waited for timeout_ms at most. False
+    /// (the connection closed) when the far end has gone or is silent.
+    bool read_exact(u8* data, usize size, int timeout_ms);
+
+    [[nodiscard]] const std::string& last_error() const { return m_last_error; }
+
+private:
+    friend class TcpListener;
+
+#if defined(_WIN32)
+    using Fd                     = std::uintptr_t;
+    static constexpr Fd kInvalid = static_cast<Fd>(~0ull);
+#else
+    using Fd                     = int;
+    static constexpr Fd kInvalid = -1;
+#endif
+
+    void adopt(Fd fd);
+
+    Fd          m_fd = kInvalid;
+    std::string m_last_error;
+};
+
+/// A non-blocking TCP listening socket, handing out each connection made to it.
+class TcpListener {
+public:
+    TcpListener() = default;
+    ~TcpListener();
+
+    TcpListener(const TcpListener&)            = delete;
+    TcpListener& operator=(const TcpListener&) = delete;
+
+    /// Listen on bind_ip:port; an empty bind_ip is every interface. False on
+    /// failure.
+    bool open(const std::string& bind_ip, u16 port);
+    void close();
+    [[nodiscard]] bool valid() const { return m_fd != kInvalid; }
+
+    /// A connection waiting to be accepted, or an invalid stream when none.
+    [[nodiscard]] TcpStream accept();
+
+    [[nodiscard]] const std::string& last_error() const { return m_last_error; }
+
+private:
+#if defined(_WIN32)
+    using Fd                     = std::uintptr_t;
+    static constexpr Fd kInvalid = static_cast<Fd>(~0ull);
+#else
+    using Fd                     = int;
+    static constexpr Fd kInvalid = -1;
+#endif
+
+    Fd          m_fd = kInvalid;
+    std::string m_last_error;
+};
+
 bool startup();
 void shutdown();
 

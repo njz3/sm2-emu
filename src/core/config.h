@@ -554,6 +554,12 @@ struct Config {
     /// and the status display; the board negotiates the real link id from frames.
     u32 link_cabinet_index = 0;
 
+    /// How the ring is simulated: "original", MAME's frames sent at each
+    /// vertical blank over UDP; "buffered", Supermodel's simulated network
+    /// board: TCP, the cabinets numbered in the ring's order, every cabinet's
+    /// data exchanged at the end of each frame (comm_buffered.h).
+    std::string link_mode = "original";
+
     // -- paths -------------------------------------------------------------
 
     /// ROM archives; a game named with no path loads <rom_dir>/<name>.{zip,7z}.

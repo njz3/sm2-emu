@@ -60,6 +60,11 @@ public:
     /// Whether to pace at all. Turning it off runs as fast as the host can, which
     /// is what a capture or a fast-forward key wants.
     void set_throttled(bool throttled);
+
+    /// Each frame due one period after the last one ended rather than on a
+    /// fixed schedule: a frame late is not made up (Supermodel's pacing), which
+    /// a cabinet link whose cabinets wait for one another wants.
+    void set_relative(bool relative) { m_relative = relative; }
     [[nodiscard]] bool throttled() const { return m_throttled; }
 
     /// Stretch the frame period by a small fraction to lock the emulator to the
@@ -85,6 +90,7 @@ private:
     u64    m_next_ns      = 0;
     double m_sync_adjust  = 0.0;
     bool   m_throttled    = true;
+    bool   m_relative     = false;
     bool   m_started      = false;
 
     u64    m_window_start_ns = 0;

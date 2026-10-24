@@ -511,6 +511,8 @@ void Model2::run_frame()
     m_frame_start += kCyclesPerFrame;
     ++m_frames;
     m_in_frame = false;
+    // The buffered cabinet link exchanges the frame's data now, after it.
+    m_comm.end_frame();
 }
 
 void Model2::step_copro(u32 host_cycles)

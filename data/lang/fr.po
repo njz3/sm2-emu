@@ -2200,6 +2200,37 @@ msgstr ""
 "résolution du bureau, sans la changer. Étiré : le cadre\n"
 "remplit la fenêtre ou l'écran."
 
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Original (MAME)"
+msgstr "D'origine (MAME)"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Buffered (Supermodel)"
+msgstr "Tamponné (Supermodel)"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Link mode"
+msgstr "Mode du link"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Original: MAME's ring, each cabinet's frames sent at its\n"
+"vertical blank (UDP). Buffered: as Supermodel, every\n"
+"cabinet's data exchanged at the end of each frame (TCP),\n"
+"the cabinets numbered in the ring's order. Every cabinet\n"
+"of a ring needs the same. Applies to the next game."
+msgstr ""
+"D'origine : l'anneau de MAME, les trames de chaque borne\n"
+"envoyées à son retour de trame (UDP). Tamponné : comme\n"
+"Supermodel, les données de toutes les bornes échangées à la\n"
+"fin de chaque trame (TCP), les bornes numérotées dans l'ordre\n"
+"de l'anneau. Toutes les bornes d'un anneau doivent avoir le\n"
+"même. S'applique au prochain jeu."
+
 #, no-c-format
 #~ msgid ""
 #~ "4:3 is the arcade monitor's shape (the default).\n"

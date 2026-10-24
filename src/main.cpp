@@ -1004,8 +1004,25 @@ void configure_cabinet_link(sm2::hw::Model2MachineBase& machine,
                             const sm2::Config&          config)
 {
     using namespace sm2;
+    machine.comm().set_buffered(nullptr);
     if (!config.link_enabled) {
         machine.comm().set_transport(nullptr);  // back to the loopback
+        return;
+    }
+
+    if (config.link_mode == "buffered") {
+        // Supermodel's simulated network board: TCP on the same ports.
+        auto link = std::make_unique<hw::BufferedLink>(
+            config.link_local_ip, static_cast<u16>(config.link_port), config.link_next_ip,
+            static_cast<u16>(config.link_next_port));
+        if (!link->ok()) {
+            SM2_WARN("cabinet link disabled: %s", link->error().c_str());
+            machine.comm().set_transport(nullptr);
+            return;
+        }
+        machine.comm().set_transport(nullptr);
+        machine.comm().set_buffered(std::move(link));
+        SM2_INFO("cabinet link enabled, buffered (cabinet %u)", config.link_cabinet_index);
         return;
     }
 
@@ -1179,6 +1196,7 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
     options->config.link_next_ip        = from_file.link_next_ip;
     options->config.link_next_port      = from_file.link_next_port;
     options->config.link_cabinet_index  = from_file.link_cabinet_index;
+    options->config.link_mode           = from_file.link_mode;
 
     if (!options->given.scsp_core) {
         options->config.scsp_core = from_file.scsp_core;
@@ -2588,6 +2606,9 @@ int main(int argc, char** argv)
         // game would run slow, which is what --no-vsync is for.
         osd::FramePacer pacer;
         pacer.set_throttled(options.config.throttle);
+        // The buffered link's cabinets wait for one another at the end of each
+        // frame: paced from there, as Supermodel is, rather than catching up.
+        pacer.set_relative(options.config.link_enabled && options.config.link_mode == "buffered");
         pacer.start(hw::Model2::kFrameNanoseconds);
 
 #if defined(__APPLE__)

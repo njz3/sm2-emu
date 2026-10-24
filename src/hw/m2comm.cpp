@@ -42,8 +42,16 @@ void M2Comm::set_transport(std::unique_ptr<CommTransport> transport)
     m_transport->reset();
 }
 
+M2Comm::~M2Comm() = default;
+
+void M2Comm::set_buffered(std::unique_ptr<BufferedLink> link)
+{
+    m_buffered = std::move(link);
+}
+
 bool M2Comm::transport_connected() const
 {
+    if (m_buffered) return m_buffered->connected();
     return m_transport && m_transport->connected();
 }
 
@@ -87,6 +95,7 @@ void M2Comm::cn_write(u8 value)
 
     if (m_cn == 0) {
         SM2_DEBUG("m2comm: board disabled");
+        if (m_buffered) m_buffered->stop();
         m_linkenable = 0;
         m_zfg        = 0;
         m_cn         = 0;
@@ -112,6 +121,7 @@ void M2Comm::cn_write(u8 value)
     set_shared(0x14, static_cast<u8>(m_frame_offset & 0xff));
     set_shared(0x15, static_cast<u8>(m_frame_offset >> 8));
 
+    if (m_buffered) m_buffered->start();
     tick();
 }
 
@@ -159,6 +169,10 @@ void M2Comm::send_data(u8 frame_type, int frame_start, int frame_size, int data_
 void M2Comm::tick()
 {
     if (m_linkenable != 0x01) return;
+    if (m_buffered) {
+        buffered_vblank();
+        return;
+    }
 
     const int frame_size = (shared(0x13) << 8) | shared(0x12);
     const int frame_offset = kFrameStart | (shared(0x15) << 8) | shared(0x14);
@@ -279,6 +293,7 @@ void M2Comm::tick()
 
 void M2Comm::read_fg()
 {
+    if (m_buffered) return;  // its frames come at the end of the frame
     // Two reads after a frame arrived report the gate unchanged, which is how the
     // host is given time to consume what is already there.
     if (m_zfg_delay > 0x00) {
@@ -316,6 +331,77 @@ void M2Comm::read_fg()
             recv = read_frame(data_size);
         }
     } while (m_linktimer == 0x01);
+}
+
+// -- the buffered link ------------------------------------------------------
+
+void M2Comm::buffered_vblank()
+{
+    // What the board shows while its ring is made, or once it has failed, as
+    // MAME's does at each vertical blank.
+    if (m_linkalive == 0x00) {
+        set_shared(0, 0x00);
+        set_shared(2, 0xff);
+        set_shared(3, 0xff);
+        m_zfg ^= 0x01;
+    } else if (m_linkalive == 0x02) {
+        set_shared(0, 0xff);
+    }
+}
+
+void M2Comm::end_frame()
+{
+    if (!m_buffered || m_linkenable != 0x01 || m_linkalive == 0x02) return;
+
+    // The host's role, as MAME's simulation reads it.
+    const bool is_master = (m_fg == 0x01 || shared(0x01) == 0x01);
+    const bool is_relay  = (m_fg == 0x00 && shared(0x01) == 0x00);
+    const BufferedLink::Role role = is_master ? BufferedLink::Role::Master
+                                  : is_relay  ? BufferedLink::Role::Relay
+                                              : BufferedLink::Role::Slave;
+
+    // Each cabinet's data is the first slot of its window, as long as the
+    // receive offset; the window holds the frame size's worth of slots.
+    const int frame_size = (shared(0x13) << 8) | shared(0x12);
+    const int slot       = (shared(0x15) << 8) | shared(0x14);
+    if (slot <= 0 || kFrameStart + slot > static_cast<int>(m_shared.size())) return;
+    const std::span<const u8> own(m_shared.data() + kFrameStart, std::size_t(slot));
+
+    switch (m_buffered->run_frame(role, own)) {
+    case BufferedLink::Step::Waiting:
+        return;
+    case BufferedLink::Step::Broken:
+        m_linkalive = 0x02;
+        set_shared(0, 0xff);
+        return;
+    case BufferedLink::Step::Linked:
+        m_linkid    = m_buffered->id();
+        m_linkcount = m_buffered->count();
+        m_linkalive = 0x01;
+        set_shared(0, 0x01);
+        set_shared(2, m_linkid);
+        set_shared(3, m_linkcount);
+        SM2_DEBUG("m2comm: link established, id %02x of %02x", m_linkid, m_linkcount);
+        return;
+    case BufferedLink::Step::Exchanged:
+        break;
+    }
+
+    // Slot k holds the cabinet whose id is this one's plus k, round the ring,
+    // as the window MAME's simulation keeps (slot `count` this cabinet's own,
+    // back), to one slot past the window as its copy does.
+    const int count = m_linkcount;
+    if (count == 0) return;
+    const int slots = frame_size / slot;
+    for (int k = 1; k <= slots; k++) {
+        const int base = m_linkid != 0 ? m_linkid - 1 : 0;
+        const auto id  = static_cast<u8>((base + k) % count + 1);
+        const std::span<const u8> data = m_buffered->data(id);
+        for (std::size_t j = 0; j < data.size() && j < std::size_t(slot); j++) {
+            set_shared(u32(kFrameStart + k * slot + int(j)), data[j]);
+        }
+    }
+    m_zfg ^= 0x01;  // new data, as one frame received
 }
 
 }  // namespace sm2::hw

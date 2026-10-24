@@ -35,6 +35,7 @@
 #pragma once
 
 #include "core/types.h"
+#include "hw/comm_buffered.h"
 #include "hw/comm_transport.h"
 
 #include <array>
@@ -59,6 +60,7 @@ public:
     static constexpr u16 kDefaultFrameOffset = 0x1c0;
 
     M2Comm();
+    ~M2Comm();
 
     void reset();
 
@@ -68,6 +70,17 @@ public:
     /// Swap the frame transport (takes ownership); nullptr restores the default
     /// loopback. A LAN transport (comm_udp.h) is injected when linking is on.
     void set_transport(std::unique_ptr<CommTransport> transport);
+
+    /// The "buffered" link (comm_buffered.h, as Supermodel's simulated network
+    /// board) in place of MAME's frame simulation below; nullptr goes back to
+    /// the latter. With it, the ring's frames are not sent at the vertical
+    /// blank but exchanged whole at the end of each frame (end_frame()).
+    void set_buffered(std::unique_ptr<BufferedLink> link);
+    [[nodiscard]] bool buffered() const { return m_buffered != nullptr; }
+
+    /// After each frame has run: the buffered link's handshake or exchange. A
+    /// no-op without one.
+    void end_frame();
 
     /// `comm_framesync`. MAME defaults it off, so the board does not make the
     /// host wait for the ring before finishing a frame.
@@ -154,6 +167,10 @@ private:
     /// loopback so a lone cabinet needs no configuration; a UDP transport is
     /// injected here for real LAN play.
     std::unique_ptr<CommTransport> m_transport;
+
+    /// The buffered link, when chosen (set_buffered()).
+    std::unique_ptr<BufferedLink> m_buffered;
+    void buffered_vblank();
 };
 
 }  // namespace sm2::hw

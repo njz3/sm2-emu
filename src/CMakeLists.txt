@@ -226,6 +226,7 @@ target_link_libraries(sm2_hw_ported
 # ---------------------------------------------------------------------------
 
 add_library(sm2_hw STATIC
+    hw/comm_buffered.cpp
     hw/comm_udp.cpp
     hw/copro_fifo.cpp
     hw/copro_tgp.cpp
