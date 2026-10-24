@@ -1875,6 +1875,25 @@ msgid "Establishing the ring..."
 msgstr "Établissement de l'anneau..."
 
 #: src/osd/gui.cpp
+#, c-format
+msgid "No connection to the next cabinet (%s, TCP) yet."
+msgstr "Pas encore de connexion vers la borne suivante (%s, TCP)."
+
+#: src/osd/gui.cpp
+#, c-format
+msgid "No connection from the previous cabinet (port %u, TCP) yet."
+msgstr "Pas encore de connexion de la borne précédente (port %u, TCP)."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Is the game running there with the buffered link mode,\n"
+"and do the firewalls let TCP in on these ports?"
+msgstr ""
+"Le jeu y tourne-t-il en mode de link tamponné, et les\n"
+"pare-feu laissent-ils entrer le TCP sur ces ports ?"
+
+#: src/osd/gui.cpp
 #, no-c-format
 msgid "This machine's interfaces:"
 msgstr "Interfaces de cette machine :"

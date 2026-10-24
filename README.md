@@ -493,17 +493,19 @@ clocks, not a rollback-netplay implementation; it links the emulated comms
 board the way real cabinets were linked on a shared LAN.
 
 **Buffered link** (`link_mode = buffered`). Each cabinet listens for the previous
-one and connects to the next over TCP (the same ports; open them for TCP). Once
-every cabinet of the ring is there and its game has set its board up (about four
-seconds after enabling it, as MAME's board), a handshake numbers them in the
-ring's order; then, at the end of every frame, each cabinet's data goes round the
-whole ring, each cabinet waiting for the others, and the games read the whole
-ring's data of the frame before, as on the real ring. The cabinets keep in step
-(the frame pacer then waits one period after each frame rather than catching
-up). A cabinet that leaves tells the others, whose link then fails as on a real
-ring, and every cabinet has to be running for the ring to link: start the game
-on all of them at about the same time. Indy 500 needs this mode to link, and
-Touring Car and Super GT 24h need it with more than two cabinets.
+one and connects to the next over TCP (the same ports; open them for TCP). While
+one of these connections is missing, the Network tab names it, and so does the
+log after five seconds. Once every cabinet of the ring is there and its game has
+set its board up (about four seconds after enabling it, as MAME's board), a
+handshake numbers them in the ring's order; then, at the end of every frame, each
+cabinet's data goes round the whole ring, each cabinet waiting for the others,
+and the games read the whole ring's data of the frame before, as on the real
+ring. The cabinets keep in step (the frame pacer then waits one period after each
+frame rather than catching up). A cabinet that leaves tells the others, whose
+link then fails as on a real ring, and every cabinet has to be running for the
+ring to link: start the game on all of them at about the same time. Indy 500
+needs this mode to link, and Touring Car and Super GT 24h need it with more than
+two cabinets.
 
 How many cabinets each title links, from its test menu:
 

@@ -2849,6 +2849,23 @@ void Gui::draw_network_tab(Config& config)
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "%s",
                            tr("Establishing the ring..."));
     }
+    // The buffered link's missing connections, named: the other game not
+    // running a buffered link, or a firewall letting no TCP in, keeps them out.
+    if (m_link_status.active && m_link_status.buffered && !m_link_status.alive
+        && (!m_link_status.to_next || !m_link_status.from_previous)) {
+        if (!m_link_status.to_next) {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "%s",
+                               trf("No connection to the next cabinet (%s, TCP) yet.",
+                                   m_link_status.next.c_str()).c_str());
+        }
+        if (!m_link_status.from_previous) {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "%s",
+                               trf("No connection from the previous cabinet (port %u, TCP) yet.",
+                                   m_link_status.port).c_str());
+        }
+        ImGui::TextDisabled("%s", tr("Is the game running there with the buffered link mode,\n"
+                                     "and do the firewalls let TCP in on these ports?"));
+    }
 
     // Available interfaces, so the operator sees what to type.
     ImGui::Spacing();

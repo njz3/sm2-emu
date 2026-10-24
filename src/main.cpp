@@ -3471,9 +3471,16 @@ int main(int argc, char** argv)
             // Live link state for the Network tab.
             if (machine_iface != nullptr) {
                 const hw::M2Comm& comm = machine_iface->comm();
-                gui.set_link_status(osd::Gui::LinkStatus{
-                    options.config.link_enabled, comm.enabled(), comm.link_alive(),
-                    comm.link_id(), comm.link_count()});
+                osd::Gui::LinkStatus status{options.config.link_enabled, comm.enabled(),
+                                            comm.link_alive(), comm.link_id(), comm.link_count()};
+                if (const hw::BufferedLink* link = comm.buffered_link()) {
+                    status.buffered      = true;
+                    status.to_next       = link->connected_to_next();
+                    status.from_previous = link->connected_from_previous();
+                    status.next          = link->next_ip() + ":" + std::to_string(link->next_port());
+                    status.port          = link->port();
+                }
+                gui.set_link_status(status);
             }
             {
                 const osd::Outputs::NetworkStatus status = outputs.network_status();

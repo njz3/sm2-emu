@@ -73,6 +73,14 @@ public:
 
     /// Both connections, to the next cabinet and from the previous one, made.
     [[nodiscard]] bool connected() const { return m_connected; }
+    /// Each of them, to tell which one is missing.
+    [[nodiscard]] bool connected_to_next() const { return m_to_next; }
+    [[nodiscard]] bool connected_from_previous() const { return m_from_previous; }
+
+    /// Where the link listens for the previous cabinet and connects to the next.
+    [[nodiscard]] u16 port() const { return m_port; }
+    [[nodiscard]] const std::string& next_ip() const { return m_next_ip; }
+    [[nodiscard]] u16 next_port() const { return m_next_port; }
 
 private:
     enum class Received { Packet, Nothing, Lost, Alert };
@@ -91,6 +99,7 @@ private:
     bool send_index(u32 round, u8 total, u8 playable);
     Step exchange(std::span<const u8> own);
 
+    u16         m_port = 0;
     std::string m_next_ip;
     u16         m_next_port = 0;
     std::string m_error;
@@ -105,6 +114,8 @@ private:
     std::thread      m_thread;
     std::atomic_bool   m_quit{false};
     std::atomic_bool   m_connected{false};
+    std::atomic_bool   m_to_next{false};
+    std::atomic_bool   m_from_previous{false};
 
     std::vector<u8> m_packet;  ///< The last packet received, its type first.
 

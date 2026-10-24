@@ -77,6 +77,7 @@ public:
     /// blank but exchanged whole at the end of each frame (end_frame()).
     void set_buffered(std::unique_ptr<BufferedLink> link);
     [[nodiscard]] bool buffered() const { return m_buffered != nullptr; }
+    [[nodiscard]] const BufferedLink* buffered_link() const { return m_buffered.get(); }
 
     /// After each frame has run: the buffered link's handshake or exchange. A
     /// no-op without one.

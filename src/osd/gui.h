@@ -126,6 +126,12 @@ public:
         bool alive   = false;  ///< the ring has settled and frames flow
         u32  node    = 0;      ///< this cabinet's negotiated link id
         u32  count   = 0;      ///< cabinets the ring settled on
+        // The buffered link's connections, so that a missing one is named.
+        bool        buffered      = false;
+        bool        to_next       = false;  ///< connected to the next cabinet
+        bool        from_previous = false;  ///< connected from the previous one
+        std::string next;                   ///< the next cabinet, ip:port
+        u32         port          = 0;      ///< the port listened on
     };
     void set_link_status(const LinkStatus& status) { m_link_status = status; }
 

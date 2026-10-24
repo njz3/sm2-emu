@@ -32,6 +32,10 @@ constexpr u64 kHandshakeRetryMs  = 2000;   // the master's GUID sent again when 
 // games count on it, writing their role and their data's size meanwhile.
 constexpr u32 kSettleFrames      = 0xe8;
 constexpr int kConnectTimeoutMs  = 100;
+// A connection still missing this long is named in a warning, with what
+// usually keeps it out: the other game not running a buffered link, or a
+// firewall letting no TCP in on the port.
+constexpr u64 kConnectWarnMs     = 5000;
 constexpr u32 kMaxPacket         = 0x10000;
 
 // Packet types, the payload's first byte.
@@ -50,7 +54,7 @@ u64 now_ms()
 
 BufferedLink::BufferedLink(const std::string& local_ip, u16 port, std::string next_ip,
                            u16 next_port)
-    : m_next_ip(std::move(next_ip)), m_next_port(next_port)
+    : m_port(port), m_next_ip(std::move(next_ip)), m_next_port(next_port)
 {
     if (!m_listen.open(local_ip, port)) {
         m_error = m_listen.last_error();
@@ -85,7 +89,9 @@ bool BufferedLink::ok() const
 // connection in use by the frame's thread is there.
 void BufferedLink::connect_loop()
 {
-    bool logged = false;
+    bool logged        = false;
+    bool warned        = false;
+    u64  missing_since = now_ms();
     while (!m_quit) {
         bool send_ok = false;
         {
@@ -113,14 +119,35 @@ void BufferedLink::connect_loop()
                 receive_ok = true;
             }
         }
+        m_to_next            = send_ok;
+        m_from_previous      = receive_ok;
         const bool connected = send_ok && receive_ok;
         if (connected && !m_connected) {
             SM2_INFO("m2comm: buffered link connected to the next cabinet and from the previous one");
             logged = false;
+            warned = false;
         } else if (!connected && !logged) {
             SM2_INFO("m2comm: buffered link waiting for %s",
                      send_ok ? "the previous cabinet" : "the next cabinet");
-            logged = true;
+            logged        = true;
+            missing_since = now_ms();
+        }
+        if (!connected && !warned && now_ms() - missing_since >= kConnectWarnMs) {
+            if (!send_ok) {
+                SM2_WARN("m2comm: buffered link: no connection to the next cabinet (%s:%u, TCP) "
+                         "after %llu s: is its game running with link_mode = buffered, and does "
+                         "its firewall let TCP in on that port?",
+                         m_next_ip.c_str(), m_next_port,
+                         static_cast<unsigned long long>(kConnectWarnMs / 1000));
+            }
+            if (!receive_ok) {
+                SM2_WARN("m2comm: buffered link: no connection from the previous cabinet (port %u, "
+                         "TCP) after %llu s: is its game running with link_mode = buffered and "
+                         "this cabinet as its next one, and does this machine's firewall let TCP "
+                         "in on that port?",
+                         m_port, static_cast<unsigned long long>(kConnectWarnMs / 1000));
+            }
+            warned = true;
         }
         m_connected = connected;
         std::this_thread::sleep_for(std::chrono::milliseconds(connected ? 50 : 16));
