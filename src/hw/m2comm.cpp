@@ -8,10 +8,12 @@
 #include "core/log.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <memory>
 #include <optional>
 #include <span>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -27,6 +29,12 @@ constexpr int kFrameStart = 0x2000;
 /// frame size the host asked for. MAME's buffers are 0x1000 bytes, which caps
 /// how much of a nonsense frame size would be honoured.
 constexpr int kMaxFrame = 0x1000;
+
+/// Frame sync: how long a vertical blank waits for the ring's sync to come
+/// back, several frames' worth, and how many such waits in a row in vain drop
+/// the link (a cabinet switched off or paused) rather than slow the game down.
+constexpr auto kSyncWait   = std::chrono::milliseconds(100);
+constexpr int  kSyncMisses = 3;
 
 }  // namespace
 
@@ -62,6 +70,7 @@ void M2Comm::reset()
     m_linkid     = 0;
     m_linkcount  = 0;
     m_zfg_delay  = 0;
+    m_sync_misses = 0;
     m_transport->reset();
 }
 
@@ -101,6 +110,7 @@ void M2Comm::cn_write(u8 value)
     m_linkalive  = 0x00;
     m_linkcount  = 0x00;
     m_linktimer  = 0x00e8;  // 58 fps for about four seconds
+    m_sync_misses = 0;
     m_transport->reset();
 
     std::fill(m_shared.begin(), m_shared.end(), u8{0});
@@ -147,6 +157,35 @@ void M2Comm::send_frame(int data_size)
     }
 }
 
+void M2Comm::receive_frame(int sender, int frame_size, int frame_offset)
+{
+    // A frame is the sender's whole window: its own data in the first slot,
+    // the others' in the following ones, in the order of their ids after its
+    // own (as this one is kept: slot s holds the cabinet whose id is this
+    // one's plus s, round the ring). Each slot is put where this cabinet's
+    // own order wants it, whichever way round the ring the frame came.
+    const int slot  = frame_offset - kFrameStart;
+    const int count = m_linkcount;
+    if (m_linkid == 0 || sender == 0 || count < 2 || slot <= 0 || count * slot > frame_size) {
+        // A relay, or no ids yet: MAME's copy, the window one slot along.
+        for (int j = 0; j < frame_size && 1 + j < kMaxFrame; j++) {
+            set_shared(u32(frame_offset + j), m_buffer[std::size_t(1 + j)]);
+        }
+        return;
+    }
+    // Slots past the ring's size wrap round it, as MAME's window does: slot
+    // `count` holds this cabinet's own data as it came back. MAME's copy,
+    // one slot along, ends a slot past the window: so does this.
+    const int slots = frame_size / slot;
+    const int ahead = ((m_linkid - sender) % count + count) % count;
+    for (int s = 1; s <= slots; s++) {
+        const int from = (s + ahead) % count;
+        for (int j = 0; j < slot && 1 + from * slot + j < kMaxFrame; j++) {
+            set_shared(u32(kFrameStart + s * slot + j), m_buffer[std::size_t(1 + from * slot + j)]);
+        }
+    }
+}
+
 void M2Comm::send_data(u8 frame_type, int frame_start, int frame_size, int data_size)
 {
     m_buffer[0] = frame_type;
@@ -188,21 +227,25 @@ void M2Comm::tick()
         while (recv > 0) {
             const int idx = m_buffer[0];
             if (idx == 0xff) {
-                // Link id assignment going round the ring.
+                // Link id assignment going round the ring: each slave counts
+                // itself in and takes the count as its id, so the ids follow
+                // the ring (a cabinet's transmit to the next one's receive):
+                // the first after the master is 2. MAME gives them in the
+                // size frame below, counting down, the first after the master
+                // the highest; Indy 500, Super GT 24h and Touring Car compare
+                // the id with their car number and then never start.
                 if (is_master) {
                     m_linkid    = 0x01;
                     m_linkcount = m_buffer[1];
                     m_linktimer = 0x00;
                 } else {
-                    if (is_slave) m_buffer[1]++;
+                    if (is_slave) m_linkid = ++m_buffer[1];
                     send_frame(data_size);
                 }
             } else if (idx == 0xfe) {
                 // Ring size, which is what settles the link.
                 if (is_slave) {
-                    m_linkid    = m_buffer[1];
                     m_linkcount = m_buffer[2];
-                    m_buffer[1]--;
                     send_frame(data_size);
                 } else if (is_relay) {
                     m_linkid    = 0x00;
@@ -243,14 +286,17 @@ void M2Comm::tick()
     }
 
     if (m_linkalive == 0x01) {
+        // With frame sync, wait here for the sync the master sent last frame
+        // to come back round, so every cabinet's data is in before the frame
+        // runs. Only here: MAME waits in the flip gate reads as well, mid-frame,
+        // where two cabinets can each wait on the other for ever.
+        const auto deadline = std::chrono::steady_clock::now() + kSyncWait;
         do {
             int recv = read_frame(data_size);
             while (recv > 0) {
                 const int idx = m_buffer[0];
                 if (idx <= static_cast<int>(m_linkcount)) {
-                    for (int j = 0; j < frame_size && 1 + j < kMaxFrame; j++) {
-                        set_shared(u32(frame_offset + j), m_buffer[std::size_t(1 + j)]);
-                    }
+                    receive_frame(idx, frame_size, frame_offset);
                     m_zfg ^= 0x01;
                     if (is_slave) {
                         send_data(m_linkid, kFrameStart, frame_size, data_size);
@@ -260,9 +306,23 @@ void M2Comm::tick()
                 } else if (idx == 0xfc) {
                     // Vertical sync going round the ring.
                     m_linktimer = 0x00;
+                    m_sync_misses = 0;
                     if (!is_master) send_frame(data_size);
                 }
                 recv = read_frame(data_size);
+            }
+            if (m_linktimer == 0x01) {
+                if (std::chrono::steady_clock::now() >= deadline) {
+                    if (++m_sync_misses >= kSyncMisses) {
+                        SM2_WARN("m2comm: no frame sync from the ring; dropping the link");
+                        m_linkalive = 0x02;
+                        m_linktimer = 0x00;
+                        set_shared(0, 0xff);
+                        return;
+                    }
+                    break;
+                }
+                std::this_thread::yield();
             }
         } while (m_linktimer == 0x01);
 
@@ -295,27 +355,26 @@ void M2Comm::read_fg()
     const bool is_slave  = (m_fg == 0x00 && shared(0x01) == 0x02);
     const bool is_relay  = (m_fg == 0x00 && shared(0x01) == 0x00);
 
-    do {
-        int recv = read_frame(data_size);
-        while (recv > 0) {
-            const int idx = m_buffer[0];
-            if (idx <= static_cast<int>(m_linkcount)) {
-                for (int j = 0; j < frame_size && 1 + j < kMaxFrame; j++) {
-                    set_shared(u32(frame_offset + j), m_buffer[std::size_t(1 + j)]);
-                }
-                m_zfg ^= 0x01;
-                if (is_slave) {
-                    send_data(m_linkid, kFrameStart, frame_size, data_size);
-                } else if (is_relay) {
-                    send_frame(data_size);
-                }
-            } else if (idx == 0xfc) {
-                m_linktimer = 0x00;
-                if (!is_master) send_frame(data_size);
+    // What has arrived, without waiting: the frame sync waits at the vertical
+    // blank (see tick()).
+    int recv = read_frame(data_size);
+    while (recv > 0) {
+        const int idx = m_buffer[0];
+        if (idx <= static_cast<int>(m_linkcount)) {
+            receive_frame(idx, frame_size, frame_offset);
+            m_zfg ^= 0x01;
+            if (is_slave) {
+                send_data(m_linkid, kFrameStart, frame_size, data_size);
+            } else if (is_relay) {
+                send_frame(data_size);
             }
-            recv = read_frame(data_size);
+        } else if (idx == 0xfc) {
+            m_linktimer = 0x00;
+            m_sync_misses = 0;
+            if (!is_master) send_frame(data_size);
         }
-    } while (m_linktimer == 0x01);
+        recv = read_frame(data_size);
+    }
 }
 
 }  // namespace sm2::hw

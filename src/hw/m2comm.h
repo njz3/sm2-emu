@@ -69,8 +69,11 @@ public:
     /// loopback. A LAN transport (comm_udp.h) is injected when linking is on.
     void set_transport(std::unique_ptr<CommTransport> transport);
 
-    /// `comm_framesync`. MAME defaults it off, so the board does not make the
-    /// host wait for the ring before finishing a frame.
+    /// `comm_framesync`. Off (MAME's default), a cabinet's data reaches the
+    /// others frames later, which most titles take. On, each vertical blank
+    /// waits for the ring's sync to come round, as the real ring is fast
+    /// enough to have it: every cabinet sees the others' data of the frame
+    /// before. Indy 500 and Touring Car need it (Config::link_frame_sync).
     void set_frame_sync(bool enabled) { m_frame_sync = enabled ? 1u : 0u; }
 
     // -- the two handshake registers, on the i960's bus --------------------
@@ -120,6 +123,8 @@ private:
     /// frames, so this side always sees a complete one.
     int  read_frame(int data_size);
     void send_frame(int data_size);
+    /// The frame just read, from the cabinet `sender`, into the shared RAM.
+    void receive_frame(int sender, int frame_size, int frame_offset);
     void send_data(u8 frame_type, int frame_start, int frame_size, int data_size);
 
     [[nodiscard]] u8 shared(u32 offset) const
@@ -143,6 +148,7 @@ private:
     u8  m_linkid     = 0;
     u8  m_linkcount  = 0;
     u8  m_zfg_delay  = 0;
+    int m_sync_misses = 0;  ///< frame syncs waited for in vain in a row
 
     u8  m_frame_sync   = 0;
     u16 m_frame_offset = kDefaultFrameOffset;
