@@ -413,6 +413,13 @@ bool Input::init(const WheelSettings& wheel)
     int             count = 0;
     SDL_JoystickID* ids   = SDL_GetGamepads(&count);
     if (ids != nullptr) {
+        // The pads asked for by path go first, so the others cannot take their slots.
+        const auto asked_for = [this](SDL_JoystickID id) {
+            const char* path = SDL_GetJoystickPathForID(id);
+            return path != nullptr
+                && std::find(m_pad_devices.begin(), m_pad_devices.end(), path) != m_pad_devices.end();
+        };
+        std::stable_partition(ids, ids + count, asked_for);
         for (int index = 0; index < count; ++index) {
             add_gamepad(ids[index]);
         }
@@ -491,17 +498,37 @@ void Input::handle_event(const SDL_Event& event)
     }
 }
 
-u32 Input::first_free_player() const
+bool Input::player_taken(u32 player) const
 {
+    return std::any_of(m_pads.begin(), m_pads.end(),
+                       [player](const Pad& pad) { return pad.player == player; });
+}
+
+u32 Input::player_for(SDL_JoystickID id) const
+{
+    const auto path_is = [](SDL_JoystickID joystick, const std::string& want) {
+        const char* path = SDL_GetJoystickPathForID(joystick);
+        return !want.empty() && path != nullptr && want == path;
+    };
     for (u32 player = 0; player < kPlayers; ++player) {
-        const bool taken = std::any_of(m_pads.begin(), m_pads.end(), [player](const Pad& pad) {
-            return pad.player == player;
-        });
-        if (!taken) {
+        if (path_is(id, m_pad_devices[player]) && !player_taken(player)) {
             return player;
         }
     }
-    return kPlayers;
+    // Otherwise skip the slots kept for a pad that is plugged in.
+    int             count = 0;
+    SDL_JoystickID* ids   = SDL_GetJoysticks(&count);
+    u32             found = kPlayers;
+    for (u32 player = 0; player < kPlayers && found == kPlayers; ++player) {
+        const bool kept = ids != nullptr && std::any_of(ids, ids + count, [&](SDL_JoystickID other) {
+            return other != id && path_is(other, m_pad_devices[player]);
+        });
+        if (!player_taken(player) && !kept) {
+            found = player;
+        }
+    }
+    SDL_free(ids);
+    return found;
 }
 
 void Input::add_gamepad(SDL_JoystickID id)
@@ -523,7 +550,7 @@ void Input::add_gamepad(SDL_JoystickID id)
         return;
     }
 
-    const u32 player = first_free_player();
+    const u32 player = player_for(id);
     if (player >= kPlayers) {
         SM2_INFO("both player positions are taken; the extra gamepad is idle");
         return;

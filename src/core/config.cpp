@@ -507,7 +507,8 @@ namespace {
 /// The ini setting a --set key stands for, its gamepad section apart.
 [[nodiscard]] bool is_section_key(const std::string& key)
 {
-    return key.rfind("pad1_", 0) == 0 || key.rfind("pad2_", 0) == 0;
+    return (key.rfind("pad1_", 0) == 0 || key.rfind("pad2_", 0) == 0) && key != "pad1_device"
+           && key != "pad2_device";
 }
 
 /// A --set's "SECTION.KEY=VALUE" split; false when it is not one.
@@ -604,6 +605,7 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             }
             continue;
         }
+        bool known = true;
         if (key == "vsync") {
             if (!parse_bool(value, &out->vsync)) {
                 bad_value();
@@ -883,7 +885,14 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             if (!parse_bool(value, &out->input_background)) {
                 bad_value();
             }
-        } else if (key == "wheel_ffb_invert") {
+        } else {
+            known = false;
+        }
+        if (known) {
+            continue;
+        }
+        // The rest apart: MSVC caps how deep an else-if chain may nest.
+        if (key == "wheel_ffb_invert") {
             if (!parse_bool(value, &out->wheel_ffb_invert)) {
                 bad_value();
             }
@@ -945,6 +954,10 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             if (!parse_bool(value, &out->pad_shortcuts)) {
                 bad_value();
             }
+        } else if (key == "pad1_device") {
+            out->pad_device[0] = value;
+        } else if (key == "pad2_device") {
+            out->pad_device[1] = value;
         } else if (key == "pad_stick_deadzone") {
             if (!parse_u32(value, &out->pad_stick_deadzone)) {
                 bad_value();
@@ -1492,6 +1505,10 @@ void write_config(std::ostream& out, const Config& config)
         << "# Guide button shortcuts on a gamepad (menu, save, load, rewind...).\n"
         << "# Off for a front end that maps its own hotkeys.\n"
         << "pad_shortcuts = " << bool_text(config.pad_shortcuts) << "\n"
+        << "# The pad each player wants, by device path (/dev/input/eventN on\n"
+        << "# Linux). Empty gives the slot to the first pad found.\n"
+        << "pad1_device = " << config.pad_device[0] << "\n"
+        << "pad2_device = " << config.pad_device[1] << "\n"
         << "# Cabinet lamps and drive-board bytes for MAMEHooker, DOFLinx and\n"
         << "# similar tools, in MAME's formats: over TCP (network) and, on\n"
         << "# Windows, as window messages. With the network outputs on, a starting\n"

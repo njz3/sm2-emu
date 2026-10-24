@@ -382,6 +382,11 @@ struct Config {
     /// that maps the hotkeys itself, such as Batocera.
     bool pad_shortcuts = true;
 
+    /// The device path of the pad each player wants, as SDL reports it
+    /// (/dev/input/eventN on Linux). Empty leaves the slot to whichever pad
+    /// comes first. A front end with its own player order sets these.
+    std::array<std::string, 2> pad_device;
+
     /// The cabinet controls a gamepad button can be bound to. Test and Service
     /// stay on the Guide chord, so they are not here. Keep kCount last.
     enum class PadRole : u32 {

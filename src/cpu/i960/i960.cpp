@@ -31,6 +31,7 @@
 #include "cpu/mame_compat.h"
 
 #include <algorithm>
+#include <cfenv>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -530,9 +531,11 @@ void I960::test(u32 opcode, int mask)
 double I960::round_to_int(double val)
 {
 	// apply rounding mode
+	if (std::fegetround() != FE_TONEAREST)
+		std::fesetround(FE_TONEAREST);
 	switch ((m_AC >> 30) & 3)
 	{
-	case 0: return round(val);
+	case 0: return std::rint(val);
 	case 1: return floor(val);
 	case 2: return ceil(val);
 	default: return trunc(val);

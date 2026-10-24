@@ -161,6 +161,9 @@ public:
     /// Returns false only if the subsystem itself will not start. A machine with no
     /// gamepad is not an error: the keyboard covers everything.
     [[nodiscard]] bool init(const WheelSettings& wheel);
+
+    /// The device path each player's pad must have; set before init().
+    void set_pad_devices(const std::array<std::string, 2>& paths) { m_pad_devices = paths; }
     void shutdown();
 
     /// Offer an SDL event. Consumes connection and disconnection only; everything
@@ -553,10 +556,13 @@ private:
 
     void gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) const;
 
-    /// Lowest player position with no pad, or kPlayers when both are taken.
-    [[nodiscard]] u32 first_free_player() const;
+    /// The player for a new pad: the one asking for its path, else the lowest
+    /// free position not kept for another plugged-in pad. kPlayers when none is left.
+    [[nodiscard]] u32 player_for(SDL_JoystickID id) const;
+    [[nodiscard]] bool player_taken(u32 player) const;
 
     std::vector<Pad> m_pads;
+    std::array<std::string, 2> m_pad_devices;
     Wheel            m_wheel;
     WheelSettings    m_wheel_settings;
 
