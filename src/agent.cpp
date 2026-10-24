@@ -85,6 +85,10 @@
 //       telemetry server's `fields`.
 //   save PATH / load PATH
 //       A save state, the drive board model included. Answer: "ok" or "err".
+//   nvram
+//       The game's backup RAM and EEPROM written to the saves folder now, as
+//       a window writes them on exit; the agent never does by itself.
+//       Answer: "ok".
 //   quit
 //       Answer: "bye".
 #include "agent.h"
@@ -936,6 +940,9 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
                                 ? "ok\n"
                                 : "err\n");
             }
+        } else if (std::strcmp(command, "nvram") == 0) {
+            machine.save_nvram();
+            std::printf("ok\n");
         } else if (std::strcmp(command, "ram") == 0) {
             unsigned offset = 0, length = 0;
             std::sscanf(line, "%*s %x %x", &offset, &length);
