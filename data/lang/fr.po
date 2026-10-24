@@ -2200,26 +2200,6 @@ msgstr ""
 "résolution du bureau, sans la changer. Étiré : le cadre\n"
 "remplit la fenêtre ou l'écran."
 
-#: src/osd/gui.cpp
-#, no-c-format
-msgid "Synchronise the ring every frame"
-msgstr "Synchroniser l'anneau à chaque trame"
-
-#: src/osd/gui.cpp
-#, no-c-format
-msgid ""
-"Each frame, every cabinet waits for the others' data to\n"
-"have come round the ring, as on the real cabinets. Indy\n"
-"500 and Touring Car need it. A cabinet paused or switched\n"
-"off then drops the link of the others. Applies to the next\n"
-"game launched."
-msgstr ""
-"À chaque trame, chaque borne attend que les données des\n"
-"autres aient fait le tour de l'anneau, comme sur les vraies\n"
-"bornes. Indy 500 et Touring Car en ont besoin. Une borne en\n"
-"pause ou éteinte coupe alors le link des autres. S'applique\n"
-"au prochain jeu lancé."
-
 #, no-c-format
 #~ msgid ""
 #~ "4:3 is the arcade monitor's shape (the default).\n"

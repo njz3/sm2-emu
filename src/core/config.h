@@ -554,11 +554,6 @@ struct Config {
     /// and the status display; the board negotiates the real link id from frames.
     u32 link_cabinet_index = 0;
 
-    /// Every cabinet waits, once a frame, for the others' data to have come
-    /// round the ring, as on the real ring, fast enough for it. Indy 500 and
-    /// Touring Car need it to start with more than two cabinets, or at all.
-    bool link_frame_sync = true;
-
     // -- paths -------------------------------------------------------------
 
     /// ROM archives; a game named with no path loads <rom_dir>/<name>.{zip,7z}.

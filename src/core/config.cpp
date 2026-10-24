@@ -857,10 +857,6 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             if (!parse_u32(value, &out->link_cabinet_index)) {
                 bad_value();
             }
-        } else if (key == "link_frame_sync") {
-            if (!parse_bool(value, &out->link_frame_sync)) {
-                bad_value();
-            }
         } else if (key == "wheel_ffb") {
             if (!parse_bool(value, &out->wheel_ffb)) {
                 bad_value();
@@ -1458,10 +1454,6 @@ void write_config(std::ostream& out, const Config& config)
         << "link_next_port = " << config.link_next_port << "\n"
         << "# Where this cabinet sits in the ring, 0-based (bookkeeping only).\n"
         << "link_cabinet_index = " << config.link_cabinet_index << "\n"
-        << "# Each frame, wait for the others' data to come round the ring, as\n"
-        << "# the real ring has it (Indy 500 and Touring Car need it). A cabinet\n"
-        << "# paused or switched off then drops the others' link.\n"
-        << "link_frame_sync = " << bool_text(config.link_frame_sync) << "\n"
         << "\n"
         << "# Wheels and gamepads keep working while the window is not in front.\n"
         << "# Keyboard and mouse still need the window in front.\n"

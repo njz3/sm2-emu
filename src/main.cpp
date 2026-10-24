@@ -1006,10 +1006,8 @@ void configure_cabinet_link(sm2::hw::Model2MachineBase& machine,
     using namespace sm2;
     if (!config.link_enabled) {
         machine.comm().set_transport(nullptr);  // back to the loopback
-        machine.comm().set_frame_sync(false);
         return;
     }
-    machine.comm().set_frame_sync(config.link_frame_sync);
 
     auto transport = std::make_unique<hw::UdpTransport>(
         config.link_local_ip, static_cast<u16>(config.link_port),
@@ -1181,7 +1179,6 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
     options->config.link_next_ip        = from_file.link_next_ip;
     options->config.link_next_port      = from_file.link_next_port;
     options->config.link_cabinet_index  = from_file.link_cabinet_index;
-    options->config.link_frame_sync     = from_file.link_frame_sync;
 
     if (!options->given.scsp_core) {
         options->config.scsp_core = from_file.scsp_core;

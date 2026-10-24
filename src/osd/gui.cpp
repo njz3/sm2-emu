@@ -2792,17 +2792,6 @@ void Gui::draw_network_tab(Config& config)
         }
     }
 
-    ImGui::Checkbox(tr_id("Synchronise the ring every frame"), &config.link_frame_sync);
-    ImGui::SameLine();
-    ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered()) {
-        tooltip(tr("Each frame, every cabinet waits for the others' data to\n"
-                   "have come round the ring, as on the real cabinets. Indy\n"
-                   "500 and Touring Car need it. A cabinet paused or switched\n"
-                   "off then drops the link of the others. Applies to the next\n"
-                   "game launched."));
-    }
-
     ImGui::SeparatorText(tr("Next cabinet in the ring"));
 
     text_field(N_("Next IP"), config.link_next_ip, 180.0f);
