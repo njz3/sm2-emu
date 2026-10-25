@@ -91,3 +91,12 @@ if(SM2_TUNE)
 else()
     message(STATUS "  tuning          : none (toolchain flags inherited as-is)")
 endif()
+
+# ---------------------------------------------------------------------------
+# Floating point contraction
+# ---------------------------------------------------------------------------
+# Fused multiply-adds on ARM move polygon edge pixels against x86.
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-ffp-contract=off)
+endif()

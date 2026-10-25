@@ -296,9 +296,9 @@ void VulkanBackend::draw_overlay(bool active)
     rendering.colorAttachmentCount = 1;
     rendering.pColorAttachments    = &colour_att;
 
-    vkCmdBeginRendering(cmd, &rendering);
+    device_functions().cmd_begin_rendering(cmd, &rendering);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
-    vkCmdEndRendering(cmd);
+    device_functions().cmd_end_rendering(cmd);
 }
 
 bool VulkanBackend::end_frame()
@@ -385,7 +385,7 @@ bool VulkanBackend::init_overlay(osd::Gui& /*gui*/)
     }
 
     ImGui_ImplVulkan_InitInfo init_info{};
-    init_info.ApiVersion         = VK_API_VERSION_1_3;
+    init_info.ApiVersion         = m_context.api_version();
     init_info.Instance           = m_context.instance();
     init_info.PhysicalDevice     = m_context.physical_device();
     init_info.Device             = m_context.device();

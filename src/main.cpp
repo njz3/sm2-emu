@@ -3046,6 +3046,7 @@ int main(int argc, char** argv)
                 const bool same_game =
                     loaded.has_value() && texture_dump_game == loaded->game.name;
                 if (texture_dumper && (!dumping || !same_game)) {
+                    async_soft.wait();
                     texture_dumper->finish(same_game ? machine_iface : nullptr);
                     texture_dumper.reset();
                 }
@@ -3190,6 +3191,8 @@ int main(int argc, char** argv)
                                                             machine_iface->inputs().in1);
                 }
                 if (texture_dumper) {
+                    // scan() can compose, which must not race the render thread.
+                    async_soft.wait();
                     texture_dumper->scan(*machine_iface);
                 }
                 if (profile_sample) {
@@ -3295,8 +3298,24 @@ int main(int argc, char** argv)
             const bool need_cpu_compose =
                 machine_iface && (use_software_renderer || options.soft_render || render_test);
 
+            // The async software path composes on its render thread.
+            const bool compose_on_render_thread =
+                draw_with_software && async_software && !render_test && !options.soft_render;
+
             if (machine_iface) {
-                if (need_cpu_compose) {
+                // The render thread may still be reading the decode and pens.
+                {
+                    auto scope = core::maybe_scope(stage_software_wait, profile_sample);
+                    async_soft.wait();
+                }
+                if (compose_on_render_thread) {
+                    auto scope = core::maybe_scope(stage_compose, profile_sample);
+                    if (machine_iface->palette_dirty()) {
+                        machine_iface->video().refresh_pens();
+                        machine_iface->clear_palette_dirty();
+                    }
+                    machine_iface->video().prepare_compose();
+                } else if (need_cpu_compose) {
                     auto scope = core::maybe_scope(stage_compose, profile_sample);
                     machine_iface->compose_video();
                 } else if (use_gpu_tilemap) {
@@ -3386,7 +3405,7 @@ int main(int argc, char** argv)
                     {
                         auto scope =
                             core::maybe_scope(stage_software_snapshot, profile_sample);
-                        async_soft.begin(*machine_iface, soft_frame);
+                        async_soft.begin(*machine_iface, soft_frame, compose_on_render_thread);
                     }
                 } else {
                     {
@@ -3802,6 +3821,7 @@ int main(int argc, char** argv)
         }
 
         if (texture_dumper) {
+            async_soft.wait();
             texture_dumper->finish(machine_iface);
             texture_dumper.reset();
         }

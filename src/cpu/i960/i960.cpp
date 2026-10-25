@@ -36,6 +36,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 #include <limits>
 
 namespace sm2::cpu::i960 {
@@ -2315,6 +2316,200 @@ void I960::execute_op(u32 opcode)
 }
 
 // ---------------------------------------------------------------------------
+// Spin loops
+// ---------------------------------------------------------------------------
+
+void I960::spin_visit()
+{
+    const auto mark = [&] {
+        m_spin.icount       = m_icount;
+        m_spin.instructions = m_instruction_count;
+        for (u32 i = 0; i < m_spin.counters; ++i) {
+            m_spin.value[i] = m_r[m_spin.counter[i]];
+        }
+    };
+    if (m_IP != m_spin.head || m_PIP != m_spin.tail) {
+        const FetchWindow& rom = m_fetch[0];
+        const bool in_rom = m_PIP - rom.start < rom.limit && m_IP - rom.start < rom.limit;
+        SpinLoop& cached  = m_spin_cache[((m_IP ^ m_PIP) >> 2) & (std::size(m_spin_cache) - 1)];
+        if (in_rom && cached.head == m_IP && cached.tail == m_PIP) {
+            m_spin = cached;
+        } else {
+            m_spin.head  = m_IP;
+            m_spin.tail  = m_PIP;
+            m_spin.valid = spin_analyse(m_IP, m_PIP);
+            if (in_rom) {
+                cached = m_spin;
+            }
+        }
+        m_spin.valid  = m_spin.valid && m_trace_hook == nullptr;
+        m_spin.cycles = 0;
+        mark();
+        return;
+    }
+    if (!m_spin.valid) {
+        return;
+    }
+    // One pass through the body since the last visit.
+    bool one_pass = m_instruction_count - m_spin.instructions == m_spin.length;
+    for (u32 i = 0; i < m_spin.counters; ++i) {
+        one_pass = one_pass
+                && m_r[m_spin.counter[i]] == m_spin.value[i] + static_cast<u32>(m_spin.delta[i]);
+    }
+    if (one_pass && m_spin.instructions >= m_slice_start) {
+        const s32 cycles = m_spin.icount - m_icount;
+        if (cycles <= 0 || (m_spin.cycles != 0 && m_spin.cycles != cycles)) {
+            m_spin.cycles = cycles > 0 ? cycles : 0;
+            mark();
+            return;
+        }
+        m_spin.cycles = cycles;
+    }
+    // The timed pass lies in this slice, so its reads hold until it ends.
+    if (one_pass && m_spin.cycles > 0 && m_instruction_count - m_slice_start >= m_spin.length) {
+        const s32 skip = (m_icount - 1) / m_spin.cycles;
+        if (skip > 0) {
+            for (u32 i = 0; i < m_spin.counters; ++i) {
+                m_r[m_spin.counter[i]] += static_cast<u32>(m_spin.delta[i] * skip);
+            }
+            m_icount -= skip * m_spin.cycles;
+            m_instruction_count += static_cast<u64>(skip) * m_spin.length;
+        }
+    }
+    mark();
+}
+
+bool I960::spin_analyse(u32 head, u32 tail)
+{
+    // Only stable loads, register arithmetic, compares and branches out, plus
+    // counters stepped by a literal that nothing else reads.
+    struct Insn {
+        u32  word    = 0;
+        u32  address = 0;
+        u32  reads   = 0;  // register mask
+        u32  writes  = 0;
+        bool step    = false;
+        s32  delta   = 0;
+    };
+    Insn insns[kSpinBytes / 4 + 1];
+    u32  count = 0;
+
+    const auto reg_bit = [](u32 r) { return 1u << (r & 0x1f); };
+    const auto in_loop = [&](u32 target) { return target >= head && target <= tail; };
+
+    for (u32 ip = head; ip <= tail;) {
+        if (count == std::size(insns)) {
+            return false;
+        }
+        Insn&     in = insns[count++];
+        const u32 w  = fetch_word(ip);
+        in.word      = w;
+        in.address   = ip;
+        const u32 op = w >> 24;
+        ip += 4;
+
+        if (op >= 0x80 && op < 0xd0) {
+            // ldob, ldos, ld, ldib, ldis from an absolute address.
+            if ((op != 0x80 && op != 0x88 && op != 0x90 && op != 0xc0 && op != 0xc8)
+                || ((w >> 12) & 1) == 0 || ((w >> 10) & 0xf) != 0xc) {
+                return false;
+            }
+            const u32 address = fetch_word(ip);
+            ip += 4;
+            if (!m_bus->read_stable(address)) {
+                return false;
+            }
+            in.writes = reg_bit(w >> 19);
+        } else if (op >= 0x58 && op < 0x80) {
+            const u32  sub     = (w >> 7) & 0xf;
+            const bool lit1    = (w & 0x800) != 0;
+            const bool lit2    = (w & 0x1000) != 0;
+            const u32  src1    = w & 0x1f;
+            const u32  src2    = (w >> 14) & 0x1f;
+            const u32  dst     = (w >> 19) & 0x1f;
+            const bool has_dst = op != 0x5a;
+            const bool shift_or_add = sub == 0x0 || sub == 0x2 || sub == 0x8 || sub == 0xc;
+            if ((op == 0x58 && sub == 0x5) || (op == 0x59 && !shift_or_add)
+                || (op == 0x5a && sub > 0x1) || (op == 0x5c && sub != 0xc)
+                || (op != 0x58 && op != 0x59 && op != 0x5a && op != 0x5c)
+                || (has_dst && (w & 0x2000) != 0)) {
+                return false;
+            }
+            in.reads  = (lit1 ? 0 : reg_bit(src1)) | (lit2 || op == 0x5c ? 0 : reg_bit(src2));
+            in.writes = has_dst ? reg_bit(dst) : 0;
+            if (op == 0x59 && (sub == 0x0 || sub == 0x2)) {
+                // dst = src2 +/- src1: a step when one side is dst, the other a literal.
+                if (sub == 0x0 && lit1 != lit2) {
+                    const u32 reg = lit1 ? src2 : src1;
+                    const u32 lit = lit1 ? src1 : src2;
+                    if (reg == dst) {
+                        in.step  = true;
+                        in.delta = static_cast<s32>(lit);
+                    }
+                } else if (sub == 0x2 && lit1 && !lit2 && src2 == dst) {
+                    in.step  = true;
+                    in.delta = -static_cast<s32>(src1);
+                }
+            }
+        } else if (op >= 0x20 && op < 0x40) {
+            if (op < 0x28) {
+                in.writes = reg_bit(w >> 19);  // test*: condition code to a register
+            } else if (op >= 0x30) {
+                in.reads = ((w & 0x2000) != 0 ? 0 : reg_bit(w >> 19)) | reg_bit(w >> 14);
+                const u32 target = (in.address + 4 + get_disp_s(w)) & ~3u;
+                if (in.address == tail ? target != head : in_loop(target)) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else if (op == 0x08 || (op >= 0x10 && op < 0x18)) {
+            const u32 target = (in.address + 4 + get_disp(w)) & ~3u;
+            if (in.address == tail ? target != head : (op == 0x08 || in_loop(target))) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+    if (count == 0 || insns[count - 1].address != tail) {
+        return false;
+    }
+
+    // Counters: registers written only by their own steps.
+    u32 steps = 0;
+    u32 other = 0;
+    for (u32 i = 0; i < count; ++i) {
+        (insns[i].step ? steps : other) |= insns[i].writes;
+    }
+    const u32 counters = steps & ~other;
+    if ((steps & other) != 0) {
+        return false;
+    }
+    m_spin.counters = 0;
+    for (u32 i = 0; i < count; ++i) {
+        const Insn& in = insns[i];
+        if ((in.reads & counters) != 0 && !in.step) {
+            return false;
+        }
+        // The frame registers are never touched by a poll.
+        if ((in.writes & (reg_bit(0) | reg_bit(1) | reg_bit(2) | reg_bit(31))) != 0) {
+            return false;
+        }
+        if (in.step) {
+            if (m_spin.counters == std::size(m_spin.counter)) {
+                return false;
+            }
+            m_spin.counter[m_spin.counters] = static_cast<u8>((in.word >> 19) & 0x1f);
+            m_spin.delta[m_spin.counters]   = in.delta;
+            ++m_spin.counters;
+        }
+    }
+    m_spin.length = count;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Execution
 // ---------------------------------------------------------------------------
 
@@ -2332,8 +2527,9 @@ s32 I960::run(s32 cycles)
         return cycles;
     }
 
-    m_icount    = cycles;
-    m_end_slice = false;
+    m_icount      = cycles;
+    m_end_slice   = false;
+    m_slice_start = m_instruction_count;
 
     try {
         // Interrupt checks are deferred while a burst access is part-way through,
@@ -2367,6 +2563,12 @@ s32 I960::run(s32 cycles)
             }
 
             ++m_instruction_count;
+
+            // A short backward branch may close a spin loop.
+            if (m_IP < m_PIP && m_PIP - m_IP <= kSpinBytes
+                && (m_spin.valid || m_IP != m_spin.head || m_PIP != m_spin.tail)) {
+                spin_visit();
+            }
         }
     } catch (const Fault& fault) {
         m_faulted       = true;
@@ -2510,6 +2712,7 @@ std::string I960::state_string() const
 
 void I960::serialize(Archive& ar)
 {
+    m_spin = SpinLoop{};  // timing from before a load does not apply after it
     ar.raw(m_stall_state);
     ar.raw(m_stalled);
     ar.raw(m_halted);

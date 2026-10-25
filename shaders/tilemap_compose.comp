@@ -271,12 +271,22 @@ void resolveSplit(uint evenLayer, uint mode, uint dx, uint dy, out uint chosen, 
     sy = (v + dy) & 0x1ffu;
 }
 
+/// The texel `layer` shows at (dx, dy); false where blanked or masked off.
+bool sampleLayerAt(uint layer, uint maskDx, uint dx, uint dy, out uint pen, out uint category,
+                   out bool opaqueTexel);
+
 /// One layer's contribution at screen (dx, dy): true if it draws, with its
 /// pen. `opaqueMode` draws unconditionally (subject to blanking and the
 /// window mask); otherwise a hit additionally needs an opaque texel whose
 /// category matches `requireCategory`.
 bool evalLayerAt(uint layer, uint requireCategory, bool opaqueMode, uint maskDx, uint dx,
-                 uint dy, out uint pen);
+                 uint dy, out uint pen)
+{
+    uint category;
+    bool opaqueTexel;
+    return sampleLayerAt(layer, maskDx, dx, dy, pen, category, opaqueTexel)
+        && (opaqueMode || (opaqueTexel && category == requireCategory));
+}
 
 bool evalLayer(uint layer, uint requireCategory, bool opaqueMode, uint dx, uint dy,
               out uint pen)
@@ -284,11 +294,14 @@ bool evalLayer(uint layer, uint requireCategory, bool opaqueMode, uint dx, uint 
     return evalLayerAt(layer, requireCategory, opaqueMode, dx, dx, dy, pen);
 }
 
-/// evalLayer() sampling the map at screen column `dx` (which may lie off the
-/// screen, modulo the map) with the window mask taken at `maskDx`.
-bool evalLayerAt(uint layer, uint requireCategory, bool opaqueMode, uint maskDx, uint dx,
-                 uint dy, out uint pen)
+/// sampleLayerAt() with the window mask taken at `maskDx`.
+bool sampleLayerAt(uint layer, uint maskDx, uint dx, uint dy, out uint pen, out uint category,
+                   out bool opaqueTexel)
 {
+    pen         = 0u;
+    category    = 0u;
+    opaqueTexel = false;
+
     // Blanking is this layer's own vertical-scroll register, bit 15 -- for an
     // even layer that register is the same one the split-mode bits below come
     // from; for an odd layer it is a separate register. Checked first, exactly
@@ -304,9 +317,7 @@ bool evalLayerAt(uint layer, uint requireCategory, bool opaqueMode, uint maskDx,
     uint ctrl      = tileWord(kVerticalScroll + evenLayer);
     uint mode      = (ctrl >> 13u) & 3u;
 
-    uint sx, sy, category;
-    bool opaqueTexel;
-
+    uint sx, sy;
     if (mode != 0u) {
         if ((layer & 1u) != 0u) {
             return false;  // odd layer: no-op call in split mode
@@ -321,8 +332,7 @@ bool evalLayerAt(uint layer, uint requireCategory, bool opaqueMode, uint maskDx,
         plainSource(layer, dx, dy, sx, sy);
         sampleTileAt(layer, sx, sy, pen, category, opaqueTexel);
     }
-
-    return opaqueMode || (opaqueTexel && category == requireCategory);
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -492,13 +502,17 @@ void compositeLayers(uint dx, uint dy, out uint below, out uint above)
 {
     below = 0u;
     above = 0u;
-    uint pen;
     for (uint layer = 0u; layer < 4u; ++layer) {
-        if (evalLayer(layer, 1u, false, dx, dy, pen)) {
+        uint pen, category;
+        bool opaqueTexel;
+        if (!sampleLayerAt(layer, dx, dx, dy, pen, category, opaqueTexel)) {
+            continue;
+        }
+        if (opaqueTexel && category == 1u) {
             above = uPens[pen];
             return;
         }
-        if (evalLayer(layer, 0u, layer >= 2u, dx, dy, pen)) {
+        if (layer >= 2u || (opaqueTexel && category == 0u)) {
             below = uPens[pen];
             return;
         }

@@ -532,7 +532,7 @@ void PresentPass::record()
     rendering.layerCount           = 1;
     rendering.colorAttachmentCount = 1;
     rendering.pColorAttachments    = &colour;
-    vkCmdBeginRendering(cmd, &rendering);
+    device_functions().cmd_begin_rendering(cmd, &rendering);
 
     const VkViewport viewport = letterbox();
     const VkRect2D   scissor{
@@ -569,7 +569,7 @@ void PresentPass::record()
                        sizeof(push), &push);
     vkCmdDraw(cmd, 3, 1, 0, 0);
 
-    vkCmdEndRendering(cmd);
+    device_functions().cmd_end_rendering(cmd);
 
     m_context->write_timestamp(VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT, GpuStage::Present, true);
 }

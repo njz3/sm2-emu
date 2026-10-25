@@ -43,13 +43,25 @@ AsyncSoftRenderer::~AsyncSoftRenderer()
     }
 }
 
-void AsyncSoftRenderer::begin(Model2MachineBase& machine, std::span<u32> out)
+void AsyncSoftRenderer::begin(Model2MachineBase& machine, std::span<u32> out, bool compose)
 {
     wait();
 
     if (m_frames_begun++ == 0) {
         const core::CpuTopology topology = core::CpuTopology::detect();
-        if (m_use_slow_cores && topology.slow.size() >= 2) {
+        if (m_use_slow_cores && topology.slow.size() >= 2 && topology.fast.size() >= 3) {
+            // The emulation keeps the first fast core; the rest draw.
+            std::vector<int> workers(topology.slow.begin() + 1, topology.slow.end());
+            workers.insert(workers.end(), topology.fast.begin() + 1, topology.fast.end());
+            core::pin_current_thread({topology.fast.front()});
+            m_renderer.set_bands(static_cast<u32>(workers.size()) + 1);
+            m_renderer.set_bands_per_worker(4);
+            m_renderer.set_worker_cpus(std::move(workers));
+            m_thread_cpus = {topology.slow.front()};
+            SM2_INFO("software renderer: drawing on %zu slow and %zu fast core(s), emulation "
+                     "on cpu%d",
+                     topology.slow.size(), topology.fast.size() - 1, topology.fast.front());
+        } else if (m_use_slow_cores && topology.slow.size() >= 2) {
             // big.LITTLE: the whole draw goes to the slow cores, one band each,
             // the render thread on the first as band 0.
             m_renderer.set_bands(static_cast<u32>(topology.slow.size()));
@@ -84,9 +96,24 @@ void AsyncSoftRenderer::begin(Model2MachineBase& machine, std::span<u32> out)
         ++m_texture_copies;
     }
 
-    // Swapped, not copied: compose() rewrites every pixel next frame.
     Model2Video& video = machine.video();
-    video.swap_layers(m_below, m_above);
+    if (compose) {
+        // Copied: the latched registers can change before the draw is done.
+        const auto shown = video.tile_ram_shown();
+        const auto pens  = video.pens();
+        m_tile_ram.assign(shown.begin(), shown.end());
+        m_pens.assign(pens.begin(), pens.end());
+        m_mask_a_hidden = video.window_mask_a_hidden();
+        m_video         = &video;
+        const usize pixels = static_cast<usize>(Model2Video::kWidth) * Model2Video::kHeight;
+        m_below.resize(pixels);
+        m_above.resize(pixels);
+        m_front.resize(pixels);
+    } else {
+        // Swapped, not copied: compose() rewrites every pixel next frame.
+        video.swap_layers(m_below, m_above);
+        m_video = nullptr;
+    }
 
     const RenderList& list = machine.render_list();
     m_list.polygons.assign(list.polygons.begin(), list.polygons.end());
@@ -101,6 +128,7 @@ void AsyncSoftRenderer::begin(Model2MachineBase& machine, std::span<u32> out)
     m_sources.background       = video.background();
     m_sources.render_test_mode = machine.render_test_mode();
     m_sources.list             = &m_list;
+    m_sources.composer         = compose ? this : nullptr;
     m_out                      = out;
 
     if (!m_thread.joinable()) {
@@ -130,6 +158,12 @@ void AsyncSoftRenderer::wait()
     }
     std::unique_lock lock(m_mutex);
     m_done_cv.wait(lock, [&] { return !m_pending.load(std::memory_order_acquire); });
+}
+
+void AsyncSoftRenderer::compose_rows(u32 row_begin, u32 row_end)
+{
+    m_video->compose_rows(m_tile_ram, m_mask_a_hidden, m_pens, m_below.data(), m_above.data(),
+                          m_front.data(), row_begin, row_end);
 }
 
 void AsyncSoftRenderer::thread_main()

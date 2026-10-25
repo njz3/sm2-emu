@@ -32,8 +32,9 @@
 namespace sm2::hw {
 
 class Model2MachineBase;
+class Model2Video;
 
-class AsyncSoftRenderer {
+class AsyncSoftRenderer final : private SoftRowComposer {
 public:
     explicit AsyncSoftRenderer(SoftRenderer& renderer);
     ~AsyncSoftRenderer();
@@ -43,7 +44,9 @@ public:
 
     /// Snapshot the machine's frame and start drawing it into `out`, which is
     /// off limits until wait() returns.
-    void begin(Model2MachineBase& machine, std::span<u32> out);
+    /// With `compose`, the tile layers are composed here too; call
+    /// Model2Video::prepare_compose() first instead of compose().
+    void begin(Model2MachineBase& machine, std::span<u32> out, bool compose = false);
 
     /// Block until the frame begun by begin() is complete.
     void wait();
@@ -68,6 +71,7 @@ public:
 
 private:
     void thread_main();
+    void compose_rows(u32 row_begin, u32 row_end) override;
 
     SoftRenderer& m_renderer;
 
@@ -79,6 +83,13 @@ private:
     std::vector<u32> m_texture1;
     std::vector<u32> m_below;
     std::vector<u32> m_above;
+
+    // For a frame composed on the render thread.
+    const Model2Video* m_video = nullptr;
+    std::vector<u8>    m_tile_ram;
+    std::vector<u32>   m_pens;
+    std::vector<u8>    m_front;
+    bool               m_mask_a_hidden = false;
     RenderList       m_list;
     SoftFrameSources m_sources;
     std::span<u32>   m_out;

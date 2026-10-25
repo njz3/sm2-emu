@@ -140,6 +140,10 @@ public:
         return m_device_properties;
     }
 
+    /// The Vulkan version the device is driven at: the lowest of 1.3, the
+    /// instance's and the device's.
+    [[nodiscard]] u32 api_version() const { return m_api_version; }
+
     /// Whether anisotropic sampling was requested and enabled on the device.
     /// The max ratio, when true, is device_properties().limits.maxSamplerAnisotropy.
     [[nodiscard]] bool supports_anisotropy() const { return m_anisotropy_enabled; }
@@ -172,6 +176,7 @@ private:
     VmaAllocator             m_allocator       = nullptr;
 
     VkPhysicalDeviceProperties m_device_properties{};
+    u32                        m_api_version = VK_API_VERSION_1_3;
 
     /// Set in create_device() when the device offered samplerAnisotropy and it
     /// was enabled. Optional feature, so a device without it still runs.

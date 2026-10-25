@@ -33,6 +33,63 @@ namespace {
 
 constexpr u32 kRequiredApiVersion = VK_API_VERSION_1_3;
 
+/// Below 1.3 the renderer's features come from these extensions.
+[[nodiscard]] std::vector<const char*> feature_extensions()
+{
+    return {
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+        VK_EXT_SHADER_DEMOTE_TO_HELPER_INVOCATION_EXTENSION_NAME,
+        VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME,
+    };
+}
+
+/// What dynamic rendering builds on where that is not yet core. Enabled when
+/// offered: Turnip's Adreno 610 has dynamic rendering but no multiview.
+[[nodiscard]] std::vector<const char*> dependency_extensions(u32 api_version)
+{
+    std::vector<const char*> names;
+    if (api_version < VK_API_VERSION_1_2) {
+        names.push_back(VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME);
+        names.push_back(VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME);
+    }
+    if (api_version < VK_API_VERSION_1_1) {
+        names.push_back(VK_KHR_MULTIVIEW_EXTENSION_NAME);
+        names.push_back(VK_KHR_MAINTENANCE_2_EXTENSION_NAME);
+    }
+    return names;
+}
+
+/// The same four features through their extension structures.
+struct ExtensionFeatures {
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR                 dynamic_rendering{};
+    VkPhysicalDeviceSynchronization2FeaturesKHR                 synchronization2{};
+    VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT   demote{};
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT             dynamic_state{};
+
+    /// Chain the four, ahead of `next`, and return the head.
+    void* chain(void* next)
+    {
+        dynamic_rendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+        synchronization2.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
+        demote.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
+        dynamic_state.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+        dynamic_state.pNext     = next;
+        demote.pNext            = &dynamic_state;
+        synchronization2.pNext  = &demote;
+        dynamic_rendering.pNext = &synchronization2;
+        return &dynamic_rendering;
+    }
+
+    [[nodiscard]] bool all() const
+    {
+        return dynamic_rendering.dynamicRendering == VK_TRUE
+            && synchronization2.synchronization2 == VK_TRUE
+            && demote.shaderDemoteToHelperInvocation == VK_TRUE
+            && dynamic_state.extendedDynamicState == VK_TRUE;
+    }
+};
+
 constexpr const char* kValidationLayer = "VK_LAYER_KHRONOS_validation";
 
 [[nodiscard]] bool has_extension(const std::vector<VkExtensionProperties>& available,
@@ -274,8 +331,8 @@ bool Context::create_instance(const ContextConfig& config)
     if (vkEnumerateInstanceVersion(&loader_version) != VK_SUCCESS) {
         loader_version = VK_API_VERSION_1_0;
     }
-    if (loader_version < kRequiredApiVersion) {
-        SM2_ERROR("the Vulkan loader reports %u.%u, but 1.3 is required",
+    if (loader_version < VK_API_VERSION_1_1) {
+        SM2_ERROR("the Vulkan loader reports %u.%u, but 1.1 is required",
                   VK_API_VERSION_MAJOR(loader_version),
                   VK_API_VERSION_MINOR(loader_version));
         return false;
@@ -327,7 +384,8 @@ bool Context::create_instance(const ContextConfig& config)
     app_info.applicationVersion = VK_MAKE_VERSION(0, 1, 0);
     app_info.pEngineName        = "sm2-emu";
     app_info.engineVersion      = VK_MAKE_VERSION(0, 1, 0);
-    app_info.apiVersion         = kRequiredApiVersion;
+    app_info.apiVersion         = std::min(loader_version, kRequiredApiVersion);
+    m_api_version               = app_info.apiVersion;
 
     const char* layers[] = {kValidationLayer};
 
@@ -432,14 +490,6 @@ bool Context::select_physical_device(const ContextConfig& config)
         VkPhysicalDeviceProperties properties{};
         vkGetPhysicalDeviceProperties(candidate, &properties);
 
-        if (properties.apiVersion < kRequiredApiVersion) {
-            SM2_DEBUG("skipping '%s': reports Vulkan %u.%u, need 1.3",
-                      properties.deviceName,
-                      VK_API_VERSION_MAJOR(properties.apiVersion),
-                      VK_API_VERSION_MINOR(properties.apiVersion));
-            continue;
-        }
-
         const QueueFamilies families = find_queue_families(candidate, m_surface);
         if (!families.complete()) {
             SM2_DEBUG("skipping '%s': no graphics+present queue", properties.deviceName);
@@ -452,24 +502,39 @@ bool Context::select_physical_device(const ContextConfig& config)
             continue;
         }
 
-        // Everything Model 2 needs is core 1.3, but confirm the two features we
-        // build the whole renderer on are actually present rather than merely
-        // implied by the version.
+        // Everything Model 2 needs is core 1.3, or on an older device the same
+        // features from extensions; confirm them rather than trust the version.
+        // A device past the instance's version is driven at the instance's.
+        const bool core13 = std::min(properties.apiVersion, m_api_version) >= kRequiredApiVersion;
+        if (!core13) {
+            const std::vector<const char*> needed = feature_extensions();
+            const auto missing = std::find_if(needed.begin(), needed.end(), [&](const char* name) {
+                return !has_extension(available, name);
+            });
+            if (missing != needed.end()) {
+                SM2_DEBUG("skipping '%s': Vulkan %u.%u without %s", properties.deviceName,
+                          VK_API_VERSION_MAJOR(properties.apiVersion),
+                          VK_API_VERSION_MINOR(properties.apiVersion), *missing);
+                continue;
+            }
+        }
+
         VkPhysicalDeviceVulkan13Features features13{};
         features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+        ExtensionFeatures extension_features;
         VkPhysicalDeviceFeatures2 features2{};
         features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        features2.pNext = &features13;
+        features2.pNext = core13 ? static_cast<void*>(&features13) : extension_features.chain(nullptr);
         vkGetPhysicalDeviceFeatures2(candidate, &features2);
 
-        if (features13.dynamicRendering != VK_TRUE || features13.synchronization2 != VK_TRUE
-            || features13.shaderDemoteToHelperInvocation != VK_TRUE) {
-            SM2_DEBUG("skipping '%s': dynamicRendering=%d synchronization2=%d "
-                      "shaderDemoteToHelperInvocation=%d",
-                      properties.deviceName,
-                      features13.dynamicRendering,
-                      features13.synchronization2,
-                      features13.shaderDemoteToHelperInvocation);
+        const bool features_ok =
+            core13 ? features13.dynamicRendering == VK_TRUE && features13.synchronization2 == VK_TRUE
+                         && features13.shaderDemoteToHelperInvocation == VK_TRUE
+                   : extension_features.all();
+        if (!features_ok) {
+            SM2_DEBUG("skipping '%s': no dynamic rendering, synchronization2, demote or "
+                      "extended dynamic state",
+                      properties.deviceName);
             continue;
         }
 
@@ -496,9 +561,10 @@ bool Context::select_physical_device(const ContextConfig& config)
     }
 
     if (best == VK_NULL_HANDLE) {
-        SM2_ERROR("no physical device met the requirements (Vulkan 1.3 with "
-                  "dynamic rendering, synchronization2, a graphics+present "
-                  "queue and swapchain support)");
+        SM2_ERROR("no physical device met the requirements (Vulkan 1.3, or the "
+                  "extensions for dynamic rendering, synchronization2, demote and "
+                  "extended dynamic state, a graphics+present queue and swapchain "
+                  "support)");
         return false;
     }
 
@@ -515,6 +581,7 @@ bool Context::select_physical_device(const ContextConfig& config)
     m_graphics_family = *best_families.graphics;
     m_present_family  = *best_families.present;
     vkGetPhysicalDeviceProperties(m_physical_device, &m_device_properties);
+    m_api_version = std::min(m_device_properties.apiVersion, m_api_version);
 
     SM2_INFO("device '%s' (Vulkan %u.%u.%u, driver 0x%08x, queues gfx=%u present=%u)",
              m_device_properties.deviceName,
@@ -615,14 +682,30 @@ bool Context::create_device()
         extensions.push_back("VK_KHR_portability_subset");
     }
 
+    const bool core13 = m_api_version >= kRequiredApiVersion;
+    if (!core13) {
+        const std::vector<const char*> needed = feature_extensions();
+        extensions.insert(extensions.end(), needed.begin(), needed.end());
+        for (const char* name : dependency_extensions(m_api_version)) {
+            if (has_extension(available, name)) {
+                extensions.push_back(name);
+            }
+        }
+    }
+    ExtensionFeatures extension_features;
+    extension_features.dynamic_rendering.dynamicRendering    = VK_TRUE;
+    extension_features.synchronization2.synchronization2     = VK_TRUE;
+    extension_features.demote.shaderDemoteToHelperInvocation = VK_TRUE;
+    extension_features.dynamic_state.extendedDynamicState    = VK_TRUE;
+
     VkPhysicalDeviceVulkan13Features features13{};
     features13.sType            = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
     features13.dynamicRendering = VK_TRUE;
     features13.synchronization2 = VK_TRUE;
-    // What a shader's `discard` compiles to when the target is Vulkan 1.3. The 3D
-    // pass needs the discarded fragment to leave the stencil fill mask alone, which
-    // is how a stippled polygon lets what is behind it through. Required to be
-    // supported by any 1.3 implementation, but still has to be asked for.
+    // polygon.frag's demote. The 3D pass needs the discarded fragment to leave
+    // the stencil fill mask alone, which is how a stippled polygon lets what is
+    // behind it through. Required of any 1.3 implementation, but still has to be
+    // asked for.
     features13.shaderDemoteToHelperInvocation = VK_TRUE;
 
     // Nothing exotic: the geometry pipeline runs on the CPU exactly as the
@@ -638,7 +721,7 @@ bool Context::create_device()
 
     VkPhysicalDeviceFeatures2 features2{};
     features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    features2.pNext = &features13;
+    features2.pNext = core13 ? static_cast<void*>(&features13) : extension_features.chain(nullptr);
     features2.features.samplerAnisotropy = m_anisotropy_enabled ? VK_TRUE : VK_FALSE;
 
     VkDeviceCreateInfo create_info{};
@@ -650,6 +733,9 @@ bool Context::create_device()
     create_info.ppEnabledExtensionNames = extensions.data();
 
     SM2_VK_TRY(vkCreateDevice(m_physical_device, &create_info, nullptr, &m_device));
+    if (!load_device_functions(m_device)) {
+        return false;
+    }
 
     vkGetDeviceQueue(m_device, m_graphics_family, 0, &m_graphics_queue);
     vkGetDeviceQueue(m_device, m_present_family, 0, &m_present_queue);
@@ -663,7 +749,7 @@ bool Context::create_allocator()
     functions.vkGetDeviceProcAddr   = vkGetDeviceProcAddr;
 
     VmaAllocatorCreateInfo info{};
-    info.vulkanApiVersion = kRequiredApiVersion;
+    info.vulkanApiVersion = m_api_version;
     info.physicalDevice   = m_physical_device;
     info.device           = m_device;
     info.instance         = m_instance;
@@ -1115,7 +1201,7 @@ bool Context::end_frame()
     submit.signalSemaphoreInfoCount = 1;
     submit.pSignalSemaphoreInfos    = &signal;
 
-    SM2_VK_TRY(vkQueueSubmit2(m_graphics_queue, 1, &submit, m_in_flight[m_frame_index]));
+    SM2_VK_TRY(device_functions().queue_submit2(m_graphics_queue, 1, &submit, m_in_flight[m_frame_index]));
 
     VkPresentInfoKHR present{};
     present.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1154,7 +1240,7 @@ void Context::write_timestamp(VkPipelineStageFlags2 stage_mask, GpuStage stage, 
     const u32 stage_index = static_cast<u32>(stage);
     const u32 query =
         m_frame_index * kQueriesPerFrame + stage_index * kQueriesPerStage + (is_end ? 1u : 0u);
-    vkCmdWriteTimestamp2(m_command_buffers[m_frame_index], stage_mask, m_query_pool, query);
+    device_functions().cmd_write_timestamp2(m_command_buffers[m_frame_index], stage_mask, m_query_pool, query);
 }
 
 void Context::read_back_stage_times(u32 frame_index)

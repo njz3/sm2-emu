@@ -22,7 +22,8 @@
 namespace sm2::core {
 
 /// Cores split by the kernel's cpu_capacity: below 60% of the fastest is
-/// "slow". Homogeneous or unknown means every core is fast.
+/// "slow". Homogeneous or unknown means every core is fast. `fast` lists the
+/// fastest first.
 struct CpuTopology {
     std::vector<int> fast;
     std::vector<int> slow;

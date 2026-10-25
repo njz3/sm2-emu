@@ -305,6 +305,33 @@ private:
     void   do_call(u32 adr, int type, u32 stack);
     void   do_ret_0();
     void   do_ret();
+
+    // -- spin loops ---------------------------------------------------------
+
+    /// A loop that only polls stable addresses and counts is skipped to the
+    /// end of the slice in whole iterations, once one has been timed.
+    struct SpinLoop {
+        u32  head         = ~0u;
+        u32  tail         = 0;
+        bool valid        = false;
+        s32  icount       = 0;  ///< m_icount at the previous visit to head
+        u64  instructions = 0;  ///< m_instruction_count then
+        s32  cycles       = 0;  ///< one iteration's cost, once timed
+        u32  length       = 0;  ///< instructions per iteration
+        u32  counters     = 0;
+        u8   counter[4]{};
+        s32  delta[4]{};
+        u32  value[4]{};  ///< each counter then
+    };
+    SpinLoop m_spin;
+    static constexpr u32 kSpinBytes = 32;
+    u64 m_slice_start = 0;  ///< m_instruction_count when run() was entered
+
+    /// spin_analyse() verdicts for loops in main ROM, which cannot change.
+    SpinLoop m_spin_cache[64];
+
+    void spin_visit();
+    bool spin_analyse(u32 head, u32 tail);
 };
 
 }  // namespace sm2::cpu::i960

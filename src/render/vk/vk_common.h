@@ -81,6 +81,30 @@ using GpuStageTime  = sm2::render::GpuStageTime;
 using GpuStageTimes = sm2::render::GpuStageTimes;
 
 // ---------------------------------------------------------------------------
+// Entry points past Vulkan 1.0
+// ---------------------------------------------------------------------------
+
+/// Core on a 1.3 device; on an older one the same functions come from the
+/// KHR/EXT extensions, under their own names.
+struct DeviceFunctions {
+    PFN_vkCmdBeginRendering         cmd_begin_rendering         = nullptr;
+    PFN_vkCmdEndRendering           cmd_end_rendering           = nullptr;
+    PFN_vkCmdPipelineBarrier2       cmd_pipeline_barrier2       = nullptr;
+    PFN_vkCmdWriteTimestamp2        cmd_write_timestamp2        = nullptr;
+    PFN_vkQueueSubmit2              queue_submit2               = nullptr;
+    PFN_vkCmdSetDepthTestEnable     cmd_set_depth_test_enable   = nullptr;
+    PFN_vkCmdSetDepthWriteEnable    cmd_set_depth_write_enable  = nullptr;
+    PFN_vkCmdSetDepthCompareOp      cmd_set_depth_compare_op    = nullptr;
+    PFN_vkCmdSetStencilTestEnable   cmd_set_stencil_test_enable = nullptr;
+};
+
+/// Fill the table for `device`; false if any entry point is missing.
+[[nodiscard]] bool load_device_functions(VkDevice device);
+
+/// The table load_device_functions() filled.
+[[nodiscard]] const DeviceFunctions& device_functions();
+
+// ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
 

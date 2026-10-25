@@ -14,6 +14,8 @@
 //
 #include "render/vk/vk_common.h"
 
+#include <type_traits>
+
 namespace sm2::render::vk {
 
 const char* result_string(VkResult result)
@@ -80,7 +82,46 @@ void record_image_barrier(VkCommandBuffer        cmd,
     dependency.imageMemoryBarrierCount = 1;
     dependency.pImageMemoryBarriers    = &barrier;
 
-    vkCmdPipelineBarrier2(cmd, &dependency);
+    device_functions().cmd_pipeline_barrier2(cmd, &dependency);
+}
+
+namespace {
+DeviceFunctions g_device_functions;
+}  // namespace
+
+bool load_device_functions(VkDevice device)
+{
+    const auto load = [device](auto& slot, const char* core, const char* extension) {
+        PFN_vkVoidFunction function = vkGetDeviceProcAddr(device, core);
+        if (function == nullptr) {
+            function = vkGetDeviceProcAddr(device, extension);
+        }
+        slot = reinterpret_cast<std::remove_reference_t<decltype(slot)>>(function);
+        if (slot == nullptr) {
+            SM2_ERROR("Vulkan: neither %s nor %s is available", core, extension);
+        }
+        return slot != nullptr;
+    };
+    DeviceFunctions& f = g_device_functions;
+    bool ok = load(f.cmd_begin_rendering, "vkCmdBeginRendering", "vkCmdBeginRenderingKHR");
+    ok = load(f.cmd_end_rendering, "vkCmdEndRendering", "vkCmdEndRenderingKHR") && ok;
+    ok = load(f.cmd_pipeline_barrier2, "vkCmdPipelineBarrier2", "vkCmdPipelineBarrier2KHR") && ok;
+    ok = load(f.cmd_write_timestamp2, "vkCmdWriteTimestamp2", "vkCmdWriteTimestamp2KHR") && ok;
+    ok = load(f.queue_submit2, "vkQueueSubmit2", "vkQueueSubmit2KHR") && ok;
+    ok = load(f.cmd_set_depth_test_enable, "vkCmdSetDepthTestEnable",
+              "vkCmdSetDepthTestEnableEXT") && ok;
+    ok = load(f.cmd_set_depth_write_enable, "vkCmdSetDepthWriteEnable",
+              "vkCmdSetDepthWriteEnableEXT") && ok;
+    ok = load(f.cmd_set_depth_compare_op, "vkCmdSetDepthCompareOp",
+              "vkCmdSetDepthCompareOpEXT") && ok;
+    ok = load(f.cmd_set_stencil_test_enable, "vkCmdSetStencilTestEnable",
+              "vkCmdSetStencilTestEnableEXT") && ok;
+    return ok;
+}
+
+const DeviceFunctions& device_functions()
+{
+    return g_device_functions;
 }
 
 }  // namespace sm2::render::vk

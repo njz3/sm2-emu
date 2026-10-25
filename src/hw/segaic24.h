@@ -140,6 +140,20 @@ public:
               u8*                  tag       = nullptr,
               u8                   tag_value = 0);
 
+    /// The same from `tile_ram`, a copy of the tile RAM, for drawing on another
+    /// thread (update() must wait for it). Draws rows `row_begin` to `row_end`.
+    void draw(std::span<const u8>  tile_ram,
+              bool                 mask_a_hidden,
+              u32                  layer_and_category,
+              bool                 opaque,
+              std::span<const u32> pens,
+              u32*                 dest,
+              u32                  dest_stride,
+              u8*                  tag,
+              u8                   tag_value,
+              int                  row_begin = 0,
+              int                  row_end   = static_cast<int>(kScreenHeight)) const;
+
     /// Draw pair A as if its window mask were clear. Tile RAM is not changed.
     void set_window_mask_a_hidden(bool hidden) { m_window_mask_a_hidden = hidden; }
     [[nodiscard]] bool window_mask_a_hidden() const { return m_window_mask_a_hidden; }
@@ -159,6 +173,7 @@ public:
 private:
     /// Everything a draw needs that does not change between its rectangles.
     struct DrawState {
+        std::span<const u8>  tile_ram;
         std::span<const u32> pens;
         u32*                 dest        = nullptr;
         u32                  dest_stride = 0;
@@ -172,10 +187,13 @@ private:
         /// modes, which choose between the pair by position instead.
         bool                 masked      = true;
         bool                 mask_hidden = false;  ///< Treat the mask as clear.
+        int                  row_begin   = 0;      ///< Destination rows drawn.
+        int                  row_end     = 0;
     };
 
     /// One 16-bit word of tile RAM, addressed the way the chip sees it.
-    [[nodiscard]] u16 tile_word(u32 word_index) const;
+    [[nodiscard]] u16 tile_word(u32 word_index) const { return tile_word(m_tile_ram, word_index); }
+    [[nodiscard]] static u16 tile_word(std::span<const u8> tile_ram, u32 word_index);
 
     void decode_cell(u32 layer, u32 cell);
 
@@ -191,7 +209,7 @@ private:
                      int              x0,
                      int              y0,
                      int              x1,
-                     int              y1);
+                     int              y1) const;
 
     /// Copy a rectangle of one layer's pixel map into the destination.
     ///
@@ -206,11 +224,11 @@ private:
                    int              xx1,
                    int              yy1,
                    int              xx2,
-                   int              yy2);
+                   int              yy2) const;
 
     /// The split and window modes, where a pair is divided at a boundary and its
     /// two layers supply opposite sides.
-    void draw_split(const DrawState& state, u32 layer, u32 mode, u32 hscr, u32 vscr);
+    void draw_split(const DrawState& state, u32 layer, u32 mode, u32 hscr, u32 vscr) const;
 
     std::span<const u8> m_tile_ram;
     std::span<const u8> m_char_ram;

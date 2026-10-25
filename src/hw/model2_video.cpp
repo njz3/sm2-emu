@@ -123,9 +123,17 @@ void Model2Video::refresh_pens()
         return;
     }
 
+    u8 red[32], green[32], blue[32];
+    for (u32 level = 0; level < 32; ++level) {
+        red[level]   = translate(kRedBlockBase, level, kFlatShade);
+        green[level] = translate(kGreenBlockBase, level, kFlatShade);
+        blue[level]  = translate(kBlueBlockBase, level, kFlatShade);
+    }
     const u32 count = static_cast<u32>(std::min<usize>(kPenCount, m_palette_ram.size()));
     for (u32 entry = 0; entry < count; ++entry) {
-        m_pens[entry] = shade_colour(m_palette_ram[entry], kFlatShade);
+        const u16 colour = m_palette_ram[entry];
+        m_pens[entry] = pack_rgba(red[colour & 0x1f], green[(colour >> 5) & 0x1f],
+                                  blue[(colour >> 10) & 0x1f]);
     }
 }
 
@@ -210,34 +218,57 @@ void Model2Video::compose()
 {
     const auto start = std::chrono::steady_clock::now();
 
-    m_tiles.update();
+    prepare_compose();
+    compose_into(m_tile_ram_shown, m_tiles.window_mask_a_hidden(), m_pens, m_below, m_above,
+                 m_front);
 
-    std::fill(m_below.begin(), m_below.end(), 0u);
-    std::fill(m_above.begin(), m_above.end(), 0u);
-    std::fill(m_front.begin(), m_front.end(), u8{0});
+    m_last_compose_ns = static_cast<u64>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - start)
+            .count());
+}
+
+void Model2Video::compose_into(std::span<const u8> tile_ram, bool mask_a_hidden,
+                               std::span<const u32> pens, std::vector<u32>& below,
+                               std::vector<u32>& above, std::vector<u8>& front) const
+{
+    const usize pixels = static_cast<usize>(kWidth) * kHeight;
+    below.resize(pixels);
+    above.resize(pixels);
+    front.resize(pixels);
+    compose_rows(tile_ram, mask_a_hidden, pens, below.data(), above.data(), front.data(), 0,
+                 kHeight);
+}
+
+void Model2Video::compose_rows(std::span<const u8> tile_ram, bool mask_a_hidden,
+                               std::span<const u32> pens, u32* below, u32* above, u8* front,
+                               u32 row_begin, u32 row_end) const
+{
+    const usize first = static_cast<usize>(row_begin) * kWidth;
+    const usize last  = static_cast<usize>(row_end) * kWidth;
+    std::fill(below + first, below + last, 0u);
+    std::fill(above + first, above + last, 0u);
+    std::fill(front + first, front + last, u8{0});
 
     // The layers are mixed among themselves first, back to front, so layer 0
     // ends up on top whatever the categories. Pair B is drawn opaque: it is the
     // backdrop. The category of the pixel that ends up on top then puts it
     // behind or in front of the 3D. The vcop2 stage select needs this: pair B
     // there is category one, yet "SHOOT TO SELECT" on pair A stays over it.
+    const int begin = static_cast<int>(row_begin);
+    const int end   = static_cast<int>(row_end);
     for (u32 layer = kTileLayers; layer-- > 0;) {
-        m_tiles.draw(layer << 1, /*opaque=*/layer >= 2, m_pens, m_below.data(), kWidth,
-                     m_front.data(), 0);
-        m_tiles.draw((layer << 1) | 1, /*opaque=*/false, m_pens, m_below.data(), kWidth,
-                     m_front.data(), 1);
+        m_tiles.draw(tile_ram, mask_a_hidden, layer << 1, /*opaque=*/layer >= 2, pens, below,
+                     kWidth, front, 0, begin, end);
+        m_tiles.draw(tile_ram, mask_a_hidden, (layer << 1) | 1, /*opaque=*/false, pens, below,
+                     kWidth, front, 1, begin, end);
     }
-    for (usize i = 0; i < m_below.size(); ++i) {
-        if (m_front[i] != 0) {
-            m_above[i] = m_below[i];
-            m_below[i] = 0;
+    for (usize i = first; i < last; ++i) {
+        if (front[i] != 0) {
+            above[i] = below[i];
+            below[i] = 0;
         }
     }
-
-    m_last_compose_ns = static_cast<u64>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now() - start)
-            .count());
 }
 
 void Model2Video::draw_framebuffer(std::span<const u16> pixels)

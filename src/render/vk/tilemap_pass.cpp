@@ -102,7 +102,7 @@ void record_buffer_barrier(VkCommandBuffer      cmd,
     dependency.sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
     dependency.bufferMemoryBarrierCount = 1;
     dependency.pBufferMemoryBarriers    = &barrier;
-    vkCmdPipelineBarrier2(cmd, &dependency);
+    device_functions().cmd_pipeline_barrier2(cmd, &dependency);
 }
 
 }  // namespace
@@ -918,7 +918,7 @@ void TilemapPass::record_below(VkImageView                      target,
         rendering.pStencilAttachment = stencil;
         rendering.pDepthAttachment   = stencil_depth ? stencil : nullptr;
     }
-    vkCmdBeginRendering(cmd, &rendering);
+    device_functions().cmd_begin_rendering(cmd, &rendering);
 
     vkCmdSetViewport(cmd, 0, 1, &viewport);
     vkCmdSetScissor(cmd, 0, 1, &scissor);
@@ -969,7 +969,7 @@ void TilemapPass::record_above()
                        sizeof(push), &push);
     vkCmdDraw(cmd, 3, 1, 0, 0);
 
-    vkCmdEndRendering(cmd);
+    device_functions().cmd_end_rendering(cmd);
 }
 
 }  // namespace sm2::render::vk

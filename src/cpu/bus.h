@@ -84,6 +84,14 @@ public:
     /// Instruction fetch. Separate from read32 so a machine can serve code from
     /// a faster path, and so tracing can distinguish fetches from data.
     virtual u32 fetch32(u32 address) { return read32(address); }
+
+    /// True if reading `address` has no side effect and returns the same
+    /// value until the CPU's current run() returns.
+    virtual bool read_stable(u32 address) const
+    {
+        (void)address;
+        return false;
+    }
 };
 
 }  // namespace sm2::cpu

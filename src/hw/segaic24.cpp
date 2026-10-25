@@ -22,6 +22,7 @@
 #include <array>
 #include <cassert>
 #include <cstddef>
+#include <cstring>
 
 namespace sm2::hw {
 namespace {
@@ -229,13 +230,13 @@ void Segaic24Tile::decode_cell(u32 layer, u32 cell)
 // Drawing
 // ---------------------------------------------------------------------------
 
-u16 Segaic24Tile::tile_word(u32 word_index) const
+u16 Segaic24Tile::tile_word(std::span<const u8> tile_ram, u32 word_index)
 {
     const u32 offset = word_index * 2;
-    if (offset + 1 >= m_tile_ram.size()) {
+    if (offset + 1 >= tile_ram.size()) {
         return 0;
     }
-    return static_cast<u16>(m_tile_ram[offset] | (m_tile_ram[offset + 1] << 8));
+    return static_cast<u16>(tile_ram[offset] | (tile_ram[offset + 1] << 8));
 }
 
 bool Segaic24Tile::window_mask_a_full() const
@@ -274,16 +275,32 @@ void Segaic24Tile::draw(u32                  layer_and_category,
                         u8*                  tag,
                         u8                   tag_value)
 {
-    if (m_tile_ram.empty() || dest == nullptr || pens.size() < 0x1000) {
+    draw(m_tile_ram, m_window_mask_a_hidden, layer_and_category, opaque, pens, dest,
+         dest_stride, tag, tag_value);
+}
+
+void Segaic24Tile::draw(std::span<const u8>  tile_ram,
+                        bool                 mask_a_hidden,
+                        u32                  layer_and_category,
+                        bool                 opaque,
+                        std::span<const u32> pens,
+                        u32*                 dest,
+                        u32                  dest_stride,
+                        u8*                  tag,
+                        u8                   tag_value,
+                        int                  row_begin,
+                        int                  row_end) const
+{
+    if (tile_ram.empty() || dest == nullptr || pens.size() < 0x1000) {
         return;
     }
 
     const u32 packed = layer_and_category;
     const u32 layer  = (packed >> 1) & 3;
 
-    const u32 hscr = tile_word(kHorizontalScroll + layer);
-    const u32 vscr = tile_word(kVerticalScroll + layer);
-    const u32 ctrl = tile_word(kVerticalScroll + (layer & 2));
+    const u32 hscr = tile_word(tile_ram, kHorizontalScroll + layer);
+    const u32 vscr = tile_word(tile_ram, kVerticalScroll + layer);
+    const u32 ctrl = tile_word(tile_ram, kVerticalScroll + (layer & 2));
 
     // Bit 15 of the vertical scroll register blanks the layer outright.
     if ((vscr & 0x8000) != 0) {
@@ -291,6 +308,7 @@ void Segaic24Tile::draw(u32                  layer_and_category,
     }
 
     DrawState state;
+    state.tile_ram    = tile_ram;
     state.pens        = pens;
     state.dest        = dest;
     state.dest_stride = dest_stride;
@@ -305,7 +323,9 @@ void Segaic24Tile::draw(u32                  layer_and_category,
     // complement of the mask.
     state.window = (layer & 1) != 0;
     state.masked = true;
-    state.mask_hidden = m_window_mask_a_hidden && state.mask_base == kWindowMaskA;
+    state.mask_hidden = mask_a_hidden && state.mask_base == kWindowMaskA;
+    state.row_begin   = std::max(row_begin, 0);
+    state.row_end     = std::min(row_end, static_cast<int>(kScreenHeight));
 
     if ((ctrl & 0x6000) != 0) {
         // A split mode. The pair's two layers supply opposite sides of a boundary,
@@ -327,9 +347,9 @@ void Segaic24Tile::draw(u32                  layer_and_category,
         // Per-line horizontal scroll. One word per raster line, and the vertical
         // scroll advances with the line so the layer is sampled row by row.
         const u32 table = kRowScrollTable + 0x200 * layer;
-        for (int y = 0; y < screen_height; ++y) {
+        for (int y = state.row_begin; y < state.row_end; ++y) {
             const int h = static_cast<int>(
-                (0u - static_cast<u32>(tile_word(table + static_cast<u32>(y)))) & 0x1ff);
+                (0u - static_cast<u32>(tile_word(state.tile_ram, table + static_cast<u32>(y)))) & 0x1ff);
             draw_region(state, layer, h, (v + y) & 0x1ff, 0, y, screen_width, y + 1);
         }
         return;
@@ -343,7 +363,7 @@ void Segaic24Tile::draw_split(const DrawState& state,
                              u32              layer,
                              u32              mode,
                              u32              hscr,
-                             u32              vscr)
+                             u32              vscr) const
 {
     // Both layers of the pair share the vertical scroll here, and the row scroll
     // table is always the even layer's: MAME binds it before the layer index is
@@ -377,10 +397,10 @@ void Segaic24Tile::draw_split(const DrawState& state,
             // ground plane without any geometry.
             const int  boundary = static_cast<int>((0u - vscr) & 0x1ff);
             const u32  first    = ((0u - vscr) & 0x200) != 0 ? layer : (layer ^ 1);
-            for (int y = 0; y < screen_height; ++y) {
+            for (int y = state.row_begin; y < state.row_end; ++y) {
                 const u32 chosen = y >= boundary ? (first ^ 1) : first;
                 const int h      = static_cast<int>(
-                    (0u - static_cast<u32>(tile_word(table + static_cast<u32>(y)))) & 0x1ff);
+                    (0u - static_cast<u32>(tile_word(state.tile_ram, table + static_cast<u32>(y)))) & 0x1ff);
                 draw_region(state, chosen, h, (v + y) & 0x1ff, 0, y, screen_width, y + 1);
             }
             return;
@@ -388,8 +408,8 @@ void Segaic24Tile::draw_split(const DrawState& state,
 
         // Modes 2 and 3: a vertical boundary whose position is the line's own
         // horizontal scroll, so the split itself can move down the screen.
-        for (int y = 0; y < screen_height; ++y) {
-            const u32 raw      = tile_word(table + static_cast<u32>(y));
+        for (int y = state.row_begin; y < state.row_end; ++y) {
+            const u32 raw      = tile_word(state.tile_ram, table + static_cast<u32>(y));
             const int boundary = static_cast<int>(raw & 0x1ff);
             const int h        = static_cast<int>((0u - raw) & 0x1ff);
             const u32 left     = (raw & 0x200) != 0 ? layer : (layer ^ 1);
@@ -440,8 +460,13 @@ void Segaic24Tile::draw_region(const DrawState& state,
                               int              x0,
                               int              y0,
                               int              x1,
-                              int              y1)
+                              int              y1) const
 {
+    if (y0 < state.row_begin) {
+        v  = (v + (state.row_begin - y0)) & 0x1ff;
+        y0 = state.row_begin;
+    }
+    y1 = std::min(y1, state.row_end);
     if (x1 <= x0 || y1 <= y0) {
         return;
     }
@@ -464,6 +489,47 @@ void Segaic24Tile::draw_region(const DrawState& state,
     }
 }
 
+namespace {
+
+// `count` pixels of one run: all when `opaque`, else those flagged `match`,
+// eight flags at a time.
+inline void draw_run(const u8* flags, const u16* pixels, const u32* pen, u32* dest, u8* tag,
+                     u8 tag_value, u8 match, bool opaque, int count)
+{
+    int i = 0;
+    if (!opaque) {
+        constexpr u64 kOnes  = 0x0101010101010101ull;
+        constexpr u64 kHighs = 0x8080808080808080ull;
+        const u64     want   = kOnes * match;
+        for (; i + 8 <= count; i += 8) {
+            u64 word;
+            std::memcpy(&word, flags + i, sizeof(word));
+            const u64 x = word ^ want;
+            if (((x - kOnes) & ~x & kHighs) == 0) {
+                continue;  // no flag in these eight is `match`
+            }
+            for (int k = i; k < i + 8; ++k) {
+                if (flags[k] == match) {
+                    dest[k] = pen[pixels[k]];
+                    if (tag != nullptr) {
+                        tag[k] = tag_value;
+                    }
+                }
+            }
+        }
+    }
+    for (; i < count; ++i) {
+        if (flags[i] == match || opaque) {
+            dest[i] = pen[pixels[i]];
+            if (tag != nullptr) {
+                tag[i] = tag_value;
+            }
+        }
+    }
+}
+
+}  // namespace
+
 void Segaic24Tile::draw_rect(const DrawState& state,
                              u32              layer,
                              int              sx,
@@ -471,7 +537,7 @@ void Segaic24Tile::draw_rect(const DrawState& state,
                              int              xx1,
                              int              yy1,
                              int              xx2,
-                             int              yy2)
+                             int              yy2) const
 {
     const usize layer_base = static_cast<usize>(layer) * kMapWidth * kMapHeight;
     const u16*  pixels     = m_pixmap.data() + layer_base;
@@ -512,7 +578,7 @@ void Segaic24Tile::draw_rect(const DrawState& state,
         while (llx > 0) {
             // In the split modes the pair is chosen by position, so the mask does
             // not take part and every pixel of the selected layer is a candidate.
-            u16 m = state.masked && !state.mask_hidden ? tile_word(mask_word) : u16{0};
+            u16 m = state.masked && !state.mask_hidden ? tile_word(state.tile_ram, mask_word) : u16{0};
             ++mask_word;
             if (win && state.masked) {
                 m = static_cast<u16>(~m);
@@ -522,16 +588,10 @@ void Segaic24Tile::draw_rect(const DrawState& state,
                 // Whole 128-pixel block with no side clipping.
                 if (m == 0) {
                     // Entirely this layer.
-                    for (int x = 0; x < 128; ++x) {
-                        if (flags[src] == match || opaque) {
-                            dest[dst] = pen[pixels[src]];
-                            if (tag != nullptr) {
-                                tag[dst] = tag_value;
-                            }
-                        }
-                        ++src;
-                        ++dst;
-                    }
+                    draw_run(flags + src, pixels + src, pen, dest + dst,
+                             tag != nullptr ? tag + dst : nullptr, tag_value, match, opaque, 128);
+                    src += 128;
+                    dst += 128;
                 } else if (m == 0xffff) {
                     // Entirely the other layer of the pair.
                     src += 128;
@@ -540,15 +600,9 @@ void Segaic24Tile::draw_rect(const DrawState& state,
                     // Mixed, decided in groups of eight.
                     for (int x = 0; x < 128; x += 8) {
                         if ((m & 0x8000) == 0) {
-                            for (int xx = 0; xx < 8; ++xx) {
-                                if (flags[src + static_cast<usize>(xx)] == match || opaque) {
-                                    dest[dst + static_cast<usize>(xx)] =
-                                        pen[pixels[src + static_cast<usize>(xx)]];
-                                    if (tag != nullptr) {
-                                        tag[dst + static_cast<usize>(xx)] = tag_value;
-                                    }
-                                }
-                            }
+                            draw_run(flags + src, pixels + src, pen, dest + dst,
+                                     tag != nullptr ? tag + dst : nullptr, tag_value, match,
+                                     opaque, 8);
                         }
                         src += 8;
                         dst += 8;
@@ -559,15 +613,13 @@ void Segaic24Tile::draw_rect(const DrawState& state,
                 const int llx1 = llx >= 128 ? 128 : llx;
 
                 if (m == 0) {
-                    for (int x = cur_x; x < llx1; ++x) {
-                        if (flags[src] == match || opaque) {
-                            dest[dst] = pen[pixels[src]];
-                            if (tag != nullptr) {
-                                tag[dst] = tag_value;
-                            }
-                        }
-                        ++src;
-                        ++dst;
+                    const int count = llx1 - cur_x;
+                    if (count > 0) {
+                        draw_run(flags + src, pixels + src, pen, dest + dst,
+                                 tag != nullptr ? tag + dst : nullptr, tag_value, match, opaque,
+                                 count);
+                        src += static_cast<usize>(count);
+                        dst += static_cast<usize>(count);
                     }
                 } else if (m == 0xffff) {
                     src += static_cast<usize>(128 - cur_x);

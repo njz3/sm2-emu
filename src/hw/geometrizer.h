@@ -382,6 +382,9 @@ private:
 
     bool m_render_done = false;
 
+    /// build_render_list's polygons per window, kept to reuse the capacity.
+    std::vector<std::vector<Polygon*>> m_window_polygons;
+
     u32 m_geo_read_start_address = 0;
 
     s16 m_crtc_xoffset = 0;

@@ -219,6 +219,7 @@ void SHARC::reset()
     // copro_boot only releases the halt line), precisely so that the microcode
     // just uploaded into these banks survives.
     std::memset(m_blocks, 0, sizeof(m_blocks));
+    pm_cache_clear();
     m_short_word_sign_extend = false;
 
     std::memset(m_r, 0, sizeof(m_r));
@@ -344,7 +345,7 @@ s32 SHARC::run(s32 cycles)
         m_astat_old_old = m_astat_old;
         m_astat_old = m_astat;
 
-        m_opcode = pm_read48(m_pc);
+        m_opcode = fetch48(m_pc);
 
         if (m_trace_hook)
             m_trace_hook(m_trace_context, m_pc, m_opcode);
@@ -1098,11 +1099,43 @@ u64 SHARC::block_pm_read48(unsigned block, u32 offset) const
     return (u64(words[base]) << 16) | (words[base + 0x1000] >> 16);
 }
 
+u64 SHARC::fetch48(u32 address)
+{
+    const u32 offset = address & 0x7fff;
+    if (address - 0x20000 > 0x1ffff || offset >= kPmWords) {
+        return pm_read48(address);
+    }
+    const unsigned block = address < 0x28000 ? 0 : 1;
+    u64& entry = m_pm_cache[block][offset];
+    if (!(entry & kPmCached)) {
+        entry = block_pm_read48(block, offset) | kPmCached;
+    }
+    return entry & ~kPmCached;
+}
+
+// Inverse of block_pm_read48's layout: storage word `word` holds part of slot
+// 2p (lanes 0 and 1) and of slot 2p+1 (lanes 1 and 2), at the same row.
+void SHARC::pm_cache_invalidate(unsigned block, u32 word)
+{
+    const u32 pair = word / (3u << 12);
+    const u32 rest = word - pair * (3u << 12);
+    const u32 lane = rest >> 12;
+    const u32 even = ((pair * 2) << 12) | (rest & 0xfff);
+    const u32 odd  = even + 0x1000;
+    if (lane != 2 && even < kPmWords) {
+        m_pm_cache[block][even] = 0;
+    }
+    if (lane != 0 && odd < kPmWords) {
+        m_pm_cache[block][odd] = 0;
+    }
+}
+
 void SHARC::block_pm_write48(unsigned block, u32 offset, u64 data, u64 mem_mask)
 {
     const u32 slot = offset >> 12;
     const u32 base = (offset & 0xfff) + (slot >> 1) * (3u << 12);
     u32* words = m_blocks[block];
+    m_pm_cache[block][offset] = 0;
     const bool accessing_low16 = (mem_mask & 0xffff) != 0;
     if (slot & 1) {
         if (accessing_low16) {
@@ -1201,13 +1234,16 @@ void SHARC::dm_write32(u32 address, u32 data)
         return;
     }
     if (address >= 0x20000 && address <= 0x3ffff) {
-        m_blocks[address < 0x28000 ? 0 : 1][address & 0x7fff] = data;
+        const unsigned block = address < 0x28000 ? 0 : 1;
+        m_blocks[block][address & 0x7fff] = data;
+        pm_cache_invalidate(block, address & 0x7fff);
         return;
     }
     if (address >= 0x40000 && address <= 0x7ffff) {
         const unsigned block = address < 0x50000 ? 0 : 1;
         const u32 index = address & 0xffff;
         u32& word = m_blocks[block][index >> 1];
+        pm_cache_invalidate(block, index >> 1);
         if (index & 1) {
             word = (word & 0x0000ffffu) | (u32(data & 0xffff) << 16);
         } else {
@@ -2619,6 +2655,9 @@ void SHARC::serialize(Archive& ar)
     // On-chip SRAM (256 KB). Program and data memory are windows onto this.
     for (auto& bank : m_blocks) {
         ar.bytes(bank, kBlockWords);
+    }
+    if (ar.loading()) {
+        pm_cache_clear();
     }
     ar.raw(m_short_word_sign_extend);
     ar.bytes(m_r, 16);

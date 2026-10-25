@@ -58,6 +58,8 @@ CpuTopology CpuTopology::detect()
     const long fastest = std::max_element(cores.begin(), cores.end(), [](const Core& a, const Core& b) {
                              return a.capacity < b.capacity;
                          })->capacity;
+    std::stable_sort(cores.begin(), cores.end(),
+                     [](const Core& a, const Core& b) { return a.capacity > b.capacity; });
     for (const Core& core : cores) {
         (core.capacity * 10 >= fastest * 6 ? topology.fast : topology.slow).push_back(core.cpu);
     }

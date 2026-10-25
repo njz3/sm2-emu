@@ -908,7 +908,7 @@ void record_level_barrier(VkCommandBuffer cmd, VkImage image, u32 level, u32 lev
     dependency.sType                   = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
     dependency.imageMemoryBarrierCount = 1;
     dependency.pImageMemoryBarriers    = &barrier;
-    vkCmdPipelineBarrier2(cmd, &dependency);
+    device_functions().cmd_pipeline_barrier2(cmd, &dependency);
 }
 
 }  // namespace
@@ -1179,10 +1179,10 @@ void Poly3DPass::draw_polygons()
         // Everything but the blended pass keeps the fill mask; with blending
         // on it also records its draw order as depth for that pass to test.
         const VkBool32 ordered = blending() ? VK_TRUE : VK_FALSE;
-        vkCmdSetDepthTestEnable(cmd, ordered);
-        vkCmdSetDepthWriteEnable(cmd, ordered);
-        vkCmdSetDepthCompareOp(cmd, VK_COMPARE_OP_ALWAYS);
-        vkCmdSetStencilTestEnable(cmd, VK_TRUE);
+        device_functions().cmd_set_depth_test_enable(cmd, ordered);
+        device_functions().cmd_set_depth_write_enable(cmd, ordered);
+        device_functions().cmd_set_depth_compare_op(cmd, VK_COMPARE_OP_ALWAYS);
+        device_functions().cmd_set_stencil_test_enable(cmd, VK_TRUE);
 
         VkPipeline bound   = VK_NULL_HANDLE;
         bool       blended = false;
@@ -1192,10 +1192,10 @@ void Poly3DPass::draw_polygons()
             }
             if (batch.blended && !blended) {
                 blended = true;
-                vkCmdSetDepthTestEnable(cmd, VK_TRUE);
-                vkCmdSetDepthWriteEnable(cmd, VK_FALSE);
-                vkCmdSetDepthCompareOp(cmd, VK_COMPARE_OP_LESS);
-                vkCmdSetStencilTestEnable(cmd, VK_FALSE);
+                device_functions().cmd_set_depth_test_enable(cmd, VK_TRUE);
+                device_functions().cmd_set_depth_write_enable(cmd, VK_FALSE);
+                device_functions().cmd_set_depth_compare_op(cmd, VK_COMPARE_OP_LESS);
+                device_functions().cmd_set_stencil_test_enable(cmd, VK_FALSE);
             }
             const VkPipeline wanted =
                 batch.early ? m_polygon_pipeline_early : m_polygon_pipeline;

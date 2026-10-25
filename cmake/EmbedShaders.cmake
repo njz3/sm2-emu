@@ -117,7 +117,7 @@ function(sm2_add_shader target)
     add_custom_command(
         OUTPUT  "${spv_path}"
         COMMAND "${SM2_GLSLC}"
-                --target-env=vulkan1.3
+                --target-env=vulkan1.0
                 -O
                 ${werror_flag}
                 ${define_flags}

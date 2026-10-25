@@ -139,6 +139,17 @@ void SoftRenderer::band_rows(u32 w, u32 workers, s32& row_begin, s32& row_end)
     row_end        = static_cast<s32>(static_cast<u64>(w + 1) * rows / workers);
 }
 
+void SoftRenderer::render_claimed_bands(u32 bands, u32& pixels)
+{
+    for (u32 band = m_next_band.fetch_add(1, std::memory_order_relaxed); band < bands;
+         band = m_next_band.fetch_add(1, std::memory_order_relaxed)) {
+        s32 begin = 0;
+        s32 end   = 0;
+        band_rows(band, bands, begin, end);
+        render_rows(begin, end, pixels);
+    }
+}
+
 void SoftRenderer::start_workers(u32 workers)
 {
     if (!m_threads.empty()) {
@@ -158,8 +169,7 @@ void SoftRenderer::worker_loop(u32 w)
     }
     u64 seen = 0;
     for (;;) {
-        const RenderList* list  = nullptr;
-        u32               bands = 0;
+        u32 bands = 0;
         {
             std::unique_lock lock(m_mutex);
             m_work_cv.wait(lock, [&] { return m_quit || m_generation != seen; });
@@ -167,15 +177,11 @@ void SoftRenderer::worker_loop(u32 w)
                 return;
             }
             seen  = m_generation;
-            list  = m_job_list;
             bands = m_job_bands;
         }
 
-        s32 begin = 0;
-        s32 end   = 0;
-        band_rows(w, bands, begin, end);
         m_counts[w] = 0;
-        render_band(*list, begin, end, m_counts[w]);
+        render_claimed_bands(bands, m_counts[w]);
 
         {
             std::lock_guard lock(m_mutex);
@@ -790,88 +796,87 @@ void SoftRenderer::render(const SoftFrameSources& sources, std::span<u32> out)
         return;
     }
 
-    const RenderList& list = *sources.list;
+    m_palram      = sources.palram;
+    m_colorxlat   = sources.colorxlat;
+    m_lumaram     = sources.lumaram;
+    m_texture0    = sources.texture0;
+    m_texture1    = sources.texture1;
+    m_pixels      = 0;
+    m_job_sources = &sources;
+    m_job_out     = out;
 
-    m_palram    = sources.palram;
-    m_colorxlat = sources.colorxlat;
-    m_lumaram   = sources.lumaram;
-    m_texture0  = sources.texture0;
-    m_texture1  = sources.texture1;
-    m_pixels    = 0;
-
-    // The background pen first, as MAME's screen_update fills the bitmap with
-    // m_palette->pen(0).
-    std::fill(out.begin(), out.begin() + static_cast<usize>(kWidth) * kHeight,
-              sources.background);
-
-    // Then the tilemap layers of priority category zero.
-    const std::span<const u32> below = sources.below;
-    for (usize index = 0; index < static_cast<usize>(kWidth) * kHeight && index < below.size();
-         ++index) {
-        if ((below[index] >> 24) != 0) {
-            out[index] = below[index];
-        }
+    u32 workers = worker_count();
+    if (!m_threads.empty()) {
+        // Only wait on threads the pool started.
+        workers = std::min<u32>(workers, static_cast<u32>(m_threads.size()) + 1);
+    }
+    if (workers <= 1) {
+        render_rows(0, static_cast<s32>(kHeight), m_pixels);
+        return;
     }
 
-    // Then the 3D, or the framebuffer in its place.
+    // Bands are claimed in turn; render_band says why this matches serial.
+    start_workers(workers);
+    const u32 bands = workers * m_bands_per_worker;
+    {
+        std::lock_guard lock(m_mutex);
+        m_job_bands = bands;
+        m_pending   = workers - 1;
+        m_next_band.store(0, std::memory_order_relaxed);
+        ++m_generation;
+    }
+    m_work_cv.notify_all();
+
+    m_counts[0] = 0;
+    render_claimed_bands(bands, m_counts[0]);  // this thread too
+
+    {
+        std::unique_lock lock(m_mutex);
+        m_done_cv.wait(lock, [&] { return m_pending == 0; });
+    }
+    for (const u32 c : m_counts) {
+        m_pixels += c;
+    }
+}
+
+void SoftRenderer::render_rows(s32 row_begin, s32 row_end, u32& pixels)
+{
+    if (row_end <= row_begin) {
+        return;
+    }
+    const SoftFrameSources& sources = *m_job_sources;
+    if (sources.composer != nullptr) {
+        sources.composer->compose_rows(static_cast<u32>(row_begin), static_cast<u32>(row_end));
+    }
+
     if (!sources.render_test_mode) {
-        std::fill(m_destmap.begin(), m_destmap.end(), 0u);
-        std::fill(m_fillmap.begin(), m_fillmap.end(), u8{0});
+        const usize first = static_cast<usize>(row_begin) * kTargetWidth;
+        const usize last  = static_cast<usize>(row_end) * kTargetWidth;
+        std::fill(m_destmap.begin() + first, m_destmap.begin() + last, 0u);
+        std::fill(m_fillmap.begin() + first, m_fillmap.begin() + last, u8{0});
+        render_band(*sources.list, row_begin, row_end, pixels);
+    }
 
-        u32 workers = worker_count();
-        if (!m_threads.empty()) {
-            // The pool was sized on the first frame; never wait on threads that
-            // do not exist.
-            workers = std::min<u32>(workers, static_cast<u32>(m_threads.size()) + 1);
-        }
-        if (workers <= 1) {
-            m_pixels = 0;
-            render_band(list, 0, static_cast<s32>(kHeight), m_pixels);
-        } else {
-            // One band of rows per worker; see render_band and draw_polygon for
-            // why the split is bit-identical to serial.
-            start_workers(workers);
-            {
-                std::lock_guard lock(m_mutex);
-                m_job_list  = &list;
-                m_job_bands = workers;
-                m_pending   = workers - 1;
-                ++m_generation;
+    // Background pen, category zero tiles, the 3D (or framebuffer), category one.
+    const std::span<const u32> below = sources.below;
+    const std::span<const u32> above = sources.above;
+    for (s32 y = row_begin; y < row_end; ++y) {
+        for (u32 x = 0; x < kWidth; ++x) {
+            const usize index = static_cast<usize>(y) * kWidth + x;
+            u32         pixel = sources.background;
+            if (index < below.size() && (below[index] >> 24) != 0) {
+                pixel = below[index];
             }
-            m_work_cv.notify_all();
-
-            s32 begin = 0;
-            s32 end   = 0;
-            band_rows(0, workers, begin, end);
-            m_counts[0] = 0;
-            render_band(list, begin, end, m_counts[0]);  // band 0 on this thread
-
-            {
-                std::unique_lock lock(m_mutex);
-                m_done_cv.wait(lock, [&] { return m_pending == 0; });
-            }
-            m_pixels = 0;
-            for (const u32 c : m_counts) {
-                m_pixels += c;
-            }
-        }
-
-        for (u32 y = 0; y < kHeight; ++y) {
-            for (u32 x = 0; x < kWidth; ++x) {
-                const u32 pixel = m_destmap[static_cast<usize>(y) * kTargetWidth + x];
-                if (pixel != 0) {
-                    out[static_cast<usize>(y) * kWidth + x] = pixel;
+            if (!sources.render_test_mode) {
+                const u32 drawn = m_destmap[static_cast<usize>(y) * kTargetWidth + x];
+                if (drawn != 0) {
+                    pixel = drawn;
                 }
             }
-        }
-    }
-
-    // Finally the layers of category one.
-    const std::span<const u32> above = sources.above;
-    for (usize index = 0; index < static_cast<usize>(kWidth) * kHeight && index < above.size();
-         ++index) {
-        if ((above[index] >> 24) != 0) {
-            out[index] = above[index];
+            if (index < above.size() && (above[index] >> 24) != 0) {
+                pixel = above[index];
+            }
+            m_job_out[index] = pixel;
         }
     }
 }

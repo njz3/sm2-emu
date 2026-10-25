@@ -13,6 +13,7 @@
 #include "core/types.h"
 
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 namespace sm2 {
@@ -256,6 +257,16 @@ private:
     // maps and its pm_r/pm_w/dm_short_r/dm_short_w block accessors.
     static constexpr u32 kBlockWords = 0x8000;
     u32 m_blocks[2][kBlockWords]{};
+
+    /// Unpacked program words; kPmCached marks a filled entry. A write to
+    /// m_blocks clears the entries built from that word.
+    static constexpr u32 kPmWords  = 0x5000;
+    static constexpr u64 kPmCached = u64(1) << 63;
+    u64 m_pm_cache[2][kPmWords]{};
+
+    u64  fetch48(u32 address);
+    void pm_cache_invalidate(unsigned block, u32 word);
+    void pm_cache_clear() { std::memset(m_pm_cache, 0, sizeof(m_pm_cache)); }
 
     /// Mirrors MAME's `m_dm_short_view` enable state, toggled by MODE1's SSE
     /// bit (short-word sign extension) with the usual 2-cycle latency.

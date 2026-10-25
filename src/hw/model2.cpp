@@ -1374,6 +1374,13 @@ void Model2::register_write(u32 address, u32 value, u32 width)
 // Bus interface
 // ---------------------------------------------------------------------------
 
+bool Model2::read_stable(u32 address) const
+{
+    // ROM, work RAM (only the CPU writes it) and the frame parity.
+    return address - kRomMainCpu < 0x200000 || address - kWorkRam < 0x100000
+        || (address & ~3u) == kVideoRegs + 0x0c;
+}
+
 const u8* Model2::hot_read(u32 address, u32 width) const
 {
     if (const u32 offset = address - kRomMainCpu; offset < 0x200000) {

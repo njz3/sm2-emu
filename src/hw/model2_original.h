@@ -250,6 +250,7 @@ public:
     u16 read16(u32 address) override;
     u32 read32(u32 address) override;
     u32 fetch32(u32 address) override;
+    [[nodiscard]] bool read_stable(u32 address) const override;
     void write8(u32 address, u8 value) override;
     void write16(u32 address, u16 value) override;
     void write32(u32 address, u32 value) override;

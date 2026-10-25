@@ -17,6 +17,7 @@
 #include "core/types.h"
 #include "hw/geometrizer.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <span>
@@ -53,6 +54,15 @@ struct SoftPolyExtra {
 
 /// Views of everything one frame of the software path reads, so a snapshot can
 /// be drawn on another thread (see AsyncSoftRenderer).
+/// Fills rows of SoftFrameSources::below and above, band by band.
+class SoftRowComposer {
+public:
+    virtual void compose_rows(u32 row_begin, u32 row_end) = 0;
+
+protected:
+    ~SoftRowComposer() = default;
+};
+
 struct SoftFrameSources {
     std::span<const u16> palram;
     std::span<const u16> colorxlat;
@@ -64,6 +74,8 @@ struct SoftFrameSources {
     u32                  background       = 0xff000000u;
     bool                 render_test_mode = false;
     const RenderList*    list             = nullptr;
+    /// When set, fills below and above band by band.
+    SoftRowComposer* composer = nullptr;
 };
 
 /// The software 3D pass, plus the same three-way composition MAME's screen_update
@@ -106,6 +118,9 @@ public:
     /// Pin worker w (band 0 runs on the caller) to cpus[(w - 1) % n]. Call
     /// before the first render().
     void set_worker_cpus(std::vector<int> cpus) { m_worker_cpus = std::move(cpus); }
+
+    /// Bands per worker, claimed in turn so faster cores draw more of them.
+    void set_bands_per_worker(u32 count) { m_bands_per_worker = count < 1 ? 1 : count; }
 
     /// Cores this process may run on (its affinity mask on Linux).
     [[nodiscard]] static u32 available_cores();
@@ -156,6 +171,12 @@ private:
     /// Rows [row_begin, row_end) of band `w` out of `workers`, split evenly.
     static void band_rows(u32 w, u32 workers, s32& row_begin, s32& row_end);
 
+    /// One band: its tilemap rows, its 3D, then their composite.
+    void render_rows(s32 row_begin, s32 row_end, u32& pixels);
+
+    /// Draw bands claimed from m_next_band until none are left.
+    void render_claimed_bands(u32 bands, u32& pixels);
+
     /// Start the persistent workers on first use; they are parked between
     /// frames rather than spawned per frame.
     void start_workers(u32 workers);
@@ -183,8 +204,11 @@ private:
     std::mutex               m_mutex;
     std::condition_variable  m_work_cv;
     std::condition_variable  m_done_cv;
-    const RenderList*        m_job_list  = nullptr;
+    const SoftFrameSources*  m_job_sources = nullptr;
+    std::span<u32>           m_job_out;
     u32                      m_job_bands = 0;
+    u32                      m_bands_per_worker = 1;
+    std::atomic<u32>         m_next_band{0};
     u64                      m_generation = 0;
     u32                      m_pending    = 0;
     bool                     m_quit       = false;

@@ -82,6 +82,18 @@ public:
     /// deferred character decode.
     void compose();
 
+    /// compose() in two halves, so compose_into() can run on another thread
+    /// from a copy of the tile RAM. The next prepare_compose() must wait for it.
+    void prepare_compose() { m_tiles.update(); }
+    void compose_into(std::span<const u8> tile_ram, bool mask_a_hidden,
+                      std::span<const u32> pens, std::vector<u32>& below,
+                      std::vector<u32>& above, std::vector<u8>& front) const;
+
+    /// compose_into() for rows `row_begin` to `row_end` only.
+    void compose_rows(std::span<const u8> tile_ram, bool mask_a_hidden,
+                      std::span<const u32> pens, u32* below, u32* above, u8* front,
+                      u32 row_begin, u32 row_end) const;
+
     /// Hide the gun games' shot flash. Call after each frame with its IN1 port.
     void filter_gun_flash(bool enabled, u8 in1);
 

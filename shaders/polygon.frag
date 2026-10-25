@@ -1,4 +1,11 @@
 #version 450
+// Vulkan's demote keeps the quad's derivatives and leaves the stencil alone.
+#ifdef SM2_TARGET_GL
+#define DISCARD discard
+#else
+#extension GL_EXT_demote_to_helper_invocation : require
+#define DISCARD demote
+#endif
 //  ____  __  __  ____         _____ __  __ _   _
 // / ___||  \/  ||___ \       | ____|  \/  | | | |
 // \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
@@ -413,7 +420,7 @@ vec3 sampleReplacement(PolyParams p, vec2 texelUV, vec2 texelDx, vec2 texelDy)
     const vec4 texel = textureLod(uReplace, coord, lod);
 
     if ((p.flags & kFlagTranslucent) != 0u && texel.a < 0.5) {
-        discard;
+        DISCARD;
     }
     const vec3 tint = vec3(float(p.tint & 0x3ffu), float((p.tint >> 10) & 0x3ffu),
                            float((p.tint >> 20) & 0x3ffu)) / 512.0;
@@ -494,7 +501,7 @@ void main()
     const ivec2 nativePix = ivec2(gl_FragCoord.xy) / int(pc.renderScale);
     if ((p.flags & kFlagChecker) != 0u
         && ((nativePix.x ^ nativePix.y) & 1) == 0) {
-        discard;
+        DISCARD;
     }
 
     // The stipple's 50%, premultiplied for the pass's over blend.
@@ -573,7 +580,7 @@ void main()
         // the stencil fill mask unclaimed, so whatever is further away still gets
         // its chance at the pixel.
         if (translucent && texel.y < kAlphaThreshold) {
-            discard;
+            DISCARD;
         }
 
         // The filtered texel has eight bits but the tone curve has 128 entries, so

@@ -290,29 +290,36 @@ void Geometrizer::build_render_list(RenderList* out)
     // on.
     out->polygons.reserve(raster->poly_list_index);
 
-    for (int window = raster->cur_window; window >= 0; --window) {
-        for (u32 depth = raster->min_z; depth <= raster->max_z; ++depth) {
-            Polygon* poly = raster->poly_sorted_list[depth];
-            while (poly != nullptr) {
-                if (poly->window == window) {
-                    model2_3d_project(poly);
-                    widen_screen_overlay(poly);
-
-                    RenderPolygon& target = out->polygons.emplace_back();
-                    target.num_vertices   = poly->num_vertices;
-                    for (u32 index = 0; index < poly->num_vertices; ++index) {
-                        target.v[index] = poly->v[index];
-                    }
-                    for (u32 index = 0; index < 4; ++index) {
-                        target.texheader[index] = poly->texheader[index];
-                    }
-                    target.luma   = poly->luma;
-                    target.texlod = poly->texlod;
-                    target.window = poly->window;
-                    screen_scissor(poly, target.scissor);
-                }
-                poly = static_cast<Polygon*>(poly->next);
+    m_window_polygons.resize(usize(raster->cur_window) + 1);
+    for (std::vector<Polygon*>& list : m_window_polygons) {
+        list.clear();
+    }
+    for (u32 depth = raster->min_z; depth <= raster->max_z; ++depth) {
+        for (Polygon* poly = raster->poly_sorted_list[depth]; poly != nullptr;
+             poly = static_cast<Polygon*>(poly->next)) {
+            if (poly->window <= raster->cur_window) {
+                m_window_polygons[poly->window].push_back(poly);
             }
+        }
+    }
+
+    for (int window = raster->cur_window; window >= 0; --window) {
+        for (Polygon* poly : m_window_polygons[usize(window)]) {
+            model2_3d_project(poly);
+            widen_screen_overlay(poly);
+
+            RenderPolygon& target = out->polygons.emplace_back();
+            target.num_vertices   = poly->num_vertices;
+            for (u32 index = 0; index < poly->num_vertices; ++index) {
+                target.v[index] = poly->v[index];
+            }
+            for (u32 index = 0; index < 4; ++index) {
+                target.texheader[index] = poly->texheader[index];
+            }
+            target.luma   = poly->luma;
+            target.texlod = poly->texlod;
+            target.window = poly->window;
+            screen_scissor(poly, target.scissor);
         }
     }
 
