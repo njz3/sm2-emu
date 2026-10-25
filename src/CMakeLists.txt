@@ -467,6 +467,21 @@ target_compile_definitions(sm2-emu PRIVATE
     $<$<BOOL:${SM2_ENABLE_VALIDATION}>:SM2_ENABLE_VALIDATION=1>
 )
 
+# The build's version as the release packages name it (git describe), for the
+# window's title: worked out at every build, the header rewritten only when it
+# changes.
+find_package(Git QUIET)
+set(sm2_build_version_header "${SM2_GENERATED_DIR}/sm2_build_version.h")
+add_custom_target(sm2_build_version
+    COMMAND ${CMAKE_COMMAND} -DSM2_GIT=${GIT_EXECUTABLE} -DSM2_SOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSM2_FALLBACK=${PROJECT_VERSION} -DSM2_OUT=${sm2_build_version_header}
+            -P "${CMAKE_SOURCE_DIR}/cmake/BuildVersion.cmake"
+    BYPRODUCTS "${sm2_build_version_header}"
+    COMMENT "Build version from git describe"
+    VERBATIM)
+add_dependencies(sm2-emu sm2_build_version)
+target_include_directories(sm2-emu PRIVATE "${SM2_GENERATED_DIR}")
+
 # On macOS the Vulkan loader is not in a default search path, so record where
 # it was found. Without this the binary only runs from a shell that has sourced
 # the SDK's setup-env.sh.

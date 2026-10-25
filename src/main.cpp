@@ -53,6 +53,8 @@
 #include "agent.h"
 #include "telemetry/telemetry.h"
 
+#include "sm2_build_version.h"
+
 #include <map>
 #include <memory>
 
@@ -84,6 +86,10 @@ std::vector<std::string> enumerate_render_devices() { return {}; }
 #endif
 
 namespace {
+
+/// The window's name: this branch's builds carry their version as the release
+/// packages name it (git describe) and the edition.
+constexpr const char* kWindowName = "sm2-emu " SM2_BUILD_VERSION " FFB Edition";
 
 /// --graphics-backend's three values. Which GL flavour `Opengl` resolves to is
 /// a build-time fact (SM2_BUILD_OPENGL_DESKTOP vs SM2_BUILD_OPENGL_ES), not a
@@ -2278,7 +2284,7 @@ int main(int argc, char** argv)
     int exit_code = 0;
     {
         osd::WindowConfig window_config;
-        window_config.title      = std::string("sm2-emu ") + SM2_VERSION;
+        window_config.title      = kWindowName;
         window_config.width      = options.config.window_width;
         window_config.height     = options.config.window_height;
         window_config.fullscreen = options.config.fullscreen;
@@ -2769,7 +2775,7 @@ int main(int argc, char** argv)
         // title and the once-a-second refresh, so the two can never drift into
         // different formats.
         const auto build_title = [&]() {
-            std::string title = std::string("sm2-emu — ")
+            std::string title = std::string(kWindowName) + " — "
                               + (loaded.has_value() ? loaded->game.title : "no game")
                               + (use_software_renderer
                                     ? " [Software]"
