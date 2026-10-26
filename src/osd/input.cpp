@@ -173,20 +173,6 @@ constexpr KeyBinding kPlayerTwoKeys[] = {
     {SDL_SCANCODE_J, kButton3}, {SDL_SCANCODE_K, kButton4},
 };
 
-/// The emulator's own keys (main.cpp's), by what they type on this layout:
-/// never a cabinet control, so never bound to one.
-[[nodiscard]] bool emulator_key(SDL_Scancode key)
-{
-    switch (SDL_GetKeyFromScancode(key, SDL_KMOD_NONE, false)) {
-        case SDLK_ESCAPE: case SDLK_F6:  case SDLK_F7:  case SDLK_F8: case SDLK_F9:
-        case SDLK_F10:    case SDLK_F11: case SDLK_F12: case SDLK_P:  case SDLK_TAB:
-        case SDLK_BACKSPACE:
-            return true;
-        default:
-            return false;
-    }
-}
-
 /// Pull a port's bits low for every held key.
 template <usize Count>
 void gather_keys(u8* port, const bool* keys, int key_count,
@@ -690,6 +676,38 @@ void Input::set_pad_layout(const Config::PadLayout& layout)
         m_pad_key_names = layout.keys;
         resolve_keys();
     }
+}
+
+void Input::set_hotkeys(const std::array<std::string, Config::kHotkeyCount>& names)
+{
+    if (m_hotkeys_set && names == m_hotkey_names) {
+        return;
+    }
+    m_hotkey_names = names;
+    m_hotkeys_set  = true;
+    for (usize i = 0; i < names.size(); ++i) {
+        m_hotkeys[i] = names[i].empty() ? SDLK_UNKNOWN : SDL_GetKeyFromName(names[i].c_str());
+    }
+    resolve_keys();  // a key a shortcut takes leaves its control
+}
+
+/// The emulator's shortcuts are never a cabinet control, so never bound to
+/// one: until the settings say otherwise, their default keys.
+bool Input::emulator_key(SDL_Scancode key) const
+{
+    const SDL_Keycode typed = SDL_GetKeyFromScancode(key, SDL_KMOD_NONE, false);
+    if (typed == SDLK_UNKNOWN) {
+        return false;
+    }
+    if (!m_hotkeys_set) {
+        for (const char* name : Config::kDefaultHotkeys) {
+            if (SDL_GetKeyFromName(name) == typed) {
+                return true;
+            }
+        }
+        return false;
+    }
+    return std::find(m_hotkeys.begin(), m_hotkeys.end(), typed) != m_hotkeys.end();
 }
 
 void Input::resolve_keys()
@@ -3413,9 +3431,9 @@ void Input::print_bindings()
     std::printf("  F6 F7                quick-save, quick-load state (more slots in F10)\n");
     std::printf("  F8                   toggle FPS counter\n");
     std::printf("  F10 F11 F12          settings menu, fullscreen, screenshot\n");
+    std::printf("  (Escape to F12 are the defaults; the System tab rebinds them)\n");
     std::printf("The Wheel and Gamepad tabs can bind a key beside each button, which then\n");
-    std::printf("leaves its role above; the emulator's keys (Escape, P, Tab, Backspace,\n");
-    std::printf("F6-F12) cannot be bound.\n");
+    std::printf("leaves its role above; the emulator's own keys cannot be bound.\n");
     std::printf("\nVirtual On (keyboard): WASD left lever, arrows right lever,\n");
     std::printf("Q/E left shot/dash, Right Shift/Right Ctrl right shot/dash.\n");
     std::printf("\nThe first gamepad to connect is player 1. Gamepads and the keyboard\n");

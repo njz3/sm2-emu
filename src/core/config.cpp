@@ -243,6 +243,12 @@ constexpr std::array<const char*, Config::kWheelRoleCount> kWheelRoleNames = {
     "test", "service", "menu", "gear_1", "gear_2", "gear_3", "gear_4", "gear_neutral",
 };
 
+/// Shortcut names in the ini, after "key_", in Config::Hotkey order.
+constexpr std::array<const char*, Config::kHotkeyCount> kHotkeyNames = {
+    "exit", "quit", "overlay", "fullscreen", "screenshot", "pause",
+    "quick_save", "quick_load", "fps", "fast_forward", "rewind",
+};
+
 /// Pad analogue-axis role names in the ini, in Config::PadAxisRole order.
 constexpr std::array<const char*, Config::kPadAxisCount> kPadAxisNames = {
     "aim_x", "aim_y", "accel", "brake", "lever_x", "lever_y",
@@ -390,6 +396,11 @@ namespace {
 /// The section holding the default gamepad layout.
 constexpr const char* kDefaultPadSection = "gamepad";
 
+/// The sections named after the overlay's tabs; any other is a game family's.
+constexpr std::array<const char*, 8> kTabSections = {
+    "video", "audio", "paths", "gamepad", "wheel", "lightgun", "network", "system",
+};
+
 /// What a pad1_*/pad2_* key did to `layout`.
 enum class PadKey { NotPad, Unknown, BadValue, Set };
 
@@ -527,21 +538,46 @@ namespace {
     return !key->empty();
 }
 
-/// The settings before the first [section], by key.
+/// The [section] a line opens, or none.
+[[nodiscard]] std::optional<std::string> section_of(const std::string& trimmed)
+{
+    if (trimmed.empty() || trimmed[0] != '[') {
+        return std::nullopt;
+    }
+    const usize close = trimmed.find(']');
+    return lowered(trim(trimmed.substr(1, close == std::string::npos ? std::string::npos : close - 1)));
+}
+
+/// A section of settings: none (a flat ini's) or one of the overlay's tabs'.
+/// A game family's holds its gamepad layout only.
+[[nodiscard]] bool settings_section(const std::string& section)
+{
+    return section.empty()
+        || std::find(kTabSections.begin(), kTabSections.end(), section) != kTabSections.end();
+}
+
+/// The settings, by key: those before any [section] and in the tabs' sections,
+/// the gamepad layouts' keys left out.
 [[nodiscard]] std::map<std::string, std::string> top_settings(std::istream& file)
 {
     std::map<std::string, std::string> values;
     std::string                        line;
+    std::string                        section;
     while (std::getline(file, line)) {
         const std::string trimmed = trim(line);
-        if (!trimmed.empty() && trimmed[0] == '[') {
-            break;
-        }
-        const usize equals = trimmed.find('=');
-        if (trimmed.empty() || trimmed[0] == '#' || trimmed[0] == ';' || equals == std::string::npos) {
+        if (const std::optional<std::string> opened = section_of(trimmed)) {
+            section = *opened;
             continue;
         }
-        values[lowered(trim(trimmed.substr(0, equals)))] = trim(trimmed.substr(equals + 1));
+        const usize equals = trimmed.find('=');
+        if (trimmed.empty() || trimmed[0] == '#' || trimmed[0] == ';' || equals == std::string::npos
+            || !settings_section(section)) {
+            continue;
+        }
+        const std::string key = lowered(trim(trimmed.substr(0, equals)));
+        if (!is_section_key(key)) {
+            values[key] = trim(trimmed.substr(equals + 1));
+        }
     }
     return values;
 }
@@ -551,7 +587,7 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
 {
     std::string line;
     u32         number = 0;
-    std::string section;  // the game family a [section] names, empty before one
+    std::string section;  // the [section] a line is in, empty before one
 
     struct FamilyKey {
         std::string family, key, value;
@@ -590,11 +626,22 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
                                 + "' does not accept '" + value + "'");
         };
 
-        if (!section.empty() && section != kDefaultPadSection && is_pad_key(key)) {
+        const bool family_section =
+            !section.empty()
+            && std::find(kTabSections.begin(), kTabSections.end(), section) == kTabSections.end();
+        if (family_section && is_pad_key(key)) {
             // Applied over the default once the whole file is read, so a game's
             // section may be partial and may come before [gamepad].
             family_keys.push_back({section, key, value, number});
             continue;
+        }
+        if (key.rfind("key_", 0) == 0) {
+            const auto name = std::find_if(kHotkeyNames.begin(), kHotkeyNames.end(),
+                                           [&](const char* n) { return key.substr(4) == n; });
+            if (name != kHotkeyNames.end()) {
+                out->hotkeys[static_cast<usize>(name - kHotkeyNames.begin())] = value;
+                continue;
+            }
         }
         if (const PadKey pad = parse_pad_key(key, value, &out->pad); pad != PadKey::NotPad) {
             if (pad == PadKey::BadValue) {
@@ -1290,8 +1337,8 @@ void restore_settings(const std::string& path, const std::vector<std::string>& k
     bool                     changed = false;
     while (std::getline(in, line)) {
         const std::string trimmed = trim(line);
-        if (!trimmed.empty() && trimmed[0] == '[') {
-            top = false;
+        if (const std::optional<std::string> opened = section_of(trimmed)) {
+            top = settings_section(*opened);
         }
         const usize equals = trimmed.find('=');
         if (top && equals != std::string::npos && trimmed[0] != '#' && trimmed[0] != ';') {
@@ -1321,40 +1368,111 @@ void restore_settings(const std::string& path, const std::vector<std::string>& k
 
 namespace {
 
-/// The ini text of `config`, as save_config writes it.
+/// The ini text of `config`, as save_config writes it: a section for each of
+/// the overlay's tabs, then [gamepad] and the game families'.
 void write_config(std::ostream& out, const Config& config)
 {
-    out << "# sm2-emu settings.\n"
-        << "#\n"
-        << "# Every setting below is at its default. Anything given on the command\n"
-        << "# line overrides what is here, and anything missing here keeps its\n"
-        << "# default, so deleting a line is the same as never writing it.\n"
-        << "\n"
-        << "# Wait for the display's vertical blank before presenting. Off can tear\n"
-        << "# but shows a frame as soon as it is ready.\n"
+    const auto wheel_button = [&](Config::WheelRole role) {
+        return config.wheel_buttons[cfg_role(role)];
+    };
+
+    out << "# sm2-emu settings\n"
+        << "\n[video]\n"
+        << "graphics_backend = " << config.graphics_backend << "\n"
+        << "gpu = " << config.gpu << "\n"
         << "vsync = " << bool_text(config.vsync) << "\n"
-        << "\n"
-        << "# Hold the machine to its own 57.5245 Hz. Off runs as fast as this\n"
-        << "# computer manages, which is only useful for captures and benchmarks.\n"
         << "throttle = " << bool_text(config.throttle) << "\n"
-        << "\n"
         << "fullscreen = " << bool_text(config.fullscreen) << "\n"
-        << "# In full screen, a borderless window covering the screen at the\n"
-        << "# desktop's resolution; false switches the screen to the window size.\n"
         << "borderless_fullscreen = " << bool_text(config.borderless_fullscreen) << "\n"
+        << "window_width = " << config.window_width << "\n"
+        << "window_height = " << config.window_height << "\n"
         << "show_fps = " << bool_text(config.show_fps) << "\n"
-        << "# Software renderer: draw on a second thread, one frame behind.\n"
-        << "software_async = " << bool_text(config.software_async) << "\n"
-        << "# With software_async on a big.LITTLE CPU, draw on the slow cores.\n"
-        << "software_slow_cores = " << bool_text(config.software_slow_cores) << "\n"
         << "show_notifications = " << bool_text(config.show_notifications) << "\n"
-        << "# Keep recent states so holding Backspace steps back through play,\n"
-        << "# using up to rewind_buffer_mb MiB of memory.\n"
-        << "rewind = " << bool_text(config.rewind) << "\n"
-        << "rewind_buffer_mb = " << config.rewind_buffer_mb << "\n"
-        << "# Overlay language: auto (follow the system), en, or a file name from\n"
-        << "# lang/ without .po (de, pt_BR, zh_TW, ...).\n"
-        << "language = " << config.language << "\n"
+        << "render_scale = " << config.render_scale << "\n"
+        << "scaling_method = " << scaling_method_name(config.scaling_method) << "\n"
+        << "aspect_mode = " << aspect_mode_name(config.aspect_mode) << "\n"
+        << "aspect_ratio = " << aspect_ratio_name(config.aspect_ratio) << "\n"
+        << "crop_position = " << config.crop_position << "\n"
+        << "crop_barrel = " << bool_text(config.crop_barrel) << "\n"
+        << "barrel_center = " << config.barrel_center << "\n"
+        << "barrel_radius = " << config.barrel_radius << "\n"
+        << "display_stretch = " << bool_text(config.display_stretch) << "\n"
+        << "bezel = " << bool_text(config.bezel) << "\n"
+        << "crt_enabled = " << bool_text(config.crt_enabled) << "\n"
+        << "crt_scanline_strength = " << config.crt_scanline_strength << "\n"
+        << "crt_mask_strength = " << config.crt_mask_strength << "\n"
+        << "crt_glow_strength = " << config.crt_glow_strength << "\n"
+        << "crt_curvature = " << config.crt_curvature << "\n"
+        << "texture_filter = " << texture_filter_name(config.texture_filter) << "\n"
+        << "anisotropy = " << config.anisotropy << "\n"
+        << "upscale_2d = " << upscale_2d_name(config.upscale_2d) << "\n"
+        << "translucency = " << translucency_name(config.translucency) << "\n"
+        << "extended_draw_distance = " << bool_text(config.extended_draw_distance) << "\n"
+        << "custom_textures = " << bool_text(config.custom_textures) << "\n"
+        << "dump_textures = " << bool_text(config.dump_textures) << "\n"
+        << "software_async = " << bool_text(config.software_async) << "\n"
+        << "software_slow_cores = " << bool_text(config.software_slow_cores) << "\n"
+        << "\n[audio]\n"
+        << "scsp_core = " << config.scsp_core << "\n"
+        << "game_volume = " << bool_text(config.game_volume) << "\n";
+    for (const auto& [family, percent] : config.game_volumes) {
+        if (percent != Config::kDefaultGameVolume) {
+            out << "volume_" << family << " = " << percent << "\n";
+        }
+    }
+    out << "\n[paths]\n"
+        << "rom_dir = " << config.rom_dir << "\n"
+        << "nvram_dir = " << config.nvram_dir << "\n"
+        << "screenshot_dir = " << config.screenshot_dir << "\n"
+        << "write_dir = " << config.write_dir << "\n"
+        << "bezel_dir = " << config.bezel_dir << "\n"
+        << "crosshair_dir = " << config.crosshair_dir << "\n"
+        << "scrape_artwork = " << bool_text(config.scrape_artwork) << "\n"
+        << "\n[wheel]\n"
+        << "wheel_steer_degrees = " << config.wheel_steer_degrees << "\n"
+        << "wheel_lock_degrees = " << config.wheel_lock_degrees << "\n"
+        << "wheel_steer_deadzone = " << config.wheel_steer_deadzone << "\n"
+        << "wheel_steer_axis = " << config.wheel_steer_axis << "\n"
+        << "wheel_accel_axis = " << config.wheel_accel_axis << "\n"
+        << "wheel_brake_axis = " << config.wheel_brake_axis << "\n"
+        << "wheel_accel_invert = " << bool_text(config.wheel_accel_invert) << "\n"
+        << "wheel_brake_invert = " << bool_text(config.wheel_brake_invert) << "\n"
+        << "wheel_accel_half = " << bool_text(config.wheel_accel_half) << "\n"
+        << "wheel_brake_half = " << bool_text(config.wheel_brake_half) << "\n"
+        << "wheel_ffb = " << bool_text(config.wheel_ffb) << "\n"
+        << "wheel_ffb_strength = " << config.wheel_ffb_strength << "\n"
+        << "wheel_ffb_invert = " << bool_text(config.wheel_ffb_invert) << "\n"
+        << "wheel_panel_spring = " << config.wheel_panel_spring << "\n"
+        << "wheel_indy_deadband = " << config.wheel_indy_deadband << "\n"
+        << "wheel_indy_full_power = " << config.wheel_indy_full_power << "\n"
+        << "wheel_drive_dip = " << config.wheel_drive_dip << "\n"
+        << "wheel_rumble = " << bool_text(config.wheel_rumble) << "\n"
+        << "wheel_rumble_strength = " << config.wheel_rumble_strength << "\n"
+        << "wheel_rumble_engine = " << bool_text(config.wheel_rumble_engine) << "\n"
+        << "wheel_shifter_neutral = " << bool_text(config.wheel_shifter_neutral) << "\n"
+        << "wheel_shift_neutral_ms = " << config.wheel_shift_neutral_ms << "\n"
+        << "wheel_button_start = " << wheel_button(Config::WheelRole::Start) << "\n"
+        << "wheel_button_coin = " << wheel_button(Config::WheelRole::Coin) << "\n"
+        << "wheel_button_1 = " << wheel_button(Config::WheelRole::Button1) << "\n"
+        << "wheel_button_2 = " << wheel_button(Config::WheelRole::Button2) << "\n"
+        << "wheel_button_3 = " << wheel_button(Config::WheelRole::Button3) << "\n"
+        << "wheel_button_4 = " << wheel_button(Config::WheelRole::Button4) << "\n"
+        << "wheel_button_gear_up = " << wheel_button(Config::WheelRole::GearUp) << "\n"
+        << "wheel_button_gear_down = " << wheel_button(Config::WheelRole::GearDown) << "\n"
+        << "wheel_button_gear_1 = " << wheel_button(Config::WheelRole::Gear1) << "\n"
+        << "wheel_button_gear_2 = " << wheel_button(Config::WheelRole::Gear2) << "\n"
+        << "wheel_button_gear_3 = " << wheel_button(Config::WheelRole::Gear3) << "\n"
+        << "wheel_button_gear_4 = " << wheel_button(Config::WheelRole::Gear4) << "\n"
+        << "wheel_button_gear_neutral = " << wheel_button(Config::WheelRole::GearNeutral) << "\n"
+        << "wheel_button_test = " << wheel_button(Config::WheelRole::Test) << "\n"
+        << "wheel_button_service = " << wheel_button(Config::WheelRole::Service) << "\n"
+        << "wheel_button_menu = " << wheel_button(Config::WheelRole::Menu) << "\n";
+    for (u32 r = 0; r < Config::kWheelRoleCount; ++r) {
+        if (!config.wheel_keys[r].empty()) {
+            out << "wheel_key_" << kWheelRoleNames[r] << " = " << config.wheel_keys[r] << "\n";
+        }
+    }
+    out << "\n[lightgun]\n"
         << "lightgun = " << bool_text(config.lightgun) << "\n"
         << "lightgun_crosshair = " << bool_text(config.lightgun_crosshair) << "\n"
         << "lightgun_hide_flash = " << bool_text(config.lightgun_hide_flash) << "\n"
@@ -1365,319 +1483,51 @@ void write_config(std::ostream& out, const Config& config)
         << "sinden_border_colour = 0x" << std::hex << std::setw(6)
         << std::setfill('0') << (config.sinden_border_colour & 0xffffff) << std::dec
         << std::setfill(' ') << "\n"
-        << "sinden_border_thickness = " << config.sinden_border_thickness << "\n"
-        << "window_width = " << config.window_width << "\n"
-        << "window_height = " << config.window_height << "\n"
-        << "\n"
-        << "# Internal 3D render scale (1..8). 1 is native 496x384; higher\n"
-        << "# renders the 3D pass at N times that for crisper geometry. GPU\n"
-        << "# backends only (the software renderer stays native), and it takes\n"
-        << "# effect on the next launch.\n"
-        << "render_scale = " << config.render_scale << "\n"
-        << "\n"
-        << "# How the finished frame is scaled to the window. One of: nearest,\n"
-        << "# bilinear, sharp (sharp-bilinear), integer. Sharp keeps 2D text crisp\n"
-        << "# without the shimmer nearest gives at non-integer window sizes.\n"
-        << "# Present-stage only, so it takes effect live.\n"
-        << "scaling_method = " << scaling_method_name(config.scaling_method) << "\n"
-        << "\n"
-        << "# 4:3, or 16:9 to draw the 3D wider (experimental, GPU renderers only).\n"
-        << "aspect_mode = " << aspect_mode_name(config.aspect_mode) << "\n"
-        << "# The frame and how the picture fills it, as linuxloader names them:\n"
-        << "# ORIGINAL (the render resolution's shape); 4:3 or 16:9 (the whole\n"
-        << "# picture inside at its proportions, black bars); 4:3_STRETCH or\n"
-        << "# 16:9_STRETCH (filling it, distorted); 4:3_CROP or 16:9_CROP (filling it\n"
-        << "# at its proportions, the rest cut). crop_position -100 (left or top) to\n"
-        << "# 100 (right or bottom). crop_barrel bends the cut parts onto the edges\n"
-        << "# instead: barrel_center is the undistorted middle (% of the frame),\n"
-        << "# barrel_radius the cylinder's radius (% of the frame, 10..300).\n"
-        << "# display_stretch stretches the frame to the window (display_mode\n"
-        << "# WINDOW, FULLSCREEN or BORDERLESS, each also with _STRETCH, sets it,\n"
-        << "# fullscreen and borderless_fullscreen).\n"
-        << "aspect_ratio = " << aspect_ratio_name(config.aspect_ratio) << "\n"
-        << "crop_position = " << config.crop_position << "\n"
-        << "crop_barrel = " << bool_text(config.crop_barrel) << "\n"
-        << "barrel_center = " << config.barrel_center << "\n"
-        << "barrel_radius = " << config.barrel_radius << "\n"
-        << "display_stretch = " << bool_text(config.display_stretch) << "\n"
-        << "\n"
-        << "# Optional CRT cosmetic filter over the finished frame. Strengths are\n"
-        << "# 0..100; curvature 0 is flat. Live-switchable.\n"
-        << "crt_enabled = " << bool_text(config.crt_enabled) << "\n"
-        << "crt_scanline_strength = " << config.crt_scanline_strength << "\n"
-        << "crt_mask_strength = " << config.crt_mask_strength << "\n"
-        << "crt_glow_strength = " << config.crt_glow_strength << "\n"
-        << "crt_curvature = " << config.crt_curvature << "\n"
-        << "\n"
-        << "# Bezel artwork around the picture, in fullscreen.\n"
-        << "bezel = " << bool_text(config.bezel) << "\n"
-        << "\n"
-        << "# Opt-in graphics enhancement beyond the original hardware. Defaults\n"
-        << "# match the arcade; each is GPU-gated and falls back to faithful.\n"
-        << "# texture_filter: faithful or anisotropic (sharper 3D at grazing\n"
-        << "# angles); anisotropy is the 2..16 tap ceiling, clamped to the GPU.\n"
-        << "# upscale_2d: faithful, xbr or scalefx (edge-smooth the 2D layers).\n"
-        << "# translucency: stipple (the hardware's checkerboard) or blended\n"
-        << "# (the 50% see-through it's trying to achieve: lights, glass,\n"
-        << "# shadows).\n"
-        << "# extended_draw_distance: draw the scenery to the edge of the\n"
-        << "# course instead of the arcade's short range (Daytona USA).\n"
-        << "texture_filter = " << texture_filter_name(config.texture_filter) << "\n"
-        << "anisotropy = " << config.anisotropy << "\n"
-        << "upscale_2d = " << upscale_2d_name(config.upscale_2d) << "\n"
-        << "translucency = " << translucency_name(config.translucency) << "\n"
-        << "extended_draw_distance = " << bool_text(config.extended_draw_distance) << "\n"
-        << "\n"
-        << "# Custom textures: images in <saves>/textures/<game>/load named as\n"
-        << "# dumped replace the game's own, at any whole multiple of the size.\n"
-        << "# dump_textures writes every texture drawn, with a browsable\n"
-        << "# index.html, to <saves>/textures/<game>/dump when the game exits.\n"
-        << "custom_textures = " << bool_text(config.custom_textures) << "\n"
-        << "dump_textures = " << bool_text(config.dump_textures) << "\n"
-        << "\n"
-        << "# Exact device name as --list-gpus prints it. Empty picks the best one.\n"
-        << "gpu = " << config.gpu << "\n"
-        << "\n"
-        << "# Renderer: software, vulkan or opengl (whichever the build has).\n"
-        << "# Empty picks the build default. Applies on the next launch.\n"
-        << "graphics_backend = " << config.graphics_backend << "\n"
-        << "\n"
-        << "# Cabinet link (networking). Links this instance to other cabinets on\n"
-        << "# the LAN running the same linked title (Sega Rally, Daytona, Super GT\n"
-        << "# 24h, Indy 500, ...). Off keeps the single-cabinet loopback. The comms\n"
-        << "# board is a ring: each cabinet receives on its own address and sends\n"
-        << "# to the next one; for two machines they point at each other. The\n"
-        << "# master/slave role is still set in the game's own test menu.\n"
-        << "link_enabled = " << bool_text(config.link_enabled) << "\n"
-        << "# This cabinet's own address. link_local_ip empty binds every\n"
-        << "# interface; it is prefilled from the primary NIC on first run.\n"
-        << "# link_subnet_mask is informational (shown in the GUI).\n"
-        << "link_local_ip = " << config.link_local_ip << "\n"
-        << "link_subnet_mask = " << config.link_subnet_mask << "\n"
-        << "link_port = " << config.link_port << "\n"
-        << "# The next cabinet in the ring: where this instance sends. Empty\n"
-        << "# link_next_ip disables sending.\n"
-        << "link_next_ip = " << config.link_next_ip << "\n"
-        << "link_next_port = " << config.link_next_port << "\n"
-        << "# Where this cabinet sits in the ring, 0-based (bookkeeping only).\n"
-        << "link_cabinet_index = " << config.link_cabinet_index << "\n"
-        << "# original: MAME's ring, frames at each vertical blank (UDP).\n"
-        << "# buffered: Supermodel's, every cabinet's data exchanged at the end\n"
-        << "# of each frame (TCP), the cabinets numbered in the ring's order.\n"
-        << "# Every cabinet of a ring needs the same.\n"
-        << "link_mode = " << config.link_mode << "\n"
-        << "\n"
-        << "# Wheels and gamepads keep working while the window is not in front.\n"
-        << "# Keyboard and mouse still need the window in front.\n"
-        << "input_background = " << bool_text(config.input_background) << "\n"
-        << "# Steering-wheel force feedback, from the game's drive board. The gain\n"
-        << "# is 0..200 percent: at 100 the board's full power (63) gives the\n"
-        << "# wheel's maximum torque, every force in proportion; 200 doubles them,\n"
-        << "# the strongest saturating.\n"
-        << "wheel_ffb = " << bool_text(config.wheel_ffb) << "\n"
-        << "wheel_ffb_strength = " << config.wheel_ffb_strength << "\n"
-        << "# Sega Rally Championship and Daytona USA only, all their versions:\n"
-        << "# their panel's light centring spring, 0..100 percent of Sega Rally's\n"
-        << "# strongest torque (32) at the gain above. The other games' panels\n"
-        << "# have none.\n"
-        << "wheel_panel_spring = " << config.wheel_panel_spring << "\n"
-        << "# Indy 500, Touring Car, Over Rev and Super GT 24h: the drive board's\n"
-        << "# power (0..63) that gives no torque yet, and the one taken as its full\n"
-        << "# power. 0 and 63: the torque in proportion to the power, as the board\n"
-        << "# sends it to the motor drive board.\n"
-        << "wheel_indy_deadband = " << config.wheel_indy_deadband << "\n"
-        << "wheel_indy_full_power = " << config.wheel_indy_full_power << "\n"
-        << "# The drive board's DIP switches for the motor's strength, 0..7 (0 all\n"
-        << "# OFF, as Sega Rally and Daytona leave the factory): Sega Rally and\n"
-        << "# Daytona switches 1-3, Indy 500's family 1-1..1-3.\n"
-        << "wheel_drive_dip = " << config.wheel_drive_dip << "\n"
-        << "# Reverses the force, for a wheel whose driver pushes the wrong way:\n"
-        << "# one that pulls away from the centre instead of bringing it back.\n"
-        << "wheel_ffb_invert = " << bool_text(config.wheel_ffb_invert) << "\n"
-        << "# Wheel rumble, for wheels without force feedback: vibrates on the\n"
-        << "# game's impacts. wheel_rumble_engine adds a vibration that grows with\n"
-        << "# the throttle; it is not from the game.\n"
-        << "wheel_rumble = " << bool_text(config.wheel_rumble) << "\n"
-        << "wheel_rumble_strength = " << config.wheel_rumble_strength << "\n"
-        << "wheel_rumble_engine = " << bool_text(config.wheel_rumble_engine) << "\n"
-        << "\n"
-        << "# Gamepad rumble in driving games: vibrates on the game's impacts.\n"
-        << "# pad_rumble_cornering adds a vibration that grows as you steer; it is\n"
-        << "# not from the game.\n"
-        << "pad_rumble = " << bool_text(config.pad_rumble) << "\n"
-        << "pad_rumble_strength = " << config.pad_rumble_strength << "\n"
-        << "pad_rumble_cornering = " << bool_text(config.pad_rumble_cornering) << "\n"
-        << "# Stick sensitivity past the deadzone, percent (25..300). Full\n"
-        << "# deflection is always full lock; under 100 the middle of the travel\n"
-        << "# does less, over 100 it does more.\n"
-        << "pad_stick_sensitivity = " << config.pad_stick_sensitivity << "\n"
-        << "# Stick travel about centre that reads as centre, percent (0..40).\n"
-        << "# Raise it for a stick that no longer settles at rest.\n"
-        << "pad_stick_deadzone = " << config.pad_stick_deadzone << "\n"
-        << "# Guide button shortcuts on a gamepad (menu, save, load, rewind...).\n"
-        << "# Off for a front end that maps its own hotkeys.\n"
-        << "pad_shortcuts = " << bool_text(config.pad_shortcuts) << "\n"
-        << "# The pad each player wants, by device path (/dev/input/eventN on\n"
-        << "# Linux). Empty gives the slot to the first pad found.\n"
-        << "pad1_device = " << config.pad_device[0] << "\n"
-        << "pad2_device = " << config.pad_device[1] << "\n"
-        << "# Cabinet lamps and drive-board bytes for MAMEHooker, DOFLinx and\n"
-        << "# similar tools, in MAME's formats: over TCP (network) and, on\n"
-        << "# Windows, as window messages. With the network outputs on, a starting\n"
-        << "# game is also announced over UDP to outputs_network_udp_port, as\n"
-        << "# Supermodel does on 8001, which BackForceFeeder waits for; 0 turns\n"
-        << "# the announcement off.\n"
-        << "outputs_network = " << bool_text(config.outputs_network) << "\n"
-        << "outputs_network_port = " << config.outputs_network_port << "\n"
-        << "outputs_network_udp_port = " << config.outputs_network_udp_port << "\n"
-        << "# The racing games' telemetry (cars, race), one JSON line a frame to\n"
-        << "# every TCP client on this port; 0 serves nothing.\n"
-        << "telemetry_port = " << config.telemetry_port << "\n"
-        << "# The same as Forza Motorsport 7's Data Out datagrams (motion and\n"
-        << "# dashboard programs: SimHub, FlyPT Mover...), to HOST:PORT; empty sends none.\n"
-        << "telemetry_forza = " << config.telemetry_forza << "\n"
-        << "outputs_windows = " << bool_text(config.outputs_windows) << "\n"
-        << "# Your wheel's own physical rotation range (a G-series PC wheel is\n"
-        << "# ~900). The cabinet's ~240 of lock is mapped onto it, so matching\n"
-        << "# your wheel gives arcade-like response.\n"
-        << "wheel_steer_degrees = " << config.wheel_steer_degrees << "\n"
-        << "# Physical rotation (total) at which the game reaches full lock;\n"
-        << "# lower is more sensitive. 180..270.\n"
-        << "wheel_lock_degrees = " << config.wheel_lock_degrees << "\n"
-        << "# Wheel travel about centre that reads as centre, percent (0..20).\n"
-        << "wheel_steer_deadzone = " << config.wheel_steer_deadzone << "\n"
-        << "# Which wheel button drives each control (numbering varies by wheel;\n"
-        << "# -1 unbinds). Set these in the GUI's Wheel tab. Buttons 1..4 are the\n"
-        << "# arcade buttons, which is where a cabinet's VR/view buttons land too.\n"
-        << "wheel_button_start = " << config.wheel_buttons[cfg_role(Config::WheelRole::Start)] << "\n"
-        << "wheel_button_coin = " << config.wheel_buttons[cfg_role(Config::WheelRole::Coin)] << "\n"
-        << "wheel_button_1 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Button1)] << "\n"
-        << "wheel_button_2 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Button2)] << "\n"
-        << "wheel_button_3 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Button3)] << "\n"
-        << "wheel_button_4 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Button4)] << "\n"
-        << "wheel_button_gear_up = " << config.wheel_buttons[cfg_role(Config::WheelRole::GearUp)] << "\n"
-        << "wheel_button_gear_down = " << config.wheel_buttons[cfg_role(Config::WheelRole::GearDown)] << "\n"
-        << "wheel_button_test = " << config.wheel_buttons[cfg_role(Config::WheelRole::Test)] << "\n"
-        << "wheel_button_service = " << config.wheel_buttons[cfg_role(Config::WheelRole::Service)] << "\n"
-        << "wheel_button_menu = " << config.wheel_buttons[cfg_role(Config::WheelRole::Menu)] << "\n"
-        << "# An H shifter's positions, one button each, on the games with a gate\n"
-        << "# gearbox (Daytona USA, Sega Rally Championship).\n"
-        << "wheel_button_gear_1 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Gear1)] << "\n"
-        << "wheel_button_gear_2 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Gear2)] << "\n"
-        << "wheel_button_gear_3 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Gear3)] << "\n"
-        << "wheel_button_gear_4 = " << config.wheel_buttons[cfg_role(Config::WheelRole::Gear4)] << "\n"
-        << "wheel_button_gear_neutral = " << config.wheel_buttons[cfg_role(Config::WheelRole::GearNeutral)] << "\n"
-        << "# A keyboard key per control too, alongside the button: wheel_key_ and\n"
-        << "# the name after wheel_button_, set to an SDL scancode name (the key's\n"
-        << "# place on a US keyboard: Z, 5, Left Ctrl, F1). A bound key leaves the\n"
-        << "# role it has by default. The same for gamepads: pad1_key_button1...\n";
-    for (u32 r = 0; r < Config::kWheelRoleCount; ++r) {
-        if (!config.wheel_keys[r].empty()) {
-            out << "wheel_key_" << kWheelRoleNames[r] << " = " << config.wheel_keys[r] << "\n";
-        }
-    }
-    out
-        << "# With an H shifter bound: its lever in none of the gears is in neutral,\n"
-        << "# as on the cabinet. Off, the last gear stays until another is chosen.\n"
-        << "wheel_shifter_neutral = " << bool_text(config.wheel_shifter_neutral) << "\n"
-        << "# A paddle or RB/LB shift from one gear to another passes through\n"
-        << "# neutral this long, in ms, as a lever crosses the gate; 0 shifts\n"
-        << "# straight. 0..500.\n"
-        << "wheel_shift_neutral_ms = " << config.wheel_shift_neutral_ms << "\n"
-        << "# Wheel axes, or -1 to auto-detect (steering axis 0; pedals by rest\n"
-        << "# position). Set by the GUI calibration when a wheel differs.\n"
-        << "wheel_steer_axis = " << config.wheel_steer_axis << "\n"
-        << "wheel_accel_axis = " << config.wheel_accel_axis << "\n"
-        << "wheel_brake_axis = " << config.wheel_brake_axis << "\n"
-        << "wheel_accel_invert = " << bool_text(config.wheel_accel_invert) << "\n"
-        << "wheel_brake_invert = " << bool_text(config.wheel_brake_invert) << "\n"
-        << "# A pedal on half of its axis, released at the centre: pressed towards\n"
-        << "# the high end, or the low end when inverted (Y-).\n"
-        << "wheel_accel_half = " << bool_text(config.wheel_accel_half) << "\n"
-        << "wheel_brake_half = " << bool_text(config.wheel_brake_half) << "\n";
-    out << "\n"
-        << "# Light-gun buttons, per player, as raw Linux evdev key codes (0\n"
-        << "# unbinds). Trigger fires, reload is the off-screen reload / missile,\n"
-        << "# coin and start are the operator inputs, hat_* are a gun's D-pad.\n"
-        << "# Defaults suit a Sinden: BTN_LEFT 0x110, BTN_RIGHT 0x111, BTN_1..8\n"
-        << "# 0x101..0x108.\n";
+        << "sinden_border_thickness = " << config.sinden_border_thickness << "\n";
     for (u32 p = 0; p < 2; ++p) {
         for (u32 r = 0; r < Config::kGunRoleCount; ++r) {
             out << "gun" << (p + 1) << "_button_" << kGunRoleNames[r] << " = "
                 << config.gun_buttons[p][r] << "\n";
         }
     }
-    out << "\n"
-        << "# SCSP sound chip emulation for the Model 2A/2B/2C sound board: mame\n"
-        << "# or mednafen (being brought over, see SCSP.md). Applies from the\n"
-        << "# next game launch; a save state only loads with the core it was\n"
-        << "# made with.\n"
-        << "scsp_core = " << config.scsp_core << "\n"
-        << "\n"
-        << "# Per-game volume, 0..150 percent of the default (100). One\n"
-        << "# volume_<parent set> line per game family, e.g. volume_srallyc.\n"
-        << "game_volume = " << bool_text(config.game_volume) << "\n";
-    for (const auto& [family, percent] : config.game_volumes) {
-        if (percent != Config::kDefaultGameVolume) {
-            out << "volume_" << family << " = " << percent << "\n";
-        }
+    out << "\n[network]\n"
+        << "link_enabled = " << bool_text(config.link_enabled) << "\n"
+        << "link_local_ip = " << config.link_local_ip << "\n"
+        << "link_subnet_mask = " << config.link_subnet_mask << "\n"
+        << "link_port = " << config.link_port << "\n"
+        << "link_next_ip = " << config.link_next_ip << "\n"
+        << "link_next_port = " << config.link_next_port << "\n"
+        << "link_cabinet_index = " << config.link_cabinet_index << "\n"
+        << "link_mode = " << config.link_mode << "\n"
+        << "outputs_network = " << bool_text(config.outputs_network) << "\n"
+        << "outputs_network_port = " << config.outputs_network_port << "\n"
+        << "outputs_network_udp_port = " << config.outputs_network_udp_port << "\n"
+        << "outputs_windows = " << bool_text(config.outputs_windows) << "\n"
+        << "telemetry_port = " << config.telemetry_port << "\n"
+        << "telemetry_forza = " << config.telemetry_forza << "\n"
+        << "\n[system]\n"
+        << "language = " << config.language << "\n"
+        << "input_background = " << bool_text(config.input_background) << "\n"
+        << "rewind = " << bool_text(config.rewind) << "\n"
+        << "rewind_buffer_mb = " << config.rewind_buffer_mb << "\n";
+    for (u32 h = 0; h < Config::kHotkeyCount; ++h) {
+        out << "key_" << kHotkeyNames[h] << " = " << config.hotkeys[h] << "\n";
     }
-    out << "\n"
-        << "# Where the ROM archives live. A game launched by name with no\n"
-        << "# explicit path is loaded from <rom_dir>/<name>.zip or .7z.\n"
-        << "rom_dir = " << config.rom_dir << "\n"
-        << "\n"
-        << "# Saves: per-game .nv and .eeprom (scores, settings).\n"
-        << "nvram_dir = " << config.nvram_dir << "\n"
-        << "\n"
-        << "# Where F12 screenshots are written.\n"
-        << "screenshot_dir = " << config.screenshot_dir << "\n"
-        << "\n"
-        << "# The one directory a run writes to, for a cabinet whose disk is behind\n"
-        << "# a write filter (--write-dir): these settings at its root, copied there\n"
-        << "# the first time; each game's NVRAM, EEPROM, states, screenshots and\n"
-        << "# texture dumps in <write_dir>/<set>; the scraped artwork in\n"
-        << "# <write_dir>/cache/artwork. What it does not hold yet is read from the\n"
-        << "# places above. Relative to the executable's folder. Empty: those places.\n"
-        << "write_dir = " << config.write_dir << "\n"
-        << "\n"
-        << "# Empty means a bezels folder beside this file.\n"
-        << "bezel_dir = " << config.bezel_dir << "\n"
-        << "# Crosshair images: <game>-p1.png or <game>.png, the parent's, or\n"
-        << "# default-p1.png / default.png. Empty means a crosshairs folder beside this file.\n"
-        << "crosshair_dir = " << config.crosshair_dir << "\n"
-        << "\n"
-        << "# Let the game picker fetch box art and descriptions from ArcadeDB\n"
-        << "# over the network. Off keeps the emulator offline: the picker still\n"
-        << "# lists and launches every game, with placeholder tiles and no text.\n"
-        << "scrape_artwork = " << bool_text(config.scrape_artwork) << "\n"
-        << "\n"
-        << "# Vulkan validation layers. Slow, and only useful when developing.\n"
-        << "validation = " << bool_text(config.validation) << "\n"
-        << "\n"
-        << "# trace, debug, info, warning or error.\n"
-        << "log_level = " << config.log_level << "\n";
+    out << "log_level = " << config.log_level << "\n"
+        << "validation = " << bool_text(config.validation) << "\n";
 
-    // Sections run to the end of the file, so they come last.
-    out << "\n"
-        << "# Gamepad buttons, per player, as SDL_GamepadButton values (-1\n"
-        << "# unbinds). button1..4 are the arcade buttons, up/down/left/right the\n"
-        << "# joystick gate, start/coin the operator inputs, gear_up/gear_down\n"
-        << "# the shift. Defaults are the positional SDL layout: South 0 East 1\n"
-        << "# West 2 North 3 -> button1..4, DpadUp 11 DpadDown 12 DpadLeft 13\n"
-        << "# DpadRight 14, Start 6, Back 4, RightShoulder 10, LeftShoulder 9.\n"
-        << "# 100 + an axis number is that axis pushed past half travel (a trigger\n"
-        << "# pulled, a stick right or down); 200 + axis is the other direction.\n"
-        << "# Gamepad analogue axes, per player, as SDL_GamepadAxis values (-1\n"
-        << "# keeps the default: aim on the left stick, accel on the right trigger,\n"
-        << "# brake on the left trigger, Virtual On's lever on the right stick).\n"
-        << "# LeftX 0 LeftY 1 RightX 2 RightY 3 LeftTrigger 4 RightTrigger 5. An\n"
-        << "# *_invert flag reverses an axis that reads the wrong way; a pedal's\n"
-        << "# *_button is a binding that floors it while held (-1 none).\n"
-        << "# [gamepad] is the default layout. A [family] section, named after\n"
-        << "# the parent set, replaces it for every version of that game and only\n"
-        << "# needs the bindings that differ. Delete one to use [gamepad] again.\n"
-        << "\n[gamepad]\n";
+    // Game sections run to the end of the file, so they and [gamepad] come last.
+    out << "\n# A [family] section after [gamepad], named after the parent set,\n"
+        << "# replaces its bindings for every version of that game.\n"
+        << "\n[gamepad]\n"
+        << "pad_rumble = " << bool_text(config.pad_rumble) << "\n"
+        << "pad_rumble_strength = " << config.pad_rumble_strength << "\n"
+        << "pad_rumble_cornering = " << bool_text(config.pad_rumble_cornering) << "\n"
+        << "pad_stick_sensitivity = " << config.pad_stick_sensitivity << "\n"
+        << "pad_stick_deadzone = " << config.pad_stick_deadzone << "\n"
+        << "pad_shortcuts = " << bool_text(config.pad_shortcuts) << "\n"
+        << "pad1_device = " << config.pad_device[0] << "\n"
+        << "pad2_device = " << config.pad_device[1] << "\n";
     write_pad_layout(out, config.pad);
     for (const auto& [family, layout] : config.pad_layouts) {
         out << "\n[" << family << "]\n";

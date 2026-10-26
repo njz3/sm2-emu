@@ -185,6 +185,10 @@ public:
     /// Replace the wheel settings live, e.g. from a GUI slider.
     void set_wheel_settings(const WheelSettings& wheel);
 
+    /// The emulator's shortcuts as the settings bind them, by SDL key name:
+    /// those keys are never bound to a cabinet control nor captured.
+    void set_hotkeys(const std::array<std::string, Config::kHotkeyCount>& names);
+
     /// True when a wheel is connected, for the settings UI to show its controls.
     [[nodiscard]] bool wheel_connected() const { return m_wheel.handle != nullptr; }
 
@@ -591,6 +595,17 @@ private:
     std::array<bool, SDL_SCANCODE_COUNT>                       m_key_taken{};
     /// Keys held when a capture began, not taken for the binding.
     std::array<bool, SDL_SCANCODE_COUNT>                       m_key_capture_held{};
+    /// The shortcuts' keys, by name and as keycodes (set_hotkeys()).
+    std::array<std::string, Config::kHotkeyCount> m_hotkey_names{};
+    std::array<SDL_Keycode, Config::kHotkeyCount> m_hotkeys = [] {
+        std::array<SDL_Keycode, Config::kHotkeyCount> keys{};
+        keys.fill(SDLK_UNKNOWN);
+        return keys;
+    }();
+    bool m_hotkeys_set = false;
+
+    /// One of the shortcuts' keys, by what it types on this layout.
+    [[nodiscard]] bool emulator_key(SDL_Scancode key) const;
 
     /// Desert Tank's forward/reverse shift.
     mutable bool m_desert_shift      = false;  ///< latched forward(false)/reverse(true).

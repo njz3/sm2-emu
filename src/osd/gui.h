@@ -225,6 +225,12 @@ public:
                          std::vector<std::string> missing);
     [[nodiscard]] bool load_error_open() const { return m_load_error.has_value(); }
 
+    /// True while the System tab waits for a key to bind to a shortcut.
+    [[nodiscard]] bool capturing_key() const { return m_capture_hotkey >= 0; }
+    /// Binds `key` (an SDL_Keycode) to the shortcut being captured; Escape
+    /// cancels.
+    void capture_key(Config& config, u32 key);
+
     /// GPU capabilities for gating the enhancement options, fed each frame so
     /// the GUI need not include the render backend header. Defaults leave the
     /// opt-in enhancements unavailable until a backend reports otherwise.
@@ -309,12 +315,13 @@ private:
     void draw_gamepad_tab(Config& config, class Input* input);
     void draw_lightgun_tab(Config& config, class Input* input);
     void draw_network_tab(Config& config);
-    void draw_states_tab();
+    void draw_states_tab(const Config& config);
     void draw_system_tab(Config& config);
+    void draw_hotkeys(Config& config);
     void draw_audio_tab(Config& config);
     bool draw_volume_slider(Config& config, const GameFamily& family);
     void draw_dir_picker_popup(Config& config);
-    void draw_status_bar(float measured_hz);
+    void draw_status_bar(const Config& config, float measured_hz);
     void draw_fps_overlay(float measured_hz, const char* renderer_label);
     void draw_notification();
     void draw_crosshairs(const Config& config, const class Input* input);
@@ -389,6 +396,7 @@ private:
     int m_pad_capture_player = -1;
     u32 m_pad_capture_role   = 0;
     int m_pad_edit_player    = 0;
+    int  m_capture_hotkey     = -1;     ///< Config::Hotkey waiting for a key, or -1
     bool m_pad_shortcuts_view = false;  ///< the Guide shortcuts in place of the bindings
 
     // Axis capture: the (player, role) awaiting a move, or -1, and the rest

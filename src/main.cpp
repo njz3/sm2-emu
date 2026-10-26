@@ -376,7 +376,7 @@ void print_usage()
         "                      software; auto-reduced if the GPU cannot allocate it\n"
         "      --rom-dir <dir> Where the ROM archives live; a game named with no\n"
         "                      path is loaded from <dir>/<name>.zip or .7z\n"
-        "      --screenshot-dir <dir>  Where F12 screenshots are written\n"
+        "      --screenshot-dir <dir>  Where screenshots are written\n"
         "      --load-state <file>  Restore this save state before running, so a\n"
         "                      one-frame --screenshot captures that exact moment\n"
         "\n");
@@ -1178,6 +1178,7 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
     options->config.pad_stick_sensitivity = from_file.pad_stick_sensitivity;
     options->config.pad_stick_deadzone    = from_file.pad_stick_deadzone;
     options->config.pad_shortcuts         = from_file.pad_shortcuts;
+    options->config.hotkeys               = from_file.hotkeys;
     options->config.pad_device            = from_file.pad_device;
     options->config.pad                   = from_file.pad;
     options->config.pad_layouts           = from_file.pad_layouts;
@@ -2617,17 +2618,20 @@ int main(int argc, char** argv)
         pacer.set_relative(options.config.link_enabled && options.config.link_mode == "buffered");
         pacer.start(hw::Model2::kFrameNanoseconds);
 
-#if defined(__APPLE__)
-        // F11 is the cross-platform fullscreen key, but macOS binds it to Show
-        // Desktop by default and consumes it before the app sees it, so Cmd+F is
-        // offered as the reliable alternative there.
-        const char* fullscreen_key = "F11/Cmd+F fullscreen";
-#else
-        const char* fullscreen_key = "F11 fullscreen";
-#endif
-        SM2_INFO("entering main loop; Esc back to games, F9 quits, P pauses, "
-                 "Tab fast-forwards, F6/F7 quick save/load, F8 FPS, F10 menu, "
-                 "%s, F12 screenshot", fullscreen_key);
+{
+            const auto key = [&](Config::Hotkey hotkey) {
+                const std::string& name = options.config.hotkey(hotkey);
+                return name.empty() ? "none" : name.c_str();
+            };
+            SM2_INFO("entering main loop; %s back to games, %s quits, %s pauses, "
+                     "%s fast-forwards, %s/%s quick save/load, %s FPS, %s menu, "
+                     "%s fullscreen, %s screenshot",
+                     key(Config::Hotkey::Exit), key(Config::Hotkey::Quit),
+                     key(Config::Hotkey::Pause), key(Config::Hotkey::FastForward),
+                     key(Config::Hotkey::QuickSave), key(Config::Hotkey::QuickLoad),
+                     key(Config::Hotkey::Fps), key(Config::Hotkey::Overlay),
+                     key(Config::Hotkey::Fullscreen), key(Config::Hotkey::Screenshot));
+        }
 
         /// Everything the sound board produced, when --dump-audio was given.
         std::vector<s16> recorded_audio;
@@ -2838,8 +2842,18 @@ int main(int argc, char** argv)
             pacer.resync();
         };
 
+        const auto is_hotkey = [&](const SDL_KeyboardEvent& key, Config::Hotkey hotkey) {
+            const std::string& name  = options.config.hotkey(hotkey);
+            const SDL_Keycode  bound = name.empty() ? SDLK_UNKNOWN : SDL_GetKeyFromName(name.c_str());
+            return bound != SDLK_UNKNOWN && key.key == bound;
+        };
+
         while (running) {
             const u64 frame_start_ns = SDL_GetTicksNS();
+
+            // The shortcuts' keys, as the System tab binds them, stay out of
+            // the cabinet controls' (paused or not, for the binding UI).
+            input.set_hotkeys(options.config.hotkeys);
 
             // Inputs in the background, as the wheel settings last set it.
             if (options.config.input_background != input_background) {
@@ -2850,8 +2864,11 @@ int main(int argc, char** argv)
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
                 // Let ImGui see every event so it can capture mouse/keyboard
-                // when the overlay is active.
-                ImGui_ImplSDL3_ProcessEvent(&event);
+                // when the overlay is active, bar a key the System tab is
+                // binding, which its keyboard navigation would also press.
+                if (event.type != SDL_EVENT_KEY_DOWN || !gui.visible() || !gui.capturing_key()) {
+                    ImGui_ImplSDL3_ProcessEvent(&event);
+                }
 
                 switch (event.type) {
                     case SDL_EVENT_QUIT:
@@ -2861,9 +2878,12 @@ int main(int argc, char** argv)
                         running = false;
                         break;
                     case SDL_EVENT_KEY_DOWN:
-                        if (event.key.key == SDLK_ESCAPE && gui.load_error_open()) {
+                        if (gui.visible() && gui.capturing_key()) {
+                            // The System tab is binding a shortcut.
+                            gui.capture_key(options.config, event.key.key);
+                        } else if (event.key.key == SDLK_ESCAPE && gui.load_error_open()) {
                             // The dialog takes this Esc.
-                        } else if (event.key.key == SDLK_ESCAPE) {
+                        } else if (is_hotkey(event.key, Config::Hotkey::Exit)) {
                             // Esc returns to the game picker (unloading the
                             // current game) when there is a picker to return to;
                             // otherwise -- a single ROM launched by path with no
@@ -2874,40 +2894,40 @@ int main(int argc, char** argv)
                             } else {
                                 running = false;
                             }
-                        } else if (event.key.key == SDLK_F9 && !event.key.repeat) {
+                        } else if (is_hotkey(event.key, Config::Hotkey::Quit) && !event.key.repeat) {
                             quit_key_pressed = true;
-                        } else if (event.key.key == SDLK_F10 && !event.key.repeat) {
+                        } else if (is_hotkey(event.key, Config::Hotkey::Overlay) && !event.key.repeat) {
                             gui.toggle();
-                        } else if ((event.key.key == SDLK_F11
+                        } else if ((is_hotkey(event.key, Config::Hotkey::Fullscreen)
                                     || (event.key.key == SDLK_F
                                         && (event.key.mod & SDL_KMOD_GUI) != 0))
                                    && !event.key.repeat) {
-                            // F11 everywhere, plus Cmd+F on macOS: the OS there
-                            // reserves F11 (Show Desktop), so it never reaches us.
+                            // Plus Cmd+F on macOS: the OS there reserves F11
+                            // (Show Desktop), so it never reaches us.
                             options.config.fullscreen = !window.fullscreen();
                             window.set_fullscreen(options.config.fullscreen,
                                                   options.config.borderless_fullscreen,
                                                   options.config.window_width,
                                                   options.config.window_height);
-                        } else if (event.key.key == SDLK_F12 && !event.key.repeat) {
+                        } else if (is_hotkey(event.key, Config::Hotkey::Screenshot) && !event.key.repeat) {
                             screenshot_requested = true;
                         } else if (!gui.visible()) {
                             // Only process game keys when the overlay is hidden.
-                            if (event.key.key == SDLK_P && !event.key.repeat) {
+                            if (is_hotkey(event.key, Config::Hotkey::Pause) && !event.key.repeat) {
                                 paused = !paused;
-                            } else if (event.key.key == SDLK_F6 && !event.key.repeat
+                            } else if (is_hotkey(event.key, Config::Hotkey::QuickSave) && !event.key.repeat
                                        && machine_iface != nullptr) {
                                 // Quick-save / quick-load the reserved slot. Only
                                 // with a game running; serviced between frames.
                                 state_action = StateAction{StateOp::Save, hw::kQuickSlot};
-                            } else if (event.key.key == SDLK_F7 && !event.key.repeat
+                            } else if (is_hotkey(event.key, Config::Hotkey::QuickLoad) && !event.key.repeat
                                        && machine_iface != nullptr) {
                                 state_action = StateAction{StateOp::Load, hw::kQuickSlot};
-                            } else if (event.key.key == SDLK_F8 && !event.key.repeat) {
+                            } else if (is_hotkey(event.key, Config::Hotkey::Fps) && !event.key.repeat) {
                                 options.config.show_fps = !options.config.show_fps;
-                            } else if (event.key.key == SDLK_TAB && !event.key.repeat) {
+                            } else if (is_hotkey(event.key, Config::Hotkey::FastForward) && !event.key.repeat) {
                                 fast_forward = true;
-                            } else if (event.key.key == SDLK_BACKSPACE) {
+                            } else if (is_hotkey(event.key, Config::Hotkey::Rewind)) {
                                 rewind_held = true;
                             }
                         }
@@ -2918,11 +2938,11 @@ int main(int argc, char** argv)
                         }
                         break;
                     case SDL_EVENT_KEY_UP:
-                        if (event.key.key == SDLK_TAB) {
+                        if (is_hotkey(event.key, Config::Hotkey::FastForward)) {
                             fast_forward = false;
-                        } else if (event.key.key == SDLK_BACKSPACE) {
+                        } else if (is_hotkey(event.key, Config::Hotkey::Rewind)) {
                             rewind_held = false;
-                        } else if (event.key.key == SDLK_F9 && quit_key_pressed) {
+                        } else if (is_hotkey(event.key, Config::Hotkey::Quit) && quit_key_pressed) {
                             running = false;
                         }
                         break;

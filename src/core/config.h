@@ -382,6 +382,32 @@ struct Config {
     /// that maps the hotkeys itself, such as Batocera.
     bool pad_shortcuts = true;
 
+    /// The keyboard shortcuts. Keep kCount last.
+    enum class Hotkey : u32 {
+        Exit, Quit, Overlay, Fullscreen, Screenshot, Pause, QuickSave, QuickLoad,
+        Fps, FastForward, Rewind, kCount
+    };
+    static constexpr u32 kHotkeyCount = static_cast<u32>(Hotkey::kCount);
+
+    /// The default key for each shortcut, by SDL key name.
+    static constexpr std::array<const char*, kHotkeyCount> kDefaultHotkeys = {
+        "Escape", "F9", "F10", "F11", "F12", "P", "F6", "F7", "F8", "Tab", "Backspace",
+    };
+
+    /// The key bound to each shortcut, by SDL key name, or empty for none.
+    std::array<std::string, kHotkeyCount> hotkeys = [] {
+        std::array<std::string, kHotkeyCount> keys;
+        for (u32 i = 0; i < kHotkeyCount; ++i) {
+            keys[i] = kDefaultHotkeys[i];
+        }
+        return keys;
+    }();
+
+    [[nodiscard]] const std::string& hotkey(Hotkey h) const
+    {
+        return hotkeys[static_cast<usize>(h)];
+    }
+
     /// The device path of the pad each player wants, as SDL reports it
     /// (/dev/input/eventN on Linux). Empty leaves the slot to whichever pad
     /// comes first. A front end with its own player order sets these.

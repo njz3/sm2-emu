@@ -83,6 +83,20 @@ void right_aligned_lines(std::string_view text)
     }
 }
 
+/// The key bound to a shortcut, for display, or nullptr for none.
+const char* hotkey_name(const Config& config, Config::Hotkey hotkey)
+{
+    const std::string& name = config.hotkey(hotkey);
+    return name.empty() ? nullptr : name.c_str();
+}
+
+/// As hotkey_name(), with "none" for an unbound shortcut.
+const char* hotkey_label(const Config& config, Config::Hotkey hotkey)
+{
+    const char* name = hotkey_name(config, hotkey);
+    return name != nullptr ? name : tr("none");
+}
+
 /// A tooltip of already-translated text.
 void tooltip(const char* text)
 {
@@ -451,7 +465,7 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
     if (m_visible) {
         draw_menu_bar(config);
         draw_settings(config, gpu_names, input);
-        draw_status_bar(measured_hz);
+        draw_status_bar(config, measured_hz);
     }
 
     if (m_load_error.has_value()) {
@@ -478,11 +492,12 @@ void Gui::draw_menu_bar(Config& config)
 {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu(tr_id("File"))) {
-            if (ImGui::MenuItem(tr_id("Hide overlay"), "F10")) {
+            if (ImGui::MenuItem(tr_id("Hide overlay"),
+                                hotkey_name(config, Config::Hotkey::Overlay))) {
                 m_visible = false;
             }
             ImGui::Separator();
-            if (ImGui::MenuItem(tr_id("Quit"), "F9")) {
+            if (ImGui::MenuItem(tr_id("Quit"), hotkey_name(config, Config::Hotkey::Quit))) {
                 SDL_Event quit_event{};
                 quit_event.type = SDL_EVENT_QUIT;
                 SDL_PushEvent(&quit_event);
@@ -492,7 +507,8 @@ void Gui::draw_menu_bar(Config& config)
         if (ImGui::BeginMenu(tr_id("Settings"))) {
             ImGui::MenuItem(tr_id("Vsync"), nullptr, &config.vsync);
             ImGui::MenuItem(tr_id("Fullscreen"), nullptr, &config.fullscreen);
-            ImGui::MenuItem(tr_id("FPS counter"), "F8", &config.show_fps);
+            ImGui::MenuItem(tr_id("FPS counter"), hotkey_name(config, Config::Hotkey::Fps),
+                            &config.show_fps);
             ImGui::MenuItem(tr_id("On-screen notifications"), nullptr, &config.show_notifications);
             ImGui::MenuItem(tr_id("Light-gun mode"), nullptr, &config.lightgun);
             ImGui::EndMenu();
@@ -1001,7 +1017,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
             ImGui::Spacing();
             dir_field(N_("Screenshots directory"), "##shots", config.screenshot_dir,
                       DirPickerTarget::ScreenshotDir,
-                      N_("Where F12 screenshots are written."));
+                      N_("Where screenshots are written."));
             ImGui::Spacing();
             dir_field(N_("Bezels directory"), "##bezels", config.bezel_dir,
                       DirPickerTarget::BezelDir,
@@ -1058,7 +1074,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
 
         // -- States tab ----------------------------------------------------
         if (ImGui::BeginTabItem(tr_id("States"))) {
-            draw_states_tab();
+            draw_states_tab(config);
             ImGui::EndTabItem();
         }
 
@@ -3028,8 +3044,9 @@ void Gui::draw_system_tab(Config& config)
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        tooltip(tr("Hold Backspace to step back through play.\n"
-                   "Costs a little speed on every frame while on."));
+        tooltip(trf("Hold %s to step back through play.\n"
+                    "Costs a little speed on every frame while on.",
+                    hotkey_label(config, Config::Hotkey::Rewind)).c_str());
     }
     if (config.rewind) {
         int buffer = static_cast<int>(config.rewind_buffer_mb);
@@ -3038,17 +3055,95 @@ void Gui::draw_system_tab(Config& config)
             config.rewind_buffer_mb = static_cast<u32>(buffer);
         }
     }
+
+    ImGui::Spacing();
+    ImGui::SeparatorText(tr("Keyboard shortcuts"));
+    draw_hotkeys(config);
 }
 
-void Gui::draw_states_tab()
+void Gui::draw_hotkeys(Config& config)
+{
+    struct HotkeyRow {
+        const char*    name;
+        Config::Hotkey hotkey;
+    };
+    static constexpr HotkeyRow kRows[] = {
+        {N_("Back to games"),        Config::Hotkey::Exit},
+        {N_("Quit"),                 Config::Hotkey::Quit},
+        {N_("Settings overlay"),     Config::Hotkey::Overlay},
+        {N_("Fullscreen"),           Config::Hotkey::Fullscreen},
+        {N_("Screenshot"),           Config::Hotkey::Screenshot},
+        {N_("Pause"),                Config::Hotkey::Pause},
+        {N_("Quick-save"),           Config::Hotkey::QuickSave},
+        {N_("Quick-load"),           Config::Hotkey::QuickLoad},
+        {N_("FPS counter"),          Config::Hotkey::Fps},
+        {N_("Fast-forward (held)"),  Config::Hotkey::FastForward},
+        {N_("Rewind (held)"),        Config::Hotkey::Rewind},
+    };
+    const float key_column =
+        value_column(kRows, [](const HotkeyRow& r) { return r.name; });
+
+    for (const HotkeyRow& r : kRows) {
+        const int index = static_cast<int>(r.hotkey);
+        ImGui::PushID(index);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr(r.name));
+        ImGui::SameLine(key_column);
+        const bool capturing = m_capture_hotkey == index;
+        const std::string key =
+            capturing ? std::string(tr("press a key...")) : hotkey_label(config, r.hotkey);
+        if (ImGui::Button((key + "###key").c_str(), ImVec2(140, 0))) {
+            m_capture_hotkey = capturing ? -1 : index;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(tr_id("Default"))) {
+            config.hotkeys[static_cast<usize>(index)] = Config::kDefaultHotkeys[static_cast<usize>(index)];
+            m_capture_hotkey = -1;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(tr_id("Clear"))) {
+            config.hotkeys[static_cast<usize>(index)].clear();
+            m_capture_hotkey = -1;
+        }
+        ImGui::PopID();
+    }
+    ImGui::TextDisabled("%s", tr("Click a key, then press the new one. Escape cancels.\n"
+                                 "A key a game also uses does both."));
+}
+
+void Gui::capture_key(Config& config, u32 key)
+{
+    const int index  = m_capture_hotkey;
+    m_capture_hotkey = -1;
+    if (index < 0 || key == SDLK_ESCAPE) {
+        return;
+    }
+    const char* name = SDL_GetKeyName(static_cast<SDL_Keycode>(key));
+    if (name == nullptr || name[0] == '\0') {
+        return;
+    }
+    // A key already on another shortcut swaps with this one's old key.
+    std::string& bound = config.hotkeys[static_cast<usize>(index)];
+    for (std::string& other : config.hotkeys) {
+        if (&other != &bound && !other.empty()
+            && SDL_GetKeyFromName(other.c_str()) == static_cast<SDL_Keycode>(key)) {
+            other = bound;
+        }
+    }
+    bound = name;
+}
+
+void Gui::draw_states_tab(const Config& config)
 {
     if (!m_state_game_loaded) {
         ImGui::TextDisabled("%s", tr("Load a game to save and restore its state."));
         return;
     }
 
-    text_wrapped("Save the whole machine to a slot and restore it later. Quick-save is "
-                 "F6, quick-load is F7.");
+    text_wrapped(trf("Save the whole machine to a slot and restore it later. Quick-save is "
+                     "%s, quick-load is %s.",
+                     hotkey_label(config, Config::Hotkey::QuickSave),
+                     hotkey_label(config, Config::Hotkey::QuickLoad)).c_str());
     ImGui::Spacing();
 
     // A table so the three buttons always fit regardless of the overlay width,
@@ -3575,7 +3670,7 @@ void Gui::draw_dir_picker_popup(Config& config)
 // Status bar (bottom of screen)
 // ---------------------------------------------------------------------------
 
-void Gui::draw_status_bar(float measured_hz)
+void Gui::draw_status_bar(const Config& config, float measured_hz)
 {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float bar_height = ImGui::GetFrameHeight() + 4.0f;
@@ -3593,7 +3688,9 @@ void Gui::draw_status_bar(float measured_hz)
     if (ImGui::Begin("##StatusBar", nullptr, flags)) {
         ImGui::Text("%.1f Hz", static_cast<double>(measured_hz));
         // Right-align by measured width so the hint never clips off the edge.
-        const char*  hint      = tr("F10: toggle overlay");
+        const std::string hint_text =
+            trf("%s: toggle overlay", hotkey_label(config, Config::Hotkey::Overlay));
+        const char*  hint      = hint_text.c_str();
         const float  hint_w    = ImGui::CalcTextSize(hint).x;
         const float  right_pad = ImGui::GetStyle().WindowPadding.x;
         ImGui::SameLine(ImGui::GetWindowWidth() - hint_w - right_pad);
@@ -3754,7 +3851,11 @@ void Gui::draw_picker(Config& config)
 
     ImGui::TextUnformatted(tr("Select a game"));
     // Right-align by measured width so the hint never clips off the edge
-    const char* hint      = tr("Enter: launch   F10: settings   F9: quit");
+    const std::string hint_text =
+        trf("Enter: launch   %s: settings   %s: quit",
+            hotkey_label(config, Config::Hotkey::Overlay),
+            hotkey_label(config, Config::Hotkey::Quit));
+    const char* hint      = hint_text.c_str();
     const float hint_w    = ImGui::CalcTextSize(hint).x;
     const float right_pad = ImGui::GetStyle().WindowPadding.x;
     ImGui::SameLine(ImGui::GetWindowWidth() - hint_w - right_pad);

@@ -354,10 +354,9 @@ which is why it is off by default.
 ## Settings
 
 Most settings live in the **settings overlay** (`F10`) and in `sm2-emu.ini`,
-which is created automatically on first run with every setting at its default
-and a comment explaining each. It is searched
-for in the working directory first or otherwise in the platform's config
-directory (`$XDG_CONFIG_HOME/sm2-emu` on Linux, `~/Library/Application
+which is created automatically on first run with every setting at its default.
+It is searched for in the working directory first or otherwise in the platform's
+config directory (`$XDG_CONFIG_HOME/sm2-emu` on Linux, `~/Library/Application
 Support/sm2-emu` on macOS); `--config <dir>` overrides both, and whichever file
 was used is named in the log. Changes made in the overlay are saved on exit. A
 command-line flag always beats the file, and an unparseable line is reported and
