@@ -94,6 +94,21 @@ public:
     /// while that client stays connected and the game the same; none otherwise.
     [[nodiscard]] std::optional<u8> drive_reply() const;
 
+    /// One row of what the running game publishes, for the settings to list,
+    /// in the overlay's language.
+    struct Listed {
+        std::string name;
+        std::string type;
+        std::string meaning;
+        std::string value;  ///< The last one sent; "-" before any, or with the outputs off.
+    };
+
+    /// What the running game publishes: its latch's lamps with what each is
+    /// for in this game, the drive board's bytes when it has one (and
+    /// m2ffb_rx, the reply a tool sends back), the set's own outputs, each with
+    /// its last value. Empty with no game.
+    [[nodiscard]] std::vector<Listed> listing() const;
+
     /// One published output, exposed for the backends.
     struct Item {
         std::string name;
@@ -110,7 +125,9 @@ private:
     void update_game_outputs(u8 lamp_latch, std::span<const u8> work_ram);
 
     std::string m_game;
-    bool        m_paused = false;
+    std::string m_family;               ///< The set's family, for its lamps' names.
+    bool        m_drive_board = false;  ///< It latches drive-board commands.
+    bool        m_paused      = false;
 
     std::vector<Item> m_items;
 

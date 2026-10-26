@@ -19,6 +19,7 @@
 
 #include "core/log.h"
 #include "core/net.h"
+#include "osd/i18n.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -123,6 +124,85 @@ std::vector<NamedBit> family_lamps(const std::string& family)
         return {{"LampView1", 4}, {"LampView2", 5}};
     }
     return {};
+}
+
+/// What a lamp-latch output means, for the settings' list: a %d format when
+/// it sets *arg.
+const char* lamp_meaning(const std::string& name, int bit, int* arg)
+{
+    if (name == "LampStart") {
+        return N_("Start button lamp");
+    }
+    if (name == "LampLeader") {
+        return N_("Leader lamp");
+    }
+    if (name == "LampRevMax") {
+        return N_("Rev limit lamp");
+    }
+    if (name == "MachineGunMotor") {
+        return N_("Machine gun motor");
+    }
+    if (name == "CannonMotor") {
+        return N_("Cannon motor");
+    }
+    if (name.size() == 9 && name.rfind("LampView", 0) == 0) {
+        *arg = name[8] - '0';
+        return N_("View change button %d lamp");
+    }
+    *arg = bit;
+    return N_("Lamp latch bit %d");
+}
+
+/// What one of a set's own outputs means: DemulShooter's names, which the
+/// games use, else what its kind says.
+const char* game_output_meaning(const rom::OutputSpec& spec, int* arg)
+{
+    struct Known {
+        std::string_view name;
+        const char*      meaning;
+    };
+    static constexpr Known kPlayer[] = {
+        {"Life", N_("Player %d's life")},
+        {"Damaged", N_("Player %d hit: a pulse each time the life drops")},
+        {"Ammo", N_("Player %d's ammunition")},
+        {"Clip", N_("Player %d's gun loaded: 1 while it has ammunition")},
+        {"CtmRecoil", N_("Player %d's gun recoil: a pulse each shot")},
+        {"Shots", N_("Shots player %d has fired")},
+        {"GunMotor", N_("Player %d's gun motor")},
+        {"LmpStart", N_("Player %d start lamp")},
+        {"Wins", N_("Rounds player %d has won in this match")},
+    };
+    const std::string_view name = spec.name;
+    if (name.size() > 3 && name[0] == 'P' && (name[1] == '1' || name[1] == '2') && name[2] == '_') {
+        for (const Known& known : kPlayer) {
+            if (name.substr(3) == known.name) {
+                *arg = name[1] - '0';
+                return known.meaning;
+            }
+        }
+    }
+    if (name == "Credits") {
+        return N_("Credits");
+    }
+    switch (spec.kind) {
+    case rom::OutputSpec::Kind::Lamp:
+        *arg = spec.bit;
+        return N_("Lamp latch bit %d");
+    case rom::OutputSpec::Kind::Value:
+        return N_("A number from the game's work RAM");
+    case rom::OutputSpec::Kind::Flag:
+        return N_("1 while the value it follows is above zero");
+    case rom::OutputSpec::Kind::Pulse:
+        return N_("A pulse when the value it follows changes");
+    }
+    return "";
+}
+
+std::string hex_byte(u8 value)
+{
+    char hex[8];
+    std::snprintf(hex, sizeof hex, "%02X", static_cast<unsigned>(value));
+    return hex;
 }
 
 std::string line(std::string_view name, s32 value)
@@ -559,7 +639,9 @@ void Outputs::set_game(const std::string& name, const std::string& parent,
         poll();
         return;
     }
-    build_items(parent.empty() ? name : parent);
+    m_family      = parent.empty() ? name : parent;
+    m_drive_board = drive_board;
+    build_items(m_family);
     if (drive_board) {
         // Sent from the game's first write, under the name BackForceFeeder
         // answers to with the real board's reply.
@@ -727,6 +809,97 @@ Outputs::NetworkStatus Outputs::network_status() const
 std::optional<u8> Outputs::drive_reply() const
 {
     return m_network != nullptr ? m_network->drive_reply() : std::nullopt;
+}
+
+std::vector<Outputs::Listed> Outputs::listing() const
+{
+    std::vector<Listed> rows;
+    if (m_game.empty()) {
+        return rows;
+    }
+    // Values go out only through a backend that is on.
+    const bool sending = m_network != nullptr || m_windows != nullptr;
+    const auto shown   = [&](const Item& item) -> std::string {
+        if (!sending || !item.known) {
+            return "-";
+        }
+        return item.hex ? hex_byte(static_cast<u8>(item.value)) : std::to_string(item.value);
+    };
+    const auto text = [](const char* msgid, int arg) {
+        return arg >= 0 ? i18n::trf(msgid, arg) : std::string(i18n::tr(msgid));
+    };
+    // What a latch bit is for in this game: the name its own outputs give it,
+    // its family's, the start lamp, or else only which bit it is.
+    const auto bit_meaning = [&](int bit) {
+        int arg = -1;
+        for (const GameOutput& output : m_game_outputs) {
+            if (output.spec.kind == rom::OutputSpec::Kind::Lamp && output.spec.bit == bit) {
+                const char* msgid = game_output_meaning(output.spec, &arg);
+                return text(msgid, arg);
+            }
+        }
+        for (const NamedBit& named : family_lamps(m_family)) {
+            if (named.bit == bit) {
+                const char* msgid = lamp_meaning(named.name, bit, &arg);
+                return text(msgid, arg);
+            }
+        }
+        return bit == 2 ? text(N_("Start button lamp"), -1) : text(N_("Lamp latch bit %d"), bit);
+    };
+
+    rows.push_back({"mame_start", i18n::tr("text"),
+                    i18n::tr("The game's name, the first line a client gets"),
+                    sending ? m_game : "-"});
+    rows.push_back({"pause", i18n::tr("0 or 1"), i18n::tr("1 while the emulation is paused"),
+                    sending ? (m_paused ? "1" : "0") : "-"});
+    // The latch, then its bits: MAME's names, then this game's own for them.
+    for (usize i = 0; i < m_items.size(); ++i) {
+        if (m_bits[i] == kRawLamps) {
+            rows.push_back({m_items[i].name, i18n::tr("byte, 0 to 255"),
+                            i18n::tr("The lamp latch: lamp0 to lamp5 on bits 2 to 7"),
+                            shown(m_items[i])});
+        }
+    }
+    for (usize i = 0; i < m_items.size(); ++i) {
+        const int bit = m_bits[i];
+        if (bit < 0) {
+            continue;
+        }
+        const Item& item    = m_items[i];
+        std::string meaning = bit_meaning(bit);
+        if (item.name != "lamp" + std::to_string(bit - 2)) {
+            meaning = i18n::trf("%s (lamp%d)", meaning.c_str(), bit - 2);
+        }
+        rows.push_back({item.name, i18n::tr("0 or 1"), std::move(meaning), shown(item)});
+    }
+    // The drive board's bytes, from a game that has one, and the set's own.
+    for (usize i = 0; i < m_items.size(); ++i) {
+        const Item& item = m_items[i];
+        const int   bit  = m_bits[i];
+        if (bit == kRawDrive && m_drive_board) {
+            rows.push_back({item.name, i18n::tr("byte, 0 to 255, one line each"),
+                            i18n::tr("Each byte the game writes to its drive board"), shown(item)});
+        } else if (bit == kDriveHex) {
+            rows.push_back({item.name, i18n::tr("byte in hex, 00 to FF, one line each"),
+                            i18n::tr("The drive board's bytes again, in hex, for BackForceFeeder"),
+                            shown(item)});
+            // What a tool answers it with, sent the other way.
+            const std::optional<u8> reply = drive_reply();
+            rows.push_back({"m2ffb_rx", i18n::tr("byte in hex, 00 to FF"),
+                            i18n::tr("Received from BackForceFeeder: the real drive board's reply, "
+                                     "which the game then reads"),
+                            reply ? hex_byte(*reply) : "-"});
+        } else if (bit == kGameOutput) {
+            const rom::OutputSpec& spec = m_game_outputs[i - m_first_game_item].spec;
+            int         arg   = -1;
+            const char* msgid = game_output_meaning(spec, &arg);
+            rows.push_back({item.name,
+                            i18n::tr(spec.kind == rom::OutputSpec::Kind::Value ? "number" : "0 or 1"),
+                            text(msgid, arg), shown(item)});
+        }
+    }
+    rows.push_back({"mame_stop", "1", i18n::tr("When the game exits"), "-"});
+    return rows;
 }
 
 }  // namespace sm2::osd

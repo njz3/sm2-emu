@@ -3511,6 +3511,9 @@ int main(int argc, char** argv)
                 const osd::Outputs::NetworkStatus status = outputs.network_status();
                 gui.set_outputs_status(
                     osd::Gui::OutputsStatus{status.listening, status.clients, status.error});
+                if (gui.visible()) {
+                    gui.set_outputs_listing(outputs.listing());
+                }
             }
             // GPU capabilities gate the enhancement options in the GUI.
             {

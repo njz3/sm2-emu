@@ -1871,6 +1871,308 @@ msgstr "Relié : borne %u sur %u."
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Cabinet outputs"
+msgstr "Sorties de la borne"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Network outputs (MAME protocol)"
+msgstr "Sorties réseau (protocole MAME)"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Sends the cabinet lamps and the drive-board commands the way MAME's\n"
+"network output does, for BackForceFeeder, MameHooker, DOFLinx and\n"
+"the like. Takes effect straight away."
+msgstr ""
+"Envoie les lampes de la borne et les commandes de la carte moteur\n"
+"comme les sorties réseau de MAME, pour BackForceFeeder, MameHooker,\n"
+"DOFLinx et les autres. S'applique tout de suite."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Outputs port"
+msgstr "Port des sorties"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Announce port (UDP)"
+msgstr "Port d'annonce (UDP)"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"When a game starts, announces it and the outputs port\n"
+"once to tools on this machine that wait for it, as\n"
+"Supermodel does (8001, which BackForceFeeder listens\n"
+"on). 0 turns it off."
+msgstr ""
+"Au lancement d'un jeu, l'annonce une fois avec le port\n"
+"des sorties aux outils de cette machine qui l'attendent,\n"
+"comme Supermodel (8001, qu'écoute BackForceFeeder).\n"
+"0 la coupe."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Windows outputs (MAMEOutput messages)"
+msgstr "Sorties Windows (messages MAMEOutput)"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The same outputs over MAME's Windows-message protocol,\n"
+"for tools that speak that one. Windows only."
+msgstr ""
+"Les mêmes sorties par le protocole de messages Windows\n"
+"de MAME, pour les outils qui le parlent. Windows seulement."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Network outputs off."
+msgstr "Sorties réseau coupées."
+
+#: src/osd/gui.cpp
+#, c-format
+msgid "Not listening: %s"
+msgstr "N'écoute pas : %s"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Not listening."
+msgstr "N'écoute pas."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Listening; no tool connected."
+msgstr "À l'écoute ; aucun outil connecté."
+
+#: src/osd/gui.cpp
+#, c-format
+msgid "%zu tool(s) connected."
+msgstr "%zu outil(s) connecté(s)."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "What this game sends"
+msgstr "Ce que ce jeu envoie"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "text"
+msgstr "texte"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "number"
+msgstr "nombre"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Name"
+msgstr "Nom"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Type"
+msgstr "Type"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Meaning"
+msgstr "Signification"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Value"
+msgstr "Valeur"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "0 or 1"
+msgstr "0 ou 1"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "byte, 0 to 255"
+msgstr "octet, 0 à 255"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "byte, 0 to 255, one line each"
+msgstr "octet, 0 à 255, une ligne chacun"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "byte in hex, 00 to FF, one line each"
+msgstr "octet en hexadécimal, 00 à FF, une ligne chacun"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "byte in hex, 00 to FF"
+msgstr "octet en hexadécimal, 00 à FF"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "The game's name, the first line a client gets"
+msgstr "Le nom du jeu, la première ligne que reçoit un client"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "The lamp latch: lamp0 to lamp5 on bits 2 to 7"
+msgstr "Le registre des lampes : lamp0 à lamp5 sur les bits 2 à 7"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "%s (lamp%d)"
+msgstr "%s (lamp%d)"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "Each byte the game writes to its drive board"
+msgstr "Chaque octet que le jeu écrit à sa carte moteur"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "When the game exits"
+msgstr "Quand le jeu s'arrête"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Each line goes as \"name = value\" on the TCP port, at each change; a client "
+"that connects gets every known value first. Value: the last sent."
+msgstr ""
+"Chaque ligne part en « nom = valeur » sur le port TCP, à chaque changement ; un "
+"client qui se connecte reçoit d'abord toutes les valeurs connues. Valeur : la "
+"dernière envoyée."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "The values show once the outputs are on."
+msgstr "Les valeurs s'affichent une fois les sorties activées."
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "1 while the emulation is paused"
+msgstr "1 tant que l'émulation est en pause"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "Start button lamp"
+msgstr "Lampe du bouton Start"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "Leader lamp"
+msgstr "Lampe du leader"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "Rev limit lamp"
+msgstr "Lampe du régime maximum"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "Machine gun motor"
+msgstr "Moteur de la mitrailleuse"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "Cannon motor"
+msgstr "Moteur du canon"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "View change button %d lamp"
+msgstr "Lampe du bouton de vue %d"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Lamp latch bit %d"
+msgstr "Bit %d du registre des lampes"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "The drive board's bytes again, in hex, for BackForceFeeder"
+msgstr "Les mêmes octets de la carte moteur, en hexadécimal, pour BackForceFeeder"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid ""
+"Received from BackForceFeeder: the real drive board's reply, which the game "
+"then reads"
+msgstr ""
+"Reçu de BackForceFeeder : la réponse de la vraie carte moteur, que le jeu lit "
+"alors"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Player %d's life"
+msgstr "Vie du joueur %d"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Player %d hit: a pulse each time the life drops"
+msgstr "Joueur %d touché : une impulsion à chaque perte de vie"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Player %d's ammunition"
+msgstr "Munitions du joueur %d"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Player %d's gun loaded: 1 while it has ammunition"
+msgstr "Arme du joueur %d chargée : 1 tant qu'elle a des munitions"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Player %d's gun recoil: a pulse each shot"
+msgstr "Recul de l'arme du joueur %d : une impulsion à chaque tir"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Shots player %d has fired"
+msgstr "Tirs du joueur %d"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Player %d's gun motor"
+msgstr "Moteur de l'arme du joueur %d"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Player %d start lamp"
+msgstr "Lampe Start du joueur %d"
+
+#: src/osd/outputs.cpp
+#, c-format
+msgid "Rounds player %d has won in this match"
+msgstr "Manches gagnées par le joueur %d dans ce match"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "Credits"
+msgstr "Crédits"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "A number from the game's work RAM"
+msgstr "Un nombre lu dans la RAM de travail du jeu"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "1 while the value it follows is above zero"
+msgstr "1 tant que la valeur qu'elle suit est au-dessus de zéro"
+
+#: src/osd/outputs.cpp
+#, no-c-format
+msgid "A pulse when the value it follows changes"
+msgstr "Une impulsion quand la valeur qu'elle suit change"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Establishing the ring..."
 msgstr "Établissement de l'anneau..."
 

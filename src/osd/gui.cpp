@@ -2934,6 +2934,47 @@ void Gui::draw_network_tab(Config& config)
         ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "%s",
                            trf("%zu tool(s) connected.", m_outputs_status.clients).c_str());
     }
+
+    // What the running game publishes, each name with its last value, laid
+    // out as linuxloader's list.
+    if (!m_outputs_listing.empty()) {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(tr("What this game sends"));
+        const float height = ImGui::GetTextLineHeightWithSpacing() * 10.5f;
+        constexpr ImGuiTableFlags kFlags = ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg
+                                         | ImGuiTableFlags_BordersOuter
+                                         | ImGuiTableFlags_BordersInnerV
+                                         | ImGuiTableFlags_Resizable;
+        if (ImGui::BeginTable("##outputs", 4, kFlags, ImVec2(0.0f, height))) {
+            ImGui::TableSetupScrollFreeze(0, 1);  // the header stays
+            ImGui::TableSetupColumn(tr("Name"), ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn(tr("Type"), ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableSetupColumn(tr("Meaning"), ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn(tr("Value"), ImGuiTableColumnFlags_WidthFixed);
+            ImGui::TableHeadersRow();
+            for (const Outputs::Listed& row : m_outputs_listing) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::TextUnformatted(row.name.c_str());
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted(row.type.c_str());
+                ImGui::TableSetColumnIndex(2);
+                ImGui::TextUnformatted(row.meaning.c_str());
+                ImGui::SetItemTooltip("%s", row.meaning.c_str());  // whole, when the column cuts it
+                ImGui::TableSetColumnIndex(3);
+                ImGui::TextUnformatted(row.value.c_str());
+            }
+            ImGui::EndTable();
+        }
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("%s", tr("Each line goes as \"name = value\" on the TCP port, at each "
+                                     "change; a client that connects gets every known value first. "
+                                     "Value: the last sent."));
+        if (!config.outputs_network && !config.outputs_windows) {
+            ImGui::TextDisabled("%s", tr("The values show once the outputs are on."));
+        }
+        ImGui::PopTextWrapPos();
+    }
 }
 
 // ---------------------------------------------------------------------------

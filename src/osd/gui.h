@@ -16,6 +16,7 @@
 
 #include "core/config.h"
 #include "core/types.h"
+#include "osd/outputs.h"
 #include "render/backend.h"
 
 #include <array>
@@ -142,6 +143,12 @@ public:
         std::string error;              ///< why the last listen failed, if it did
     };
     void set_outputs_status(OutputsStatus status) { m_outputs_status = std::move(status); }
+
+    /// What the running game publishes as outputs, listed in the Network tab.
+    void set_outputs_listing(std::vector<Outputs::Listed> rows)
+    {
+        m_outputs_listing = std::move(rows);
+    }
 
     // -- per-game settings -------------------------------------------------
 
@@ -393,6 +400,7 @@ private:
     // -- cabinet link status -----------------------------------------------
     LinkStatus m_link_status;
     OutputsStatus m_outputs_status;
+    std::vector<Outputs::Listed> m_outputs_listing;
 
     // -- per-game settings -------------------------------------------------
     std::vector<GameFamily> m_families;
