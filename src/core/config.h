@@ -266,6 +266,13 @@ struct Config {
     /// positive force with which DirectInput, SDL and Linux push left.
     bool wheel_ffb_invert = false;
 
+    /// The device that plays the wheel's force, by the name the system gives
+    /// it (SDL's, DirectInput's on Windows); empty: the wheel the steering is
+    /// read from. A device chosen gets the forces alone, wherever the steering
+    /// comes from (read from vJoy, felt on a wheel, or the other way round);
+    /// while it is not connected, the wheel plays them, as with empty.
+    std::string wheel_ffb_device;
+
     /// A synthesised road/engine rumble: a vibration that rises with the
     /// throttle and with hard steering. Used on games without force feedback;
     /// a wheel delivering force feedback does not also rumble.

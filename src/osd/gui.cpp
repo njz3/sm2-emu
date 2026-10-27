@@ -17,6 +17,7 @@
 #include "core/net.h"
 #include "osd/i18n.h"
 #include "osd/input.h"
+#include "osd/wheel_ffb.h"
 #include "osd/scraper.h"
 #include "osd/ui_text.h"
 #include "render/geometry.h"
@@ -1221,6 +1222,39 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
     }
 
     ImGui::BeginDisabled(!config.wheel_ffb);
+    // The device that plays the force: the wheel itself, or one chosen.
+    {
+        const std::vector<std::string> devices = Input::force_feedback_devices();
+        const std::string&             chosen  = config.wheel_ffb_device;
+        const bool connected_device =
+            std::any_of(devices.begin(), devices.end(), [&](const std::string& name) {
+                return WheelForce::same_device(name.c_str(), chosen);
+            });
+        const std::string shown =
+            chosen.empty() ? std::string(tr("Automatic"))
+                           : connected_device ? chosen : trf("%s (not connected)", chosen.c_str());
+        ImGui::SetNextItemWidth(320.0f);
+        if (ImGui::BeginCombo(tr_id("Force feedback device"), shown.c_str())) {
+            if (ImGui::Selectable(tr("Automatic"), chosen.empty())) {
+                config.wheel_ffb_device.clear();
+            }
+            for (const std::string& name : devices) {
+                if (ImGui::Selectable(name.c_str(), WheelForce::same_device(name.c_str(), chosen))) {
+                    config.wheel_ffb_device = name;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            tooltip(tr("Automatic: the wheel the steering is read from. A device\n"
+                       "chosen here gets the forces alone, wherever the steering\n"
+                       "is read from: read from vJoy and felt on a wheel, or the\n"
+                       "other way round. While it is not connected, Automatic\n"
+                       "plays them. Takes effect at once; kept by its name."));
+        }
+    }
     int resistance = static_cast<int>(config.wheel_ffb_strength);
     if (ImGui::SliderInt(tr_id("Resistance"), &resistance, 0, 200, "%d%%")) {
         resistance = ((resistance + 5) / 10) * 10;  // snap to 10 % steps

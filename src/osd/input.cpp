@@ -466,13 +466,24 @@ void Input::handle_event(const SDL_Event& event)
         case SDL_EVENT_GAMEPAD_REMOVED:
             remove_gamepad(event.gdevice.which);
             break;
-        case SDL_EVENT_JOYSTICK_ADDED:
+        case SDL_EVENT_JOYSTICK_ADDED: {
+            const bool had_wheel = m_wheel.handle != nullptr;
             if (is_wheel_typed(event.jdevice.which) || !SDL_IsGamepad(event.jdevice.which)) {
                 add_wheel(event.jdevice.which);
             }
+            // The device chosen for the force may be the one that came (a new
+            // wheel has opened it already).
+            if (had_wheel && !m_wheel_settings.ffb_device.empty()) {
+                open_force_feedback();
+            }
             break;
+        }
         case SDL_EVENT_JOYSTICK_REMOVED:
             remove_wheel(event.jdevice.which);
+            // Or the one that went.
+            if (!m_wheel_settings.ffb_device.empty() && m_wheel.handle != nullptr) {
+                open_force_feedback();
+            }
             break;
         case SDL_EVENT_JOYSTICK_AXIS_MOTION:
             if (event.jaxis.which == m_wheel.id && event.jaxis.axis < Wheel::kMaxAxes) {
@@ -629,28 +640,64 @@ void Input::add_wheel(SDL_JoystickID id)
     }
     assign_wheel_axes();
 
-    // Force feedback is a constant force we aim ourselves each frame (see
-    // update_force_feedback): the wheel's driver ignores FF_SPRING but honours
-    // FF_CONSTANT, so the centring pull is computed from the wheel angle rather
-    // than programmed as a spring. Started at zero level and left running.
-    if (m_wheel_settings.ffb) {
-        auto ffb = std::make_unique<WheelForce>();
-        if (ffb->open(handle)) {
-            SM2_INFO("wheel force feedback: %s%s", ffb->backend(),
-                     ffb->has_rumble() ? " (with rumble)" : "");
-            // Centres the wheel until our spring has a position to work from.
-            ffb->set_autocenter(50);
-            m_wheel.autocenter = true;
-            m_wheel.ffb        = std::move(ffb);
-        } else {
-            SM2_INFO("wheel has no constant-force effect; using plain rumble");
-        }
+    open_force_feedback();
+}
+
+// Force feedback is a constant force we aim ourselves each frame (see
+// update_force_feedback): the wheel's driver ignores FF_SPRING but honours
+// FF_CONSTANT, so the centring pull is computed from the wheel angle rather
+// than programmed as a spring. Started at zero level and left running, on the
+// wheel itself or on the device the settings name, which then gets the forces
+// alone. While that device is not connected, the wheel plays them, as
+// Automatic, until it comes (a joystick plugged in opens this again).
+void Input::open_force_feedback()
+{
+    if (m_wheel.ffb) {
+        m_wheel.ffb->close();  // the effects stop on the device left
+        m_wheel.ffb.reset();
     }
+    // What the next frame commands is sent again, to the device now playing it.
+    m_wheel.autocenter  = false;
+    m_wheel.force_level = 0;
+    m_wheel.rumble_mag  = -1;
+    m_wheel.can_rumble  = false;
+    if (m_wheel.handle == nullptr || !m_wheel_settings.ffb) {
+        return;
+    }
+
+    const std::string& device = m_wheel_settings.ffb_device;
+    auto               ffb    = std::make_unique<WheelForce>();
+    const bool         named  = !device.empty() && ffb->open_named(device, m_wheel.handle);
+    if (!device.empty() && !named) {
+        SM2_INFO("force feedback device \"%s\" not connected, or without a constant force: "
+                 "on the wheel until it is", device.c_str());
+    }
+    // The wheel's own rumble stands in when it plays the forces itself.
+    m_wheel.can_rumble = !named
+                      && SDL_GetBooleanProperty(SDL_GetJoystickProperties(m_wheel.handle),
+                                                SDL_PROP_JOYSTICK_CAP_RUMBLE_BOOLEAN, false);
+    if (named || ffb->open(m_wheel.handle)) {
+        SM2_INFO("wheel force feedback: %s%s%s%s", ffb->backend(),
+                 ffb->has_rumble() ? " (with rumble)" : "", named ? ", on " : "",
+                 named ? device.c_str() : "");
+        // Centres the wheel until our spring has a position to work from.
+        ffb->set_autocenter(50);
+        m_wheel.autocenter = true;
+        m_wheel.ffb        = std::move(ffb);
+    } else {
+        SM2_INFO("wheel has no constant-force effect; using plain rumble");
+    }
+}
+
+std::vector<std::string> Input::force_feedback_devices()
+{
+    return WheelForce::device_names();
 }
 
 void Input::set_wheel_settings(const WheelSettings& wheel)
 {
     const WheelSettings& old = m_wheel_settings;
+    const bool device_changed = !WheelForce::same_device(wheel.ffb_device.c_str(), old.ffb_device);
     const bool axes_changed =
         wheel.steer_axis != old.steer_axis || wheel.accel_axis != old.accel_axis
         || wheel.brake_axis != old.brake_axis || wheel.accel_invert != old.accel_invert
@@ -659,6 +706,10 @@ void Input::set_wheel_settings(const WheelSettings& wheel)
     m_wheel_settings = wheel;
     if (m_wheel_settings.keys != m_wheel_key_names) {
         resolve_keys();
+    }
+    // Another device for the force: at once, the effects moved over.
+    if (device_changed && m_wheel.handle != nullptr) {
+        open_force_feedback();
     }
     // A calibration takes effect at once, not at the wheel's next connection.
     if (axes_changed && m_wheel.handle != nullptr) {

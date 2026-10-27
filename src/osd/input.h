@@ -122,6 +122,9 @@ public:
         /// Reverses the force, for a driver that pushes right on the positive
         /// force with which DirectInput, SDL and Linux push left.
         bool ffb_invert    = false;
+        /// The device that plays the force, by name; empty: the wheel itself
+        /// (see Config::wheel_ffb_device).
+        std::string ffb_device;
         u32  steer_degrees = 270;
         u32  lock_degrees  = 240;  ///< physical rotation for full game lock.
         u32  steer_deadzone = 0;   ///< percent of travel about centre read as centre.
@@ -188,6 +191,9 @@ public:
     /// The emulator's shortcuts as the settings bind them, by SDL key name:
     /// those keys are never bound to a cabinet control nor captured.
     void set_hotkeys(const std::array<std::string, Config::kHotkeyCount>& names);
+
+    /// The connected devices with force feedback, by name, for the settings.
+    [[nodiscard]] static std::vector<std::string> force_feedback_devices();
 
     /// True when a wheel is connected, for the settings UI to show its controls.
     [[nodiscard]] bool wheel_connected() const { return m_wheel.handle != nullptr; }
@@ -513,6 +519,8 @@ private:
 
     /// Open `id` as a wheel if it looks like one and no wheel is open yet.
     void add_wheel(SDL_JoystickID id);
+    /// The wheel's force feedback (again), on the device the settings choose.
+    void open_force_feedback();
     void remove_wheel(SDL_JoystickID id);
 
     /// Give the open wheel's axes their roles: calibrated, or auto-detected.

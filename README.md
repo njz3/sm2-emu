@@ -277,7 +277,15 @@ in the settings overlay (`F10`):
 - **Wheels and pedals** with their own axis layout, calibrated in the **Wheel**
   tab (steering range, pedal axes, button mapping). Synthesised centring
   resistance and road/engine rumble are provided for wheels with a motor, since
-  the drive board's real force is not replayed.
+  the drive board's real force is not replayed. With several force feedback
+  devices plugged in, **Force feedback device** (`wheel_ffb_device`, or a
+  front end's `--set ForceFeedback.FFB_DEVICE=...`) picks the one that plays
+  the forces, by the name the system gives it, the case and the spaces around
+  aside: `auto` (the default) is the wheel the steering is read from; a device
+  named gets the forces alone, wherever the steering comes from (read from
+  vJoy and felt on a wheel, or the other way round). A change takes effect at
+  once, the forces moving over. While the device named is not connected, the
+  wheel plays them, as `auto`, until it is plugged in.
 - **Light guns**, with one gun per player: the first gun found is player 1 and
   the second is player 2. On Linux, any evdev device tagged `ID_INPUT_GUN` is
   used, and guns with a motor get recoil. Windows is covered below. A Sinden

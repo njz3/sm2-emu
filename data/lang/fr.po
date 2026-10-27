@@ -1871,6 +1871,36 @@ msgstr "Relié : borne %u sur %u."
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Force feedback device"
+msgstr "Dispositif de retour de force"
+
+#: src/osd/gui.cpp
+#, c-format
+msgid "%s (not connected)"
+msgstr "%s (non connecté)"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Automatic: the wheel the steering is read from. A device\n"
+"chosen here gets the forces alone, wherever the steering\n"
+"is read from: read from vJoy and felt on a wheel, or the\n"
+"other way round. While it is not connected, Automatic\n"
+"plays them. Takes effect at once; kept by its name."
+msgstr ""
+"Automatique : le volant d'où la direction est lue. Un\n"
+"dispositif choisi ici reçoit seul les efforts, d'où que la\n"
+"direction soit lue : lue sur vJoy et ressentie sur un\n"
+"volant, ou l'inverse. Tant qu'il n'est pas branché,\n"
+"Automatique les joue. Appliqué tout de suite ; gardé par son nom."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Automatic"
+msgstr "Automatique"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Cabinet outputs"
 msgstr "Sorties de la borne"
 

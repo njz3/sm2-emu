@@ -950,6 +950,9 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             if (!parse_bool(value, &out->wheel_ffb_invert)) {
                 bad_value();
             }
+        } else if (key == "wheel_ffb_device" || key == "ffb_device") {
+            // ffb_device: the front ends' FFB_DEVICE, as Supermodel takes it.
+            out->wheel_ffb_device = lowered(value) == "auto" ? std::string() : value;
         } else if (key == "wheel_rumble") {
             if (!parse_bool(value, &out->wheel_rumble)) {
                 bad_value();
@@ -1311,6 +1314,8 @@ std::vector<std::string> overridden_settings(const std::vector<std::string>& set
             keys.push_back("fullscreen");
             keys.push_back("borderless_fullscreen");
             keys.push_back("display_stretch");
+        } else if (key == "ffb_device") {
+            keys.push_back("wheel_ffb_device");
         } else if (key.rfind("net_outputs", 0) == 0) {
             keys.push_back("outputs_network" + key.substr(std::strlen("net_outputs")));
         } else {
@@ -1442,6 +1447,8 @@ void write_config(std::ostream& out, const Config& config)
         << "wheel_ffb = " << bool_text(config.wheel_ffb) << "\n"
         << "wheel_ffb_strength = " << config.wheel_ffb_strength << "\n"
         << "wheel_ffb_invert = " << bool_text(config.wheel_ffb_invert) << "\n"
+        << "wheel_ffb_device = "
+        << (config.wheel_ffb_device.empty() ? std::string("auto") : config.wheel_ffb_device) << "\n"
         << "wheel_panel_spring = " << config.wheel_panel_spring << "\n"
         << "wheel_indy_deadband = " << config.wheel_indy_deadband << "\n"
         << "wheel_indy_full_power = " << config.wheel_indy_full_power << "\n"

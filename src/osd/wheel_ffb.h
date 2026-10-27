@@ -25,6 +25,9 @@
 
 #include <SDL3/SDL.h>
 
+#include <string>
+#include <vector>
+
 namespace sm2::osd {
 
 class WheelForce {
@@ -38,6 +41,18 @@ public:
     /// Open the wheel's force feedback and start the effects at zero.
     /// Returns false if the wheel has no constant-force effect.
     [[nodiscard]] bool open(SDL_Joystick* joystick);
+
+    /// The same on the device of that name (see same_device()): `wheel` itself
+    /// when it is the one, else the first of that name. False when none is
+    /// connected or it has no constant-force effect.
+    [[nodiscard]] bool open_named(const std::string& name, SDL_Joystick* wheel);
+
+    /// The connected devices with force feedback, by name, each once.
+    [[nodiscard]] static std::vector<std::string> device_names();
+
+    /// Whether a device's name is the one the settings give: the same once
+    /// the spaces around and the case are left aside.
+    [[nodiscard]] static bool same_device(const char* name, const std::string& wanted);
 
     /// Remove the effects and restore the device's autocentre.
     void close();

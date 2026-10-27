@@ -16,6 +16,10 @@
 
 #include "core/log.h"
 
+#include <algorithm>
+#include <cctype>
+#include <string_view>
+
 #ifdef __linux__
 #include <fcntl.h>
 #include <linux/input.h>
@@ -129,6 +133,85 @@ bool WheelForce::open(SDL_Joystick* joystick)
         haptic = find_sdl_haptic(joystick);
     }
     return haptic != nullptr && open_sdl(haptic);
+}
+
+bool WheelForce::open_named(const std::string& name, SDL_Joystick* wheel)
+{
+    if (wheel != nullptr && same_device(SDL_GetJoystickName(wheel), name)) {
+        return open(wheel);
+    }
+    close();
+
+    int count = 0;
+#ifdef __linux__
+    // A joystick of that name, through evdev as the wheel's own.
+    if (SDL_JoystickID* joysticks = SDL_GetJoysticks(&count)) {
+        for (int index = 0; index < count; ++index) {
+            const char* path = SDL_GetJoystickPathForID(joysticks[index]);
+            if (same_device(SDL_GetJoystickNameForID(joysticks[index]), name) && path != nullptr
+                && open_evdev(path)) {
+                SDL_free(joysticks);
+                return true;
+            }
+        }
+        SDL_free(joysticks);
+    }
+#endif
+    SDL_HapticID* ids = SDL_GetHaptics(&count);
+    if (ids == nullptr) {
+        return false;
+    }
+    SDL_Haptic* haptic = nullptr;
+    for (int index = 0; index < count && haptic == nullptr; ++index) {
+        if (same_device(SDL_GetHapticNameForID(ids[index]), name)) {
+            haptic = SDL_OpenHaptic(ids[index]);
+        }
+    }
+    SDL_free(ids);
+    return haptic != nullptr && open_sdl(haptic);
+}
+
+std::vector<std::string> WheelForce::device_names()
+{
+    std::vector<std::string> names;
+    int                      count = 0;
+    SDL_HapticID*            ids   = SDL_GetHaptics(&count);
+    if (ids == nullptr) {
+        return names;
+    }
+    for (int index = 0; index < count; ++index) {
+        const char* name = SDL_GetHapticNameForID(ids[index]);
+        if (name != nullptr && name[0] != '\0'
+            && std::none_of(names.begin(), names.end(),
+                            [&](const std::string& known) { return same_device(name, known); })) {
+            names.emplace_back(name);
+        }
+    }
+    SDL_free(ids);
+    return names;
+}
+
+bool WheelForce::same_device(const char* name, const std::string& wanted)
+{
+    if (name == nullptr) {
+        return false;
+    }
+    const auto trimmed = [](std::string_view text) {
+        while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front()))) {
+            text.remove_prefix(1);
+        }
+        while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) {
+            text.remove_suffix(1);
+        }
+        return text;
+    };
+    const std::string_view a = trimmed(name);
+    const std::string_view b = trimmed(wanted);
+    return a.size() == b.size()
+        && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y) {
+               return std::tolower(static_cast<unsigned char>(x))
+                   == std::tolower(static_cast<unsigned char>(y));
+           });
 }
 
 void WheelForce::close()
