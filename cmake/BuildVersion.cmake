@@ -1,4 +1,4 @@
-# sm2-emu — the build's version, as `git describe --tags` names it
+# sm2-emu — the build's version, as `git describe --tags --exclude dev` names it
 # (v0.9.54-59-g9c0c080, the release packages' name), for the window's title.
 #
 # Run as a script at every build (cmake -P), so that a new commit shows
@@ -11,8 +11,10 @@
 
 set(version "")
 if(SM2_GIT)
+    # Not upstream's "dev" tag: it moves to its latest main, so once merged it
+    # would be the nearest tag and name every build dev-N-g....
     execute_process(
-        COMMAND "${SM2_GIT}" describe --tags
+        COMMAND "${SM2_GIT}" describe --tags --exclude dev
         WORKING_DIRECTORY "${SM2_SOURCE_DIR}"
         RESULT_VARIABLE result
         OUTPUT_VARIABLE version
