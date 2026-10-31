@@ -398,7 +398,7 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
     // A notification (state saved/loaded), top-centered, over gameplay.
     if (m_notify_seconds_left > 0.0f) {
         m_notify_seconds_left -= ImGui::GetIO().DeltaTime;
-        if (config.show_notifications) {
+        if (config.show_notifications || m_notify_always) {
             draw_notification();
         }
     }
@@ -3278,10 +3278,11 @@ void Gui::draw_fps_overlay(float measured_hz, const char* renderer_label)
 // On-screen notification (transient toast, top-centered)
 // ---------------------------------------------------------------------------
 
-void Gui::notify(std::string message)
+void Gui::notify(std::string message, float seconds, bool always)
 {
     m_notify_text         = std::move(message);
-    m_notify_seconds_left = 2.0f;  // a couple of seconds, per the request
+    m_notify_seconds_left = seconds;  // a couple of seconds, by default
+    m_notify_always       = always;
 }
 
 void Gui::show_load_error(std::string game, std::string message,

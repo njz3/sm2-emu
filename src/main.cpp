@@ -333,7 +333,9 @@ void print_usage()
         "                      behind a write filter): settings at its root,\n"
         "                      each game's saves, states and screenshots in\n"
         "                      <dir>/<set>; what it lacks is read from the usual\n"
-        "                      places. Relative to the executable's folder\n"
+        "                      places. Relative to the executable's folder. If\n"
+        "                      it cannot be written, nothing is written at all:\n"
+        "                      the usual places are read, never written\n"
         "      --dump-textures Write every 3D texture to <saves>/textures/<game>/dump\n"
         "      --fullscreen    Start filling the screen\n"
         "      --game <name>   Load this set specifically, for archives that\n"
@@ -392,10 +394,36 @@ struct WriteDir {
     std::filesystem::path saves;    ///< the saves directory without it (NVRAM, EEPROM, textures)
     std::filesystem::path states;   ///< the save states directory without it
     std::filesystem::path artwork;  ///< the artwork cache without it
+    /// It could not be written: then nothing is written at all, never the
+    /// usual places instead, which are still read.
+    bool        refused = false;
+    std::string refused_root;  ///< the folder that could not be written, for the notice
 
     [[nodiscard]] bool on() const { return !root.empty(); }
 };
 WriteDir g_write_dir;
+
+/// Whether a file can be made, written and removed in `dir`; if not, why.
+[[nodiscard]] bool writable(const std::filesystem::path& dir, std::string* why)
+{
+    const std::filesystem::path probe   = dir / ".sm2-emu-write-probe";
+    std::FILE*                  handle  = std::fopen(probe.string().c_str(), "wb");
+    bool                        written = handle != nullptr && std::fputs("sm2-emu\n", handle) >= 0;
+    if (handle != nullptr) {
+        written = std::fclose(handle) == 0 && written;
+    }
+    std::error_code error;
+    const bool      removed = std::filesystem::remove(probe, error) && !error;
+    if (!written) {
+        *why = "a file cannot be written in it";
+        return false;
+    }
+    if (!removed) {
+        *why = "a file written in it cannot be removed (" + error.message() + ")";
+        return false;
+    }
+    return true;
+}
 
 /// A file of `game`'s from `from`, copied into `to` unless `to` has it already.
 void copy_in(const std::filesystem::path& from, const std::filesystem::path& to,
@@ -1311,9 +1339,22 @@ int main(int argc, char** argv)
         root = root.lexically_normal();
         std::error_code error;
         std::filesystem::create_directories(root, error);
+        std::string failure;
         if (error) {
-            SM2_WARN("write-dir: could not create '%s' (%s); writing to the usual places",
-                     root.string().c_str(), error.message().c_str());
+            failure = "it cannot be created (" + error.message() + ")";
+        } else {
+            static_cast<void>(writable(root, &failure));
+        }
+        if (!failure.empty()) {
+            // Never the usual places instead: a second emulator sharing them
+            // must not find its model settings written over. Every write is
+            // refused, and the settings and the game saves are read where they
+            // are (the owner's rule, the same in every emulator).
+            g_write_dir.refused      = true;
+            g_write_dir.refused_root = root.string();
+            SM2_ERROR("write-dir: cannot write to '%s': %s. Nothing is saved: the settings "
+                      "and the game saves are read from the usual folders and not written",
+                      root.string().c_str(), failure.c_str());
         } else {
             // Where the saves were, as this ini and the command line place them.
             Config before = from_file;
@@ -1392,6 +1433,11 @@ int main(int argc, char** argv)
     // Every save of the settings: what --set gave and nothing changed since is
     // for this run only, the file keeps its own.
     const auto save_settings = [&](const std::string& path, const Config& config) {
+        if (g_write_dir.refused) {
+            SM2_WARN("settings not saved to '%s': the write folder cannot be written",
+                     path.c_str());
+            return false;
+        }
         if (!save_config(path, config)) {
             return false;
         }
@@ -1428,7 +1474,7 @@ int main(int argc, char** argv)
             && !save_settings(config_path, options.config)) {
             SM2_WARN("could not create '%s'", config_path.c_str());
         }
-        if (!options.config.nvram_dir.empty() && !g_write_dir.on()) {
+        if (!options.config.nvram_dir.empty() && !g_write_dir.on() && !g_write_dir.refused) {
             std::filesystem::create_directories(options.config.nvram_dir, error);
         }
     }
@@ -2274,7 +2320,9 @@ int main(int argc, char** argv)
             texture_dumper->finish(machine_iface);
         }
 
-        machine_iface->save_nvram();
+        if (!g_write_dir.refused) {
+            machine_iface->save_nvram();
+        }
         return the_cpu.faulted() ? 1 : exit_code_boot_test;
     }
 
@@ -2523,8 +2571,10 @@ int main(int argc, char** argv)
                               std::move(scrape_list), options.config.scrape_artwork,
                               g_write_dir.artwork.string());
             } else {
+                // The cached artwork is still shown; nothing new is fetched
+                // when it could not be written.
                 scraper.start(options.config.artwork_dir, std::move(scrape_list),
-                              options.config.scrape_artwork);
+                              options.config.scrape_artwork && !g_write_dir.refused);
             }
             gui.enable_picker(std::move(entries), backend.get(), &scraper);
         };
@@ -2852,6 +2902,9 @@ int main(int argc, char** argv)
             return bound != SDLK_UNKNOWN && key.key == bound;
         };
 
+        // The game the write folder's refusal was last shown for.
+        std::string write_refusal_shown_for;
+
         while (running) {
             const u64 frame_start_ns = SDL_GetTicksNS();
 
@@ -3066,7 +3119,8 @@ int main(int argc, char** argv)
 
             {
                 const bool dumping = machine_iface != nullptr && loaded.has_value()
-                                  && (options.dump_textures || options.config.dump_textures);
+                                  && (options.dump_textures || options.config.dump_textures)
+                                  && !g_write_dir.refused;
                 const bool same_game =
                     loaded.has_value() && texture_dump_game == loaded->game.name;
                 if (texture_dumper && (!dumping || !same_game)) {
@@ -3628,7 +3682,9 @@ int main(int argc, char** argv)
                 return_to_picker_requested = false;
                 async_soft.forget_machine();
                 if (machine_iface != nullptr) {
-                    machine_iface->save_nvram();
+                    if (!g_write_dir.refused) {
+                        machine_iface->save_nvram();
+                    }
                 }
                 backend->wait_idle();
 
@@ -3703,7 +3759,9 @@ int main(int argc, char** argv)
                     continue;
                 }
                 if (machine_iface != nullptr) {
-                    machine_iface->save_nvram();
+                    if (!g_write_dir.refused) {
+                        machine_iface->save_nvram();
+                    }
                 }
                 rom::LoadError               load_error;
                 std::optional<LoadedMachine> dropped =
@@ -3740,12 +3798,16 @@ int main(int argc, char** argv)
                 screenshot_requested = false;
                 backend->wait_idle();
                 const std::string shot_game = loaded.has_value() ? loaded->game.name : "sm2";
-                const std::string shot =
-                    screenshot_path(screenshot_directory(options.config, shot_game), shot_game);
-                if (backend->save_capture(shot)) {
-                    SM2_INFO("screenshot written to %s", shot.c_str());
+                if (g_write_dir.refused) {
+                    SM2_WARN("screenshot not written: the write folder cannot be written");
                 } else {
-                    SM2_WARN("could not write screenshot to %s", shot.c_str());
+                    const std::string shot =
+                        screenshot_path(screenshot_directory(options.config, shot_game), shot_game);
+                    if (backend->save_capture(shot)) {
+                        SM2_INFO("screenshot written to %s", shot.c_str());
+                    } else {
+                        SM2_WARN("could not write screenshot to %s", shot.c_str());
+                    }
                 }
             }
 
@@ -3763,7 +3825,13 @@ int main(int argc, char** argv)
                 // to identify what was written/read without a long full path.
                 const std::string file =
                     std::filesystem::path(path).filename().string();
-                if (state_action->op == StateOp::Save) {
+                if (g_write_dir.refused && state_action->op != StateOp::Load) {
+                    SM2_WARN("state slot '%s' left as it is: the write folder cannot be written",
+                             state_action->slot.c_str());
+                    gui.notify(state_action->op == StateOp::Save
+                                   ? i18n::trf("Save failed: %s", file.c_str())
+                                   : i18n::trf("Delete failed: %s", file.c_str()));
+                } else if (state_action->op == StateOp::Save) {
                     if (machine_iface->save_state(path)) {
                         SM2_INFO("saved state to slot '%s'", state_action->slot.c_str());
                         gui.notify(i18n::trf("State saved: %s", file.c_str()));
@@ -3793,6 +3861,19 @@ int main(int argc, char** argv)
                 }
             }
             state_action.reset();
+
+            // The write folder could not be written: said on screen as each
+            // game starts, for a while and even with the notifications off,
+            // since no one would close a dialog on a cabinet.
+            if (g_write_dir.refused && loaded.has_value()
+                && write_refusal_shown_for != loaded->game.name) {
+                write_refusal_shown_for = loaded->game.name;
+                gui.notify(std::string(i18n::tr("Cannot write to the write folder")) + "\n"
+                               + g_write_dir.refused_root + "\n"
+                               + i18n::tr("Nothing is saved: the settings and the game saves are "
+                                          "read\nfrom the usual folders and not written."),
+                           20.0f, true);
+            }
 
             ++frames_presented;
 
@@ -3984,7 +4065,9 @@ int main(int argc, char** argv)
         }
 
         if (machine_iface) {
-            machine_iface->save_nvram();
+            if (!g_write_dir.refused) {
+                machine_iface->save_nvram();
+            }
             machine_iface->log_unmapped_summary();
             machine_iface->log_burst_summary();
         }

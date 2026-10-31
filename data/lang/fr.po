@@ -1899,6 +1899,20 @@ msgstr ""
 msgid "Automatic"
 msgstr "Automatique"
 
+#: src/main.cpp
+#, no-c-format
+msgid "Cannot write to the write folder"
+msgstr "Impossible d'écrire dans le dossier d'écriture"
+
+#: src/main.cpp
+#, no-c-format
+msgid ""
+"Nothing is saved: the settings and the game saves are read\n"
+"from the usual folders and not written."
+msgstr ""
+"Rien n'est sauvegardé : les réglages et les sauvegardes des jeux sont lus\n"
+"dans les dossiers habituels et ne sont pas écrits."
+
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "Cabinet outputs"
