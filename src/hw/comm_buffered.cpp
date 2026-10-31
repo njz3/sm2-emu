@@ -291,11 +291,17 @@ void BufferedLink::broken(const char* reason)
     SM2_WARN("m2comm: buffered link broken: %s", reason);
     send_packet({});  // the others told
     m_state = State::Broken;
+    // Its game may keep the board enabled and wait (Daytona's slave does):
+    // the ring is joined again as soon as it comes back.
+    m_rejoin         = true;
+    m_handshake_sent = false;
+    m_wait_logged    = false;
 }
 
 void BufferedLink::start()
 {
     m_state          = State::Handshake;
+    m_rejoin         = false;
     m_handshake_sent = false;
     m_wait_logged    = false;
     m_settle         = 0;
@@ -311,7 +317,8 @@ void BufferedLink::stop()
         SM2_INFO("m2comm: buffered link: the board stopped by the game; the other cabinets told");
         send_packet({});
     }
-    m_state = State::Idle;
+    m_state  = State::Idle;
+    m_rejoin = false;
 }
 
 /*
@@ -367,7 +374,8 @@ bool BufferedLink::handshake(Role role)
         if (guid != kGuid) {
             SM2_ERROR("m2comm: buffered link: another cabinet runs a different link; "
                       "every cabinet needs the same sm2-emu");
-            m_state = State::Broken;
+            m_state  = State::Broken;
+            m_rejoin = false;
             return false;
         }
         // The master is cabinet 0 of the indices; the counts of the others come
@@ -428,7 +436,8 @@ bool BufferedLink::handshake(Role role)
     if (guid != kGuid) {
         SM2_ERROR("m2comm: buffered link: another cabinet runs a different link; "
                   "every cabinet needs the same sm2-emu");
-        m_state = State::Broken;
+        m_state  = State::Broken;
+        m_rejoin = false;
         return false;
     }
     // The indices of the previous cabinet, one more, on to the next one.
@@ -493,11 +502,18 @@ BufferedLink::Step BufferedLink::run_frame(Role role, std::span<const u8> own)
 {
     switch (m_state) {
     case State::Idle:
+        return Step::Waiting;
     case State::Broken:
-        return m_state == State::Broken ? Step::Broken : Step::Waiting;
     case State::Handshake:
+        if (m_state == State::Broken && !m_rejoin) {
+            return Step::Broken;
+        }
         if (!handshake(role)) {
+            // Still broken while the ring has not come back.
             return m_state == State::Broken ? Step::Broken : Step::Waiting;
+        }
+        if (m_state == State::Broken) {
+            SM2_INFO("m2comm: buffered link: the ring is back");
         }
         SM2_INFO("m2comm: buffered link: cabinet %u of %u (%s), %zu bytes a cabinet", m_id, m_count,
                  role == Role::Master ? "master" : role == Role::Slave ? "slave" : "relay",

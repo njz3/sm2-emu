@@ -127,6 +127,9 @@ private:
     u32  m_settle          = 0;  ///< frames since the board was enabled, up to kSettleFrames
     u32  m_round           = 0;
     bool m_wait_logged     = false;
+    /// Broken, the board still enabled: the ring is joined again when it comes
+    /// back (another link's mismatch excepted).
+    bool m_rejoin          = false;
 
     u8 m_id    = 0;
     u8 m_count = 0;  ///< playing cabinets

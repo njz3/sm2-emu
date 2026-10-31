@@ -351,7 +351,9 @@ void M2Comm::buffered_vblank()
 
 void M2Comm::end_frame()
 {
-    if (!m_buffered || m_linkenable != 0x01 || m_linkalive == 0x02) return;
+    // Failed, still enabled: the buffered link joins the ring again when it
+    // comes back, the game seeing it alive again.
+    if (!m_buffered || m_linkenable != 0x01) return;
 
     // The host's role, as MAME's simulation reads it.
     const bool is_master = (m_fg == 0x01 || shared(0x01) == 0x01);
