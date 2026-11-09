@@ -148,7 +148,7 @@ private:
 namespace state {
 
 inline constexpr char     kMagic[8]      = {'S', 'M', '2', 'S', 'T', 'A', 'T', 'E'};
-inline constexpr u32      kFormatVersion = 5;
+inline constexpr u32      kFormatVersion = 6;
 
 /// The oldest version read_header() accepts. Every serialize() that changed
 /// layout since has to keep reading this one (see Archive::format_version).

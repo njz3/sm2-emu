@@ -220,6 +220,9 @@ private:
     /// Reaching kCyclesPerSample means the next sample is due.
     u64 m_sample_phase = 0;
 
+    /// The bus contention not yet charged to the 68000, in 1/32 of a cycle.
+    u32 m_contention_carry = 0;
+
     std::vector<s16> m_pending;
 
     Counters m_counters;

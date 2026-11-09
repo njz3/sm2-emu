@@ -123,9 +123,12 @@ public:
     };
     [[nodiscard]] virtual const Stats& stats() const = 0;
 
-    /// How many of the 32 slots are currently sounding. The sound board's bus
-    /// contention is scaled by it.
+    /// How many of the 32 slots are currently sounding.
     [[nodiscard]] virtual u32 active_slots() const = 0;
+
+    /// How many slots are reading 8-bit samples from sound memory. The sound
+    /// board's bus contention is scaled by it.
+    [[nodiscard]] virtual u32 byte_sample_slots() const = 0;
 
     /// Save/restore the whole chip. The memory and the callbacks are not part of
     /// it: the sound board wires those again.

@@ -68,8 +68,12 @@ public:
     [[nodiscard]] const Stats& stats() const override { return m_stats; }
 
     /// Slots still reading their waveform: from key-on until a one-shot ends
-    /// or the envelope has all but died away. What the bus contention wants.
+    /// or the envelope has all but died away.
     [[nodiscard]] u32 active_slots() const override;
+
+    /// Those of them reading 8-bit samples from memory. What the bus contention
+    /// wants.
+    [[nodiscard]] u32 byte_sample_slots() const override;
 
     void serialize(Archive& ar) override;
 

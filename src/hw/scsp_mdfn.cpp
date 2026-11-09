@@ -390,6 +390,18 @@ u32 ScspMednafen::active_slots() const
                                           [](const Voice& voice) { return voice.reading; }));
 }
 
+u32 ScspMednafen::byte_sample_slots() const
+{
+    u32 count = 0;
+    for (usize slot = 0; slot < m_voices.size(); ++slot) {
+        const u16 key = m_slot_regs[slot][kSlotRegKey];
+        if (m_voices[slot].reading && ((key >> 7) & 3u) == kSourceMemory && (key & kPcm8) != 0) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 // ---------------------------------------------------------------------------
 // Register access
 // ---------------------------------------------------------------------------

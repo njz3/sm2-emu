@@ -67,15 +67,19 @@ constexpr u64 kCpuClockDenominator = 15625;
 /// is exactly 256 68000 cycles.
 constexpr u64 kCyclesPerSample = 256;
 
-/// Wait states on a 68000 access to RAM or the SCSP: a fixed two, plus up to
-/// kContentionCycles more as the SCSP's own sample fetches take the RAM bus.
-/// The contention term is fitted to a board capture of House of the Dead. The
-/// fixed two keep the music near the hardware's tempo: House of the Dead's
-/// attract music runs +0.5% against a cabinet recording with them, +1.33%
-/// without; Sega Rally's +0.48% against its soundtrack with them, +1.45%
-/// without.
+/// Wait states on a 68000 access to RAM or the SCSP: a fixed two, plus
+/// kContentionCycles / 32 for each slot reading 8-bit samples, the SCSP's own
+/// fetches taking the RAM bus, counted up to kContentionSlots of them. The
+/// contention term is fitted to board captures of House of the Dead's sound
+/// test: 16-bit slots did not show in the fit, and without the cap the sound
+/// program refills its streamed voices too late when many slots are busy, which
+/// plays a stale buffer as a sizzle. The fixed two keep the music near the
+/// hardware's tempo: House of the Dead's attract music runs +0.5% against a
+/// cabinet recording with them, +1.33% without; Sega Rally's +0.48% against its
+/// soundtrack with them, +1.45% without.
 constexpr u32 kBusWaitCycles    = 2;
-constexpr u32 kContentionCycles = 12;
+constexpr u32 kContentionCycles = 17;
+constexpr u32 kContentionSlots  = 16;
 
 /// The SCSP is clocked at half the 45.1584 MHz crystal on the video board, which
 /// divided by 512 is 44100 Hz exactly.
@@ -204,6 +208,7 @@ void Model2Sound::reset()
     m_cycle_debt   = 0;
     m_cycle_budget = 0;
     m_sample_phase = kCyclesPerSample;
+    m_contention_carry = 0;
     m_counters     = Counters{};
     m_pending.clear();
 
@@ -267,6 +272,11 @@ void Model2Sound::serialize(Archive& ar)
     ar.raw(m_cycle_debt);
     ar.raw(m_cycle_budget);
     ar.raw(m_sample_phase);
+    if (ar.format_version() >= 6) {
+        ar.raw(m_contention_carry);
+    } else if (ar.loading()) {
+        m_contention_carry = 0;
+    }
 }
 
 void Model2Sound::run(u32 host_cycles)
@@ -384,8 +394,9 @@ void Model2Sound::bus_wait(u32 address)
 {
     if (address < kRamBase + kRamSize
         || (address >= kScspBase && address < kScspBase + kScspSize)) {
-        const u32 contention = (kContentionCycles * m_scsp->active_slots() + 16) / 32;
-        m_cpu.stall(static_cast<s32>(kBusWaitCycles + contention));
+        m_contention_carry += kContentionCycles * std::min(m_scsp->byte_sample_slots(), kContentionSlots);
+        m_cpu.stall(static_cast<s32>(kBusWaitCycles + m_contention_carry / 32));
+        m_contention_carry %= 32;
     }
 }
 

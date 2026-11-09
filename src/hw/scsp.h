@@ -73,6 +73,7 @@ public:
     [[nodiscard]] const Stats& stats() const override { return m_stats; }
 
     [[nodiscard]] u32 active_slots() const override { return m_active_slots; }
+    [[nodiscard]] u32 byte_sample_slots() const override;
 
     /// Save/restore the whole chip: control registers, all 32 slots, ring
     /// buffer, IRQ/timer/MIDI/DMA state, the effects DSP and the fixed-seed RNG.

@@ -1669,6 +1669,18 @@ void ScspMame::exec_dma()
 // CPU for the same interval, which puts the register access at most a scanline
 // ahead of the audio instead of exactly at it. See Model2Sound::run.
 
+u32 ScspMame::byte_sample_slots() const
+{
+	u32 count = 0;
+	for (const SCSP_SLOT& entry : m_Slots)
+	{
+		const SCSP_SLOT* slot = &entry;
+		if (slot->active && SSCTL(slot) == 0 && PCM8B(slot))
+			++count;
+	}
+	return count;
+}
+
 void ScspMame::set_slot_gains(const u16 gains[32])
 {
 	bool any = false;
