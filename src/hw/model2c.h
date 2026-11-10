@@ -4,7 +4,7 @@
 //  ___) | |  | | / __/|_____|| |___| |  | | |_| |
 // |____/|_|  |_||_____|      |_____|_|  |_|\___/
 //
-// A Sega Model 2 arcade emulator.
+// A Sega Model 1 & 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
@@ -259,6 +259,14 @@ public:
     [[nodiscard]] u32 intena() const override { return m_intena; }
 
     void set_nvram_directory(const std::string& directory) override;
+    void set_music_volume(u32 percent) override { m_sound.set_music_volume(percent); }
+    void set_black_level(u32 bias) override
+    {
+        if (bias == m_video.black_level()) return;
+        m_video.set_black_level(bias);
+        m_palette_dirty = true;
+        ++m_table_generation;
+    }
     void load_nvram() override;
     void save_nvram() const override;
 

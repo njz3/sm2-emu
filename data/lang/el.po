@@ -282,6 +282,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Brightness"
+msgstr "Φωτεινότητα"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 2 picture's black sits. 50% is the default,\n"
+"matched to an arcade capture; lower is darker, higher is\n"
+"brighter. Applies live."
+msgstr ""
+"Πού βρίσκεται το μαύρο της εικόνας του Model 2. Το 50% είναι η προεπιλογή,\n"
+"ταιριαγμένη σε λήψη από arcade· λιγότερο είναι πιο σκούρο, περισσότερο πιο φωτεινό.\n"
+"Εφαρμόζεται αμέσως."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "CRT filter"
 msgstr "Φίλτρο CRT"
 
@@ -514,6 +530,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Model 1 ROM directory"
+msgstr "Φάκελος ROM Model 1"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 1 ROM archives live.\n"
+"Empty means the ROM directory."
+msgstr ""
+"Πού βρίσκονται τα αρχεία ROM του Model 1.\n"
+"Κενό σημαίνει τον φάκελο ROM."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Saves directory"
 msgstr "Φάκελος αποθηκεύσεων"
 
@@ -625,8 +655,8 @@ msgstr "Σχετικά"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "A Sega Model 2 arcade emulator"
-msgstr "Εξομοιωτής arcade Sega Model 2"
+msgid "A Sega Model 1 & 2 arcade emulator"
+msgstr "Εξομοιωτής arcade Sega Model 1 & 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1487,6 +1517,22 @@ msgstr "Επαναφορά"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Music volume"
+msgstr "Ένταση μουσικής"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Only for games with a separate music board: Star Wars\n"
+"Arcade, Sega Touring Car Championship and Top Skater.\n"
+"Sound effects stay as they are."
+msgstr ""
+"Μόνο για παιχνίδια με ξεχωριστή πλακέτα μουσικής:\n"
+"Star Wars Arcade, Sega Touring Car Championship, Top Skater.\n"
+"Τα ηχητικά εφέ μένουν ως έχουν."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Per-game volume"
 msgstr "Ένταση ανά παιχνίδι"
 
@@ -2064,3 +2110,78 @@ msgstr "Δεν υπάρχει διαθέσιμη περιγραφή."
 #~ "να οδηγεί το παιχνίδι, και τα κουμπιά και οι άξονές του\n"
 #~ "αντιστοιχίζονται παρακάτω χωρίς κλικ πίσω σε αυτό το παράθυρο.\n"
 #~ "Το πληκτρολόγιο και το ποντίκι θέλουν ακόμα το παράθυρο μπροστά."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Laser"
+msgstr "Λέιζερ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Torpedo"
+msgstr "Τορπίλη"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View"
+msgstr "Οπτική"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle"
+msgstr "Γκάζι"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Up"
+msgstr "Περισσότερο γκάζι"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Down"
+msgstr "Λιγότερο γκάζι"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Yoke"
+msgstr "Χειριστήριο πτήσης"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Machine Gun"
+msgstr "Πολυβόλο"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Smoke"
+msgstr "Καπνός"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Stick"
+msgstr "Μοχλίσκος"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Slots are named for this game's controls; dimmed ones are not used. Show shortcuts lists the Guide combinations."
+msgstr "Οι θέσεις έχουν το όνομα των χειριστηρίων αυτού του παιχνιδιού· οι αχνές δεν χρησιμοποιούνται. Η Εμφάνιση συντομεύσεων δείχνει τους συνδυασμούς με Guide."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 1"
+msgstr "Οπτική 1"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 2"
+msgstr "Οπτική 2"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 3"
+msgstr "Οπτική 3"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 4"
+msgstr "Οπτική 4"

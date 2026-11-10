@@ -4,7 +4,7 @@
 //  ___) | |  | | / __/|_____|| |___| |  | | |_| |
 // |____/|_|  |_||_____|      |_____|_|  |_|\___/
 //
-// A Sega Model 2 arcade emulator.
+// A Sega Model 1 & 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
@@ -199,6 +199,10 @@ struct Config {
     u32  crt_mask_strength     = 30;
     u32  crt_glow_strength     = 20;
     u32  crt_curvature         = 0;
+
+    /// Model 2 picture brightness, 0..100: 50 is the arcade-fitted default,
+    /// lower darker. Live-switchable.
+    u32 brightness = 50;
 
     /// Bezel artwork in fullscreen.
     bool bezel = false;
@@ -558,6 +562,9 @@ struct Config {
     /// Percent per game family, keyed by parent set name; absent means 100.
     std::map<std::string, u32> game_volumes;
 
+    /// The music board's level in percent, for the games with one.
+    u32 music_volume = 100;
+
     static constexpr u32 kDefaultGameVolume = 100;
     static constexpr u32 kMaxGameVolume     = 150;
 
@@ -605,6 +612,9 @@ struct Config {
     /// ROM archives; a game named with no path loads <rom_dir>/<name>.{zip,7z}.
     /// No default (ROMs are not app data): empty until the user sets it.
     std::string rom_dir;
+
+    /// Model 1 ROM archives; empty means rom_dir holds them too.
+    std::string model1_rom_dir;
 
     /// Saves: per-game .nv and .eeprom images. Empty here;
     /// resolve_default_paths() fills it under the platform data directory.

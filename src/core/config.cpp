@@ -4,7 +4,7 @@
 //  ___) | |  | | / __/|_____|| |___| |  | | |_| |
 // |____/|_|  |_||_____|      |_____|_|  |_|\___/
 //
-// A Sega Model 2 arcade emulator.
+// A Sega Model 1 & 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
@@ -820,6 +820,13 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             } else {
                 bad_value();
             }
+        } else if (key == "brightness") {
+            u32 percent = 0;
+            if (parse_u32(value, &percent)) {
+                out->brightness = std::min<u32>(percent, 100);
+            } else {
+                bad_value();
+            }
         } else if (key == "crt_enabled") {
             if (!parse_bool(value, &out->crt_enabled)) {
                 bad_value();
@@ -1155,6 +1162,13 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             } else {
                 bad_value();
             }
+        } else if (key == "music_volume") {
+            u32 percent = 0;
+            if (parse_u32(value, &percent)) {
+                out->music_volume = std::min<u32>(percent, 100);
+            } else {
+                bad_value();
+            }
         } else if (key == "game_volume") {
             if (!parse_bool(value, &out->game_volume)) {
                 bad_value();
@@ -1169,6 +1183,8 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             }
         } else if (key == "rom_dir") {
             out->rom_dir = value;
+        } else if (key == "model1_rom_dir") {
+            out->model1_rom_dir = value;
         } else if (key == "nvram_dir") {
             out->nvram_dir = value;
         } else if (key == "screenshot_dir") {
@@ -1405,6 +1421,7 @@ void write_config(std::ostream& out, const Config& config)
         << "barrel_radius = " << config.barrel_radius << "\n"
         << "display_stretch = " << bool_text(config.display_stretch) << "\n"
         << "bezel = " << bool_text(config.bezel) << "\n"
+        << "brightness = " << config.brightness << "\n"
         << "crt_enabled = " << bool_text(config.crt_enabled) << "\n"
         << "crt_scanline_strength = " << config.crt_scanline_strength << "\n"
         << "crt_mask_strength = " << config.crt_mask_strength << "\n"
@@ -1421,6 +1438,7 @@ void write_config(std::ostream& out, const Config& config)
         << "software_slow_cores = " << bool_text(config.software_slow_cores) << "\n"
         << "\n[audio]\n"
         << "scsp_core = " << config.scsp_core << "\n"
+        << "music_volume = " << config.music_volume << "\n"
         << "game_volume = " << bool_text(config.game_volume) << "\n";
     for (const auto& [family, percent] : config.game_volumes) {
         if (percent != Config::kDefaultGameVolume) {
@@ -1429,6 +1447,7 @@ void write_config(std::ostream& out, const Config& config)
     }
     out << "\n[paths]\n"
         << "rom_dir = " << config.rom_dir << "\n"
+        << "model1_rom_dir = " << config.model1_rom_dir << "\n"
         << "nvram_dir = " << config.nvram_dir << "\n"
         << "screenshot_dir = " << config.screenshot_dir << "\n"
         << "write_dir = " << config.write_dir << "\n"

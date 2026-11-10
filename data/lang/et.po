@@ -280,6 +280,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Brightness"
+msgstr "Heledus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 2 picture's black sits. 50% is the default,\n"
+"matched to an arcade capture; lower is darker, higher is\n"
+"brighter. Applies live."
+msgstr ""
+"Kus asub Model 2 pildi must. 50% on vaikimisi,\n"
+"sobitatud mängusaali salvestusega; vähem on tumedam, rohkem on heledam.\n"
+"Rakendub kohe."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "CRT filter"
 msgstr "CRT-filter"
 
@@ -512,6 +528,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Model 1 ROM directory"
+msgstr "Model 1 ROM-ide kaust"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 1 ROM archives live.\n"
+"Empty means the ROM directory."
+msgstr ""
+"Kus asuvad Model 1 ROM-arhiivid.\n"
+"Tühi tähendab ROM-ide kausta."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Saves directory"
 msgstr "Salvestuste kaust"
 
@@ -623,8 +653,8 @@ msgstr "Teave"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "A Sega Model 2 arcade emulator"
-msgstr "Sega Model 2 arkaadmasinate emulaator"
+msgid "A Sega Model 1 & 2 arcade emulator"
+msgstr "Sega Model 1 & 2 arkaadmasinate emulaator"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1479,6 +1509,22 @@ msgstr "Lähtesta"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Music volume"
+msgstr "Muusika helitugevus"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Only for games with a separate music board: Star Wars\n"
+"Arcade, Sega Touring Car Championship and Top Skater.\n"
+"Sound effects stay as they are."
+msgstr ""
+"Ainult eraldi muusikaplaadiga mängudele:\n"
+"Star Wars Arcade, Sega Touring Car Championship, Top Skater.\n"
+"Heliefektid jäävad samaks."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Per-game volume"
 msgstr "Mängupõhine helitugevus"
 
@@ -2050,3 +2096,78 @@ msgstr "Kirjeldus puudub."
 #~ "automaadi paneel vJoy kaudu) juhib endiselt mängu ning selle\n"
 #~ "nuppe ja telgi saab allpool määrata ilma sellesse aknasse\n"
 #~ "tagasi klõpsamata. Klaviatuur ja hiir vajavad endiselt akent ees."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Laser"
+msgstr "Laser"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Torpedo"
+msgstr "Torpeedo"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View"
+msgstr "Vaade"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle"
+msgstr "Gaas"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Up"
+msgstr "Rohkem gaasi"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Down"
+msgstr "Vähem gaasi"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Yoke"
+msgstr "Juhtrool"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Machine Gun"
+msgstr "Kuulipilduja"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Smoke"
+msgstr "Suits"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Stick"
+msgstr "Juhtkang"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Slots are named for this game's controls; dimmed ones are not used. Show shortcuts lists the Guide combinations."
+msgstr "Lahtrid on nimetatud selle mängu juhtnuppude järgi; tuhmid pole kasutusel. Näita otseteid loetleb Guide'i kombinatsioonid."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 1"
+msgstr "Vaade 1"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 2"
+msgstr "Vaade 2"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 3"
+msgstr "Vaade 3"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 4"
+msgstr "Vaade 4"

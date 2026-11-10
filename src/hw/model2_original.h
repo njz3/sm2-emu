@@ -4,7 +4,7 @@
 //  ___) | |  | | / __/|_____|| |___| |  | | |_| |
 // |____/|_|  |_||_____|      |_____|_|  |_|\___/
 //
-// A Sega Model 2 arcade emulator.
+// A Sega Model 1 & 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
@@ -174,6 +174,14 @@ public:
         return m_sky.rows != 0 ? &m_sky : nullptr;
     }
     void set_draw_distance(bool extended) override;
+    void set_music_volume(u32 percent) override { m_m1audio.set_music_volume(percent); }
+    void set_black_level(u32 bias) override
+    {
+        if (bias == m_video.black_level()) return;
+        m_video.set_black_level(bias);
+        m_palette_dirty = true;
+        ++m_table_generation;
+    }
     [[nodiscard]] u64 geometry_stage_nanoseconds() const override
     {
         return m_geometry.last_run_nanoseconds();
@@ -374,6 +382,7 @@ private:
 
     std::span<const u8> m_rom_maincpu;
     std::span<const u8> m_rom_main_data;
+    std::span<const u8> m_rom_prot_data;
     std::span<const u8> m_rom_copro_tables;
     std::span<const u8> m_rom_copro_data;
     std::span<const u8> m_rom_polygons;
@@ -403,6 +412,8 @@ private:
 
     /// daytonam's simulated protection state (Protection::DaytonaMaxxPic).
     u8 m_maxx_state = 0;
+    /// daytonagtx's selected data bank (Protection::DaytonaGtxBank).
+    u8 m_gtx_bank = 0;
 
     // -- interrupt latch ---------------------------------------------------
     u32 m_intreq = 0;

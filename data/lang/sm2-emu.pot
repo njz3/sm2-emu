@@ -263,6 +263,19 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Brightness"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 2 picture's black sits. 50% is the default,\n"
+"matched to an arcade capture; lower is darker, higher is\n"
+"brighter. Applies live."
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "CRT filter"
 msgstr ""
 
@@ -469,6 +482,18 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Model 1 ROM directory"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 1 ROM archives live.\n"
+"Empty means the ROM directory."
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Saves directory"
 msgstr ""
 
@@ -567,7 +592,7 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "A Sega Model 2 arcade emulator"
+msgid "A Sega Model 1 & 2 arcade emulator"
 msgstr ""
 
 #: src/osd/gui.cpp
@@ -1360,6 +1385,19 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Music volume"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Only for games with a separate music board: Star Wars\n"
+"Arcade, Sega Touring Car Championship and Top Skater.\n"
+"Sound effects stay as they are."
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Per-game volume"
 msgstr ""
 
@@ -1837,4 +1875,79 @@ msgstr ""
 #: src/osd/gui.cpp
 #, no-c-format
 msgid "No description available."
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Laser"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Torpedo"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Up"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Down"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Yoke"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Machine Gun"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Smoke"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Stick"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Slots are named for this game's controls; dimmed ones are not used. Show shortcuts lists the Guide combinations."
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 1"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 2"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 3"
+msgstr ""
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 4"
 msgstr ""

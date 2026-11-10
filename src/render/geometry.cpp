@@ -4,7 +4,7 @@
 //  ___) | |  | | / __/|_____|| |___| |  | | |_| |
 // |____/|_|  |_||_____|      |_____|_|  |_|\___/
 //
-// A Sega Model 2 arcade emulator.
+// A Sega Model 1 & 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
@@ -54,6 +54,16 @@ u32 deepest_mip_level(u32 width, u32 height)
 PolyParams describe_polygon(const hw::RenderPolygon& poly, const hw::Model2Video& video)
 {
     PolyParams params{};
+
+    if ((poly.direct_rgb & 0x80000000u) != 0) {
+        const u32 rgb = poly.direct_rgb;
+        params.colour = ((rgb >> 16) & 0xff) | (rgb & 0xff00) | ((rgb & 0xff) << 16);
+        params.flags  = kFlagDirect;
+        if ((poly.texheader[0] & kHeaderChecker) != 0) {
+            params.flags |= kFlagChecker;
+        }
+        return params;
+    }
 
     // Ten bits of colour base against the 3D half of palette RAM. The
     // components rather than a resolved colour, because the shade is a

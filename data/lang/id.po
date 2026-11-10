@@ -278,6 +278,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Brightness"
+msgstr "Kecerahan"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 2 picture's black sits. 50% is the default,\n"
+"matched to an arcade capture; lower is darker, higher is\n"
+"brighter. Applies live."
+msgstr ""
+"Letak hitam pada gambar Model 2. 50% adalah bawaan,\n"
+"dicocokkan dengan rekaman mesin arcade; lebih rendah lebih gelap, lebih tinggi lebih terang.\n"
+"Langsung berlaku."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "CRT filter"
 msgstr "Filter CRT"
 
@@ -510,6 +526,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Model 1 ROM directory"
+msgstr "Direktori ROM Model 1"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 1 ROM archives live.\n"
+"Empty means the ROM directory."
+msgstr ""
+"Tempat arsip ROM Model 1 berada.\n"
+"Kosong berarti direktori ROM."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Saves directory"
 msgstr "Direktori simpanan"
 
@@ -621,8 +651,8 @@ msgstr "Tentang"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "A Sega Model 2 arcade emulator"
-msgstr "Emulator arcade Sega Model 2"
+msgid "A Sega Model 1 & 2 arcade emulator"
+msgstr "Emulator arcade Sega Model 1 & 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1473,6 +1503,22 @@ msgstr "Atur ulang"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Music volume"
+msgstr "Volume musik"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Only for games with a separate music board: Star Wars\n"
+"Arcade, Sega Touring Car Championship and Top Skater.\n"
+"Sound effects stay as they are."
+msgstr ""
+"Hanya untuk game dengan papan musik terpisah:\n"
+"Star Wars Arcade, Sega Touring Car Championship, Top Skater.\n"
+"Efek suara tetap seperti semula."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Per-game volume"
 msgstr "Volume per game"
 
@@ -2046,3 +2092,78 @@ msgstr "Deskripsi tidak tersedia."
 #~ "mesin arkade lewat vJoy, misalnya) tetap mengemudikan game, dan\n"
 #~ "tombol serta sumbunya bisa dipasang di bawah tanpa mengklik\n"
 #~ "kembali jendela ini. Keyboard dan mouse tetap butuh jendela di depan."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Laser"
+msgstr "Laser"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Torpedo"
+msgstr "Torpedo"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View"
+msgstr "Tampilan"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle"
+msgstr "Throttle"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Up"
+msgstr "Throttle naik"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Down"
+msgstr "Throttle turun"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Yoke"
+msgstr "Kemudi"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Machine Gun"
+msgstr "Senapan mesin"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Smoke"
+msgstr "Asap"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Stick"
+msgstr "Stik"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Slots are named for this game's controls; dimmed ones are not used. Show shortcuts lists the Guide combinations."
+msgstr "Slot dinamai sesuai kontrol game ini; yang redup tidak dipakai. Tampilkan pintasan mencantumkan kombinasi Guide."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 1"
+msgstr "Tampilan 1"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 2"
+msgstr "Tampilan 2"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 3"
+msgstr "Tampilan 3"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 4"
+msgstr "Tampilan 4"

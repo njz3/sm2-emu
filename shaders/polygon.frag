@@ -12,7 +12,7 @@
 //  ___) | |  | | / __/|_____|| |___| |  | | |_| |
 // |____/|_|  |_||_____|      |_____|_|  |_|\___/
 //
-// sm2-emu — A Sega Model 2 arcade emulator.
+// sm2-emu — A Sega Model 1 & 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
@@ -147,6 +147,7 @@ const uint kFlagMicro     = 1u << 7;
 const uint kMaxLevelShift = 8u;
 const uint kFlagTranslucent = 1u << 12;
 const uint kFlagBlended     = 1u << 13;
+const uint kFlagDirect      = 1u << 14;
 
 // ---------------------------------------------------------------------------
 // Texel fetch
@@ -509,6 +510,13 @@ void main()
 
     if ((p.flags & kFlagTextured) != 0u && p.replace != 0u) {
         fragColour = vec4(sampleReplacement(p, texelUV, texelDx, texelDy) * coverage, coverage);
+        return;
+    }
+
+    if ((p.flags & kFlagDirect) != 0u) {
+        const vec3 direct = vec3(float(p.colour & 0xffu), float((p.colour >> 8) & 0xffu),
+                                 float((p.colour >> 16) & 0xffu)) / 255.0;
+        fragColour = vec4(direct * coverage, coverage);
         return;
     }
 

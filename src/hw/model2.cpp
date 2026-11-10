@@ -4,7 +4,7 @@
 //  ___) | |  | | / __/|_____|| |___| |  | | |_| |
 // |____/|_|  |_||_____|      |_____|_|  |_|\___/
 //
-// A Sega Model 2 arcade emulator.
+// A Sega Model 1 & 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
@@ -584,7 +584,7 @@ void Model2::service_timers()
 
 void Model2::on_vblank_start()
 {
-    m_video.latch_tile_ram();
+    if (m_video.latch_tile_ram()) ++m_tile_generation;
     // The geometry engine starts a new frame here. Bit 0 of the video control
     // register selects 30 Hz geometry, in which case it runs on even frames only
     // and the renderer shows the previous result again.

@@ -283,6 +283,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Brightness"
+msgstr "Яскравість"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 2 picture's black sits. 50% is the default,\n"
+"matched to an arcade capture; lower is darker, higher is\n"
+"brighter. Applies live."
+msgstr ""
+"Де розташований чорний у зображенні Model 2. 50% за замовчуванням,\n"
+"за записом з автомата; менше — темніше, більше — світліше.\n"
+"Застосовується одразу."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "CRT filter"
 msgstr "CRT-фільтр"
 
@@ -515,6 +531,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Model 1 ROM directory"
+msgstr "Тека ROM для Model 1"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 1 ROM archives live.\n"
+"Empty means the ROM directory."
+msgstr ""
+"Де лежать архіви ROM для Model 1.\n"
+"Порожньо — тека ROM."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Saves directory"
 msgstr "Тека збережень"
 
@@ -626,8 +656,8 @@ msgstr "Про програму"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "A Sega Model 2 arcade emulator"
-msgstr "Емулятор аркадної плати Sega Model 2"
+msgid "A Sega Model 1 & 2 arcade emulator"
+msgstr "Емулятор аркадних плат Sega Model 1 & 2"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1482,6 +1512,22 @@ msgstr "Скинути"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Music volume"
+msgstr "Гучність музики"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Only for games with a separate music board: Star Wars\n"
+"Arcade, Sega Touring Car Championship and Top Skater.\n"
+"Sound effects stay as they are."
+msgstr ""
+"Лише для ігор з окремою музичною платою:\n"
+"Star Wars Arcade, Sega Touring Car Championship, Top Skater.\n"
+"Звукові ефекти не змінюються."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Per-game volume"
 msgstr "Гучність ігор"
 
@@ -2053,3 +2099,78 @@ msgstr "Опис недоступний."
 #~ "(наприклад, панель автомата через vJoy), і далі керують грою, а\n"
 #~ "їхні кнопки й осі можна призначити нижче, не клацаючи назад у це\n"
 #~ "вікно. Клавіатурі й миші й далі потрібне вікно на передньому плані."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Laser"
+msgstr "Лазер"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Torpedo"
+msgstr "Торпеда"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View"
+msgstr "Вигляд"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle"
+msgstr "Газ"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Up"
+msgstr "Більше газу"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Down"
+msgstr "Менше газу"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Yoke"
+msgstr "Штурвал"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Machine Gun"
+msgstr "Кулемет"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Smoke"
+msgstr "Дим"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Stick"
+msgstr "Стік"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Slots are named for this game's controls; dimmed ones are not used. Show shortcuts lists the Guide combinations."
+msgstr "Слоти названо за керуванням цієї гри; бліді не використовуються. «Показати комбінації» виводить комбінації з Guide."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 1"
+msgstr "Вигляд 1"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 2"
+msgstr "Вигляд 2"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 3"
+msgstr "Вигляд 3"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 4"
+msgstr "Вигляд 4"

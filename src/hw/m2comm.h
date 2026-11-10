@@ -36,6 +36,7 @@
 
 #include "core/types.h"
 #include "hw/comm_buffered.h"
+#include "hw/comm_board.h"
 #include "hw/comm_transport.h"
 
 #include <array>
@@ -48,7 +49,7 @@ class Archive;
 
 namespace sm2::hw {
 
-class M2Comm {
+class M2Comm final : public CommBoard {
 public:
     /// The shared RAM the i960 sees at 0x01a00000. The board does not own it:
     /// the i960 reaches it as a burst-capable memory window, so it lives with
@@ -69,15 +70,16 @@ public:
 
     /// Swap the frame transport (takes ownership); nullptr restores the default
     /// loopback. A LAN transport (comm_udp.h) is injected when linking is on.
-    void set_transport(std::unique_ptr<CommTransport> transport);
+    void set_transport(std::unique_ptr<CommTransport> transport) override;
 
     /// The "buffered" link (comm_buffered.h, as Supermodel's simulated network
     /// board) in place of MAME's frame simulation below; nullptr goes back to
     /// the latter. With it, the ring's frames are not sent at the vertical
     /// blank but exchanged whole at the end of each frame (end_frame()).
-    void set_buffered(std::unique_ptr<BufferedLink> link);
+    [[nodiscard]] bool can_buffer() const override { return true; }
+    void set_buffered(std::unique_ptr<BufferedLink> link) override;
     [[nodiscard]] bool buffered() const { return m_buffered != nullptr; }
-    [[nodiscard]] const BufferedLink* buffered_link() const { return m_buffered.get(); }
+    [[nodiscard]] const BufferedLink* buffered_link() const override { return m_buffered.get(); }
 
     /// After each frame has run: the buffered link's handshake or exchange. A
     /// no-op without one.
@@ -106,10 +108,10 @@ public:
 
     // -- diagnostics ------------------------------------------------------
 
-    [[nodiscard]] bool link_alive() const { return m_linkalive == 0x01; }
-    [[nodiscard]] u8   link_id() const { return m_linkid; }
-    [[nodiscard]] u8   link_count() const { return m_linkcount; }
-    [[nodiscard]] bool enabled() const { return m_linkenable != 0; }
+    [[nodiscard]] bool link_alive() const override { return m_linkalive == 0x01; }
+    [[nodiscard]] u8   link_id() const override { return m_linkid; }
+    [[nodiscard]] u8   link_count() const override { return m_linkcount; }
+    [[nodiscard]] bool enabled() const override { return m_linkenable != 0; }
 
     /// Whether the underlying transport still believes it can carry frames.
     /// Always true for the loopback; a socket transport reports the peer state.

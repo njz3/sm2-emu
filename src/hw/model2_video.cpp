@@ -55,12 +55,22 @@ Model2Video::Model2Video()
     , m_above(static_cast<usize>(kWidth) * kHeight, 0)
     , m_front(static_cast<usize>(kWidth) * kHeight, 0)
 {
-    // Black at 40, higher crushes shadow detail.
-    for (u32 index = 0; index < 256; ++index) {
-        const double raw =
-            std::max((static_cast<double>(index) - 40.0) * 255.0 / 215.0, 0.0);
-        m_gamma[index] = static_cast<u8>(raw);
+    build_gamma(m_black_level, m_gamma);
+}
+
+void Model2Video::build_gamma(u32 bias, std::span<u8> out)
+{
+    const double black = static_cast<double>(std::min<u32>(bias, 128));
+    for (usize index = 0; index < out.size(); ++index) {
+        out[index] = static_cast<u8>(
+            std::max((static_cast<double>(index) - black) * 255.0 / (255.0 - black), 0.0));
     }
+}
+
+void Model2Video::set_black_level(u32 bias)
+{
+    m_black_level = bias;
+    build_gamma(bias, m_gamma);
 }
 
 void Model2Video::attach(std::span<const u8>  tile_ram,
@@ -76,8 +86,9 @@ void Model2Video::attach(std::span<const u8>  tile_ram,
     refresh_pens();
 }
 
-void Model2Video::latch_tile_ram()
+bool Model2Video::latch_tile_ram()
 {
+    bool        changed = false;
     const usize size = std::min(m_tile_ram_live.size(), m_tile_ram_shown.size());
     for (usize at = 0; at + 8 <= size; at += 8) {
         u64 live, shown;
@@ -92,7 +103,9 @@ void Model2Video::latch_tile_ram()
             }
         }
         std::memcpy(m_tile_ram_shown.data() + at, &live, 8);
+        changed = true;
     }
+    return changed;
 }
 
 void Model2Video::reset()
@@ -119,6 +132,17 @@ void Model2Video::serialize(Archive& ar)
 
 void Model2Video::refresh_pens()
 {
+    if (m_direct_palette) {
+        const u32 count = static_cast<u32>(std::min<usize>(kPenCount, m_palette_ram.size()));
+        for (u32 entry = 0; entry < count; ++entry) {
+            const u16 colour = m_palette_ram[entry];
+            const u32 shift  = (colour & 0x8000) != 0 ? 0 : 1;
+            const auto level = [shift](u32 v) { return static_cast<u8>(((v << 3) | (v >> 2)) >> shift); };
+            m_pens[entry] = pack_rgba(level(colour & 0x1f), level((colour >> 5) & 0x1f),
+                                      level((colour >> 10) & 0x1f));
+        }
+        return;
+    }
     if (m_palette_ram.empty() || m_colour_translate.empty()) {
         return;
     }
@@ -267,6 +291,49 @@ void Model2Video::compose_rows(std::span<const u8> tile_ram, bool mask_a_hidden,
         if (front[i] != 0) {
             above[i] = below[i];
             below[i] = 0;
+        }
+    }
+    if (!m_overlay_shown.empty()) {
+        draw_overlay(above, row_begin, row_end);
+    }
+}
+
+void Model2Video::draw_overlay(u32* above, u32 row_begin, u32 row_end) const
+{
+    // Pixel centres, convex polygons, scissored like the 3D. A HUD pixel with
+    // any channel above this stays on top.
+    constexpr u32 kFeatureLevel = 8;
+    for (const RenderPolygon& poly : m_overlay_shown) {
+        if (poly.num_vertices < 3 || (poly.direct_rgb & 0x80000000u) == 0) continue;
+        const u32 rgb    = poly.direct_rgb;
+        const u32 colour = pack_rgba(static_cast<u8>(rgb >> 16), static_cast<u8>(rgb >> 8), static_cast<u8>(rgb));
+        const bool checker = (poly.texheader[0] & 0x8000) != 0;
+        const s32 x0 = std::max<s32>(0, poly.scissor[0] - m_overlay_x_offset);
+        const s32 x1 = std::min<s32>(static_cast<s32>(kWidth), poly.scissor[2] - m_overlay_x_offset);
+        const s32 y0 = std::max<s32>(static_cast<s32>(row_begin), poly.scissor[1]);
+        const s32 y1 = std::min<s32>(static_cast<s32>(row_end), poly.scissor[3]);
+        for (s32 y = y0; y < y1; ++y) {
+            const float cy = static_cast<float>(y) + 0.5F;
+            float       left = 1e9F, right = -1e9F;
+            for (u32 i = 0; i < poly.num_vertices; ++i) {
+                const PolyVertex& a = poly.v[i];
+                const PolyVertex& b = poly.v[(i + 1) % poly.num_vertices];
+                if ((a.y <= cy) == (b.y <= cy)) continue;
+                const float x = a.x + (cy - a.y) * (b.x - a.x) / (b.y - a.y) - static_cast<float>(m_overlay_x_offset);
+                left  = std::min(left, x);
+                right = std::max(right, x);
+            }
+            const s32 start = std::max(x0, static_cast<s32>(std::ceil(left - 0.5F)));
+            const s32 stop  = std::min(x1, static_cast<s32>(std::ceil(right - 0.5F)));
+            u32* row = above + static_cast<usize>(y) * kWidth;
+            for (s32 x = start; x < stop; ++x) {
+                if (checker && ((x ^ y) & 1) == 0) continue;
+                const u32 hud = row[x];
+                const bool feature = (hud >> 24) != 0
+                                  && ((hud & 0xff) > kFeatureLevel || ((hud >> 8) & 0xff) > kFeatureLevel
+                                      || ((hud >> 16) & 0xff) > kFeatureLevel);
+                if (!feature) row[x] = colour;
+            }
         }
     }
 }

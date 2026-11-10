@@ -4,7 +4,7 @@
 //  ___) | |  | | / __/|_____|| |___| |  | | |_| |
 // |____/|_|  |_||_____|      |_____|_|  |_|\___/
 //
-// A Sega Model 2 arcade emulator.
+// A Sega Model 1 & 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
@@ -73,6 +73,7 @@
 namespace sm2::hw {
 
 class Model2Video;
+class CommBoard;
 class M2Comm;
 
 /// Copy a set's shipped power-on image over battery-backed storage.
@@ -193,8 +194,8 @@ public:
     /// The communication (link) board, the same M2Comm type on every variant.
     /// main.cpp injects a LAN transport here when linking is on; the OSD reads
     /// its link state.
-    [[nodiscard]] virtual M2Comm&       comm()       = 0;
-    [[nodiscard]] virtual const M2Comm& comm() const = 0;
+    [[nodiscard]] virtual CommBoard&       comm()       = 0;
+    [[nodiscard]] virtual const CommBoard& comm() const = 0;
 
     /// This frame's screen-space polygons, in drawing order.
     [[nodiscard]] virtual const RenderList& render_list() const = 0;
@@ -205,6 +206,10 @@ public:
 
     /// Widen the 3D raster by `columns` on each side; see Geometrizer.
     virtual void set_widescreen(u32 columns) = 0;
+
+    /// Whether the last frame moved HUD objects out to the widescreen edges
+    /// (GameSpec::hud_spread_*), so its 2D HUD should follow.
+    [[nodiscard]] virtual bool hud_spread() const { return false; }
 
     /// A tile layer's whole 360-degree backdrop, which the game streams into the
     /// 512-wide map a column at a time. The widescreen side columns draw from it.
@@ -224,8 +229,18 @@ public:
     };
     [[nodiscard]] virtual const SkyPanorama* sky_panorama() const { return nullptr; }
 
+    /// True when this frame's tile layers carry something drawn over them on the
+    /// CPU (Model1's above-HUD objects), so the GPU tilemap path cannot stand in.
+    [[nodiscard]] virtual bool needs_cpu_tilemap() const { return false; }
+
     /// Draw the scenery to the edge of the course, where a game supports it.
     virtual void set_draw_distance(bool /*extended*/) {}
+
+    /// The music board's level in percent, for the sets that have one.
+    virtual void set_music_volume(u32 /*percent*/) {}
+
+    /// The colour ramp's black level (Model2Video::set_black_level).
+    virtual void set_black_level(u32 /*bias*/) {}
 
     // -- per-core timing, for --profile --------------------------------------
     //

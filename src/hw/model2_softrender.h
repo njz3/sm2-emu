@@ -16,6 +16,7 @@
 
 #include "core/types.h"
 #include "hw/geometrizer.h"
+#include "hw/model2_video.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -50,6 +51,7 @@ struct SoftPolyExtra {
     u32 utexy      = 0;
     s32 texlod     = 0;
     u8  luma       = 0;
+    u32 direct_rgb = 0;  ///< RenderPolygon::direct_rgb
 };
 
 /// Views of everything one frame of the software path reads, so a snapshot can
@@ -84,6 +86,9 @@ class SoftRenderer {
 public:
     static constexpr u32 kWidth  = 496;
     static constexpr u32 kHeight = 384;
+
+    /// Model2Video::set_black_level's twin; call while nothing is drawing.
+    void set_black_level(u32 bias);
 
     /// MAME draws the 3D into a 512x512 bitmap and copies the visible window out
     /// of its top left corner, so a polygon whose viewport reaches past the raster
@@ -190,6 +195,7 @@ private:
     std::span<const u32> m_texture1;
 
     std::vector<u8>  m_gamma;
+    u32              m_black_level = Model2Video::kDefaultBlackLevel;
     std::vector<u32> m_destmap;
     std::vector<u8>  m_fillmap;
 

@@ -281,6 +281,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Brightness"
+msgstr "亮度"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 2 picture's black sits. 50% is the default,\n"
+"matched to an arcade capture; lower is darker, higher is\n"
+"brighter. Applies live."
+msgstr ""
+"Model 2 畫面黑色所在的位置。預設 50%,\n"
+"依據街機實機畫面校準;越低越暗,越高越亮。\n"
+"即時生效。"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "CRT filter"
 msgstr "CRT 濾鏡"
 
@@ -513,6 +529,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Model 1 ROM directory"
+msgstr "Model 1 ROM 目錄"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 1 ROM archives live.\n"
+"Empty means the ROM directory."
+msgstr ""
+"Model 1 ROM 壓縮檔所在的位置。\n"
+"留空表示 ROM 目錄。"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Saves directory"
 msgstr "存檔目錄"
 
@@ -624,8 +654,8 @@ msgstr "關於"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "A Sega Model 2 arcade emulator"
-msgstr "SEGA Model 2 大型電玩模擬器"
+msgid "A Sega Model 1 & 2 arcade emulator"
+msgstr "SEGA Model 1 & 2 大型電玩模擬器"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1473,6 +1503,22 @@ msgstr "重設"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Music volume"
+msgstr "音樂音量"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Only for games with a separate music board: Star Wars\n"
+"Arcade, Sega Touring Car Championship and Top Skater.\n"
+"Sound effects stay as they are."
+msgstr ""
+"僅適用於有獨立音樂板的遊戲:\n"
+"Star Wars Arcade, Sega Touring Car Championship, Top Skater。\n"
+"音效保持不變。"
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Per-game volume"
 msgstr "個別遊戲音量"
 
@@ -2036,3 +2082,78 @@ msgstr "沒有簡介。"
 #~ "驅動的方向盤或面板（例如透過 vJoy 的大型機台面板）仍能操控\n"
 #~ "遊戲，其按鍵和軸也可在下方綁定，無需再點回此視窗。\n"
 #~ "鍵盤和滑鼠仍需視窗在前景。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Laser"
+msgstr "雷射"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Torpedo"
+msgstr "魚雷"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View"
+msgstr "視角"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle"
+msgstr "油門"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Up"
+msgstr "加油門"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Down"
+msgstr "減油門"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Yoke"
+msgstr "操縱桿"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Machine Gun"
+msgstr "機槍"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Smoke"
+msgstr "煙霧"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Stick"
+msgstr "搖桿"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Slots are named for this game's controls; dimmed ones are not used. Show shortcuts lists the Guide combinations."
+msgstr "欄位依本遊戲的操作命名；變暗的欄位不使用。顯示快捷鍵會列出 Guide 組合鍵。"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 1"
+msgstr "視角 1"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 2"
+msgstr "視角 2"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 3"
+msgstr "視角 3"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 4"
+msgstr "視角 4"

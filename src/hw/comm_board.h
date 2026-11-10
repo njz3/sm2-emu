@@ -1,0 +1,34 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// What the front end needs of a cabinet link board, whichever board it is.
+#pragma once
+
+#include "core/types.h"
+#include "hw/comm_buffered.h"
+#include "hw/comm_transport.h"
+
+#include <memory>
+
+namespace sm2::hw {
+
+class CommBoard {
+public:
+    virtual ~CommBoard() = default;
+
+    /// Swap the frame transport (takes ownership); nullptr restores the default
+    /// loopback.
+    virtual void set_transport(std::unique_ptr<CommTransport> transport) = 0;
+
+    [[nodiscard]] virtual bool link_alive() const = 0;
+    [[nodiscard]] virtual u8   link_id() const    = 0;
+    [[nodiscard]] virtual u8   link_count() const = 0;
+    [[nodiscard]] virtual bool enabled() const    = 0;
+
+    /// The "buffered" link (comm_buffered.h) is the Model 2 board's only; other
+    /// boards keep the frame transport above.
+    [[nodiscard]] virtual bool can_buffer() const { return false; }
+    virtual void set_buffered(std::unique_ptr<BufferedLink> /*link*/) {}
+    [[nodiscard]] virtual const BufferedLink* buffered_link() const { return nullptr; }
+};
+
+}  // namespace sm2::hw

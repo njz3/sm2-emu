@@ -4,7 +4,7 @@
 //  ___) | |  | | / __/|_____|| |___| |  | | |_| |
 // |____/|_|  |_||_____|      |_____|_|  |_|\___/
 //
-// A Sega Model 2 arcade emulator.
+// A Sega Model 1 & 2 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
@@ -21,6 +21,7 @@
 #pragma once
 
 #include "core/types.h"
+#include "hw/geometrizer.h"
 #include "hw/segaic24.h"
 
 #include <span>
@@ -63,7 +64,8 @@ public:
     /// Take the tile RAM the display reads from. The beam scans the map during
     /// the picture, so a game writing through vblank and into the next frame's
     /// first lines still shows whole; call this at the start of vblank.
-    void latch_tile_ram();
+    /// True when the shown copy changed.
+    bool latch_tile_ram();
 
     /// The tile RAM as last latched.
     [[nodiscard]] std::span<const u8> tile_ram_shown() const { return m_tile_ram_shown; }
@@ -75,6 +77,18 @@ public:
     /// gamma tables. Cheap enough to do whenever the machine reports a change.
     void refresh_pens();
 
+    /// The ramp index that shows as black: 40 by default, fitted to an arcade
+    /// capture. Call refresh_pens() after a change.
+    static constexpr u32 kDefaultBlackLevel = 40;
+    void set_black_level(u32 bias);
+    [[nodiscard]] u32 black_level() const { return m_black_level; }
+    /// The 256-entry ramp for a black level.
+    static void build_gamma(u32 bias, std::span<u8> out);
+
+    /// Model 1: tile pens are the palette's xBGR555 straight, bit 15 clear
+    /// halving the entry, with no colour translation.
+    void set_direct_palette(bool direct) { m_direct_palette = direct; }
+
     /// Compose one frame's tilemap layers.
     ///
     /// Produces `below()` and `above()`. Call refresh_pens() first if the
@@ -84,7 +98,21 @@ public:
 
     /// compose() in two halves, so compose_into() can run on another thread
     /// from a copy of the tile RAM. The next prepare_compose() must wait for it.
-    void prepare_compose() { m_tiles.update(); }
+    void prepare_compose()
+    {
+        m_tiles.update();
+        m_overlay_shown = m_overlay;
+    }
+
+    /// Flat polygons drawn over the top tile layers where those are clear or
+    /// near black, as Model 1 draws its radar blips. Taken up by the next
+    /// prepare_compose(), so a compose on another thread never sees it change.
+    void set_overlay(const std::vector<RenderPolygon>& polygons, s32 x_offset)
+    {
+        m_overlay          = polygons;
+        m_overlay_x_offset = x_offset;
+    }
+    [[nodiscard]] bool has_overlay() const { return !m_overlay.empty(); }
     void compose_into(std::span<const u8> tile_ram, bool mask_a_hidden,
                       std::span<const u32> pens, std::vector<u32>& below,
                       std::vector<u32>& above, std::vector<u8>& front) const;
@@ -198,12 +226,20 @@ private:
     std::span<const u16> m_colour_translate;
 
     /// Converted palette, RGBA8 with alpha 0xff.
+    void draw_overlay(u32* above, u32 row_begin, u32 row_end) const;
+
+    std::vector<RenderPolygon> m_overlay;
+    std::vector<RenderPolygon> m_overlay_shown;
+    s32                        m_overlay_x_offset = 0;
+
     std::vector<u32> m_pens;
+    bool             m_direct_palette = false;
 
     /// Colour space correction. MAME's comment records that a bias of 64 and a
     /// gain of 51 suits vf2, fvipers and schamp; real cabinets were calibrated
     /// per game, so a single curve can only be a good average.
     std::vector<u8> m_gamma;
+    u32             m_black_level = kDefaultBlackLevel;
 
     std::vector<u32> m_below;
     std::vector<u32> m_above;

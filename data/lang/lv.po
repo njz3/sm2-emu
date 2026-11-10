@@ -281,6 +281,22 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Brightness"
+msgstr "Spilgtums"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 2 picture's black sits. 50% is the default,\n"
+"matched to an arcade capture; lower is darker, higher is\n"
+"brighter. Applies live."
+msgstr ""
+"Kur atrodas Model 2 attēla melnā krāsa. 50% ir noklusējums,\n"
+"pielāgots automāta ierakstam; mazāk ir tumšāk, vairāk ir gaišāk.\n"
+"Stājas spēkā uzreiz."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "CRT filter"
 msgstr "CRT filtrs"
 
@@ -513,6 +529,20 @@ msgstr ""
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Model 1 ROM directory"
+msgstr "Model 1 ROM mape"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Where the Model 1 ROM archives live.\n"
+"Empty means the ROM directory."
+msgstr ""
+"Kur atrodas Model 1 ROM arhīvi.\n"
+"Tukšs nozīmē ROM mapi."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Saves directory"
 msgstr "Saglabājumu mape"
 
@@ -624,8 +654,8 @@ msgstr "Par"
 
 #: src/osd/gui.cpp
 #, no-c-format
-msgid "A Sega Model 2 arcade emulator"
-msgstr "Sega Model 2 arkādes automātu emulators"
+msgid "A Sega Model 1 & 2 arcade emulator"
+msgstr "Sega Model 1 & 2 arkādes automātu emulators"
 
 #: src/osd/gui.cpp
 #, no-c-format
@@ -1483,6 +1513,22 @@ msgstr "Atiestatīt"
 
 #: src/osd/gui.cpp
 #, no-c-format
+msgid "Music volume"
+msgstr "Mūzikas skaļums"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"Only for games with a separate music board: Star Wars\n"
+"Arcade, Sega Touring Car Championship and Top Skater.\n"
+"Sound effects stay as they are."
+msgstr ""
+"Tikai spēlēm ar atsevišķu mūzikas plati:\n"
+"Star Wars Arcade, Sega Touring Car Championship, Top Skater.\n"
+"Skaņas efekti paliek nemainīgi."
+
+#: src/osd/gui.cpp
+#, no-c-format
 msgid "Per-game volume"
 msgstr "Spēles skaļums"
 
@@ -2055,3 +2101,78 @@ msgstr "Apraksts nav pieejams."
 #~ "automāta panelis caur vJoy) joprojām vada spēli, un tā pogas un\n"
 #~ "asis var piesaistīt zemāk, neklikšķinot atpakaļ šajā logā.\n"
 #~ "Tastatūrai un pelei logam joprojām jābūt priekšā."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Laser"
+msgstr "Lāzers"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Torpedo"
+msgstr "Torpēda"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View"
+msgstr "Skats"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle"
+msgstr "Droselis"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Up"
+msgstr "Vairāk gāzes"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Throttle Down"
+msgstr "Mazāk gāzes"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Yoke"
+msgstr "Stūre"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Machine Gun"
+msgstr "Ložmetējs"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Smoke"
+msgstr "Dūmi"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Stick"
+msgstr "Svira"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Slots are named for this game's controls; dimmed ones are not used. Show shortcuts lists the Guide combinations."
+msgstr "Lauki nosaukti pēc šīs spēles vadības; blāvie netiek izmantoti. Rādīt saīsnes uzskaita Guide kombinācijas."
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 1"
+msgstr "Skats 1"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 2"
+msgstr "Skats 2"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 3"
+msgstr "Skats 3"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "View 4"
+msgstr "Skats 4"
