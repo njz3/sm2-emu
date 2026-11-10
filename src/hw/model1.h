@@ -31,6 +31,7 @@
 #include "hw/model1io2.h"
 #include "hw/model2_machine_base.h"
 #include "hw/model2_video.h"
+#include "hw/vr_drive_reply.h"
 #include "rom/game.h"
 #include "rom/rom_set.h"
 
@@ -224,6 +225,7 @@ private:
     /// throttle sits on, which reaches the game through the base instead.
     bool m_r360          = false;
     u8   m_r360_state    = 0xff;
+    VrDriveReply m_vr_reply;
     u32  m_r360_throttle = 2;
     bool m_netmerc       = false;  ///< Seeds the headset tracker's pose.
 

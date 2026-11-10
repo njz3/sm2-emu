@@ -73,9 +73,10 @@ constexpr s32 kDualPortWaitCycles = 4;
 }
 
 /// Virtua Racing's settings image with CABINET TYPE moved from STANDARD to
-/// SPECIAL, the setting that drives the drive board. The chip holds the bytes
-/// swapped in pairs; a CRC-CCITT over 0x0a..0x80 sits at 0x08.
-void vr_special_cabinet(std::span<u8> eeprom)
+/// UPRIGHT: STANDARD sends the drive board nothing, and SPECIAL the commands of
+/// the deluxe cabinet's other board. The chip holds the bytes swapped in pairs;
+/// a CRC-CCITT over 0x0a..0x80 sits at 0x08.
+void vr_upright_cabinet(std::span<u8> eeprom)
 {
     if (eeprom.size() < 0x80) return;
     const auto at  = [&](usize offset) -> u8& { return eeprom[offset ^ 1]; };
@@ -90,7 +91,7 @@ void vr_special_cabinet(std::span<u8> eeprom)
         return value;
     };
     if (at(0x1a) != 1 || (at(0x08) | (at(0x09) << 8)) != crc()) return;
-    at(0x1a)      = 0;
+    at(0x1a)      = 2;
     const u16 sum = crc();
     at(0x08)      = static_cast<u8>(sum);
     at(0x09)      = static_cast<u8>(sum >> 8);
@@ -185,13 +186,21 @@ bool Model1::init(const rom::GameSpec& game, rom::RomSet roms)
         m_ioboard.set_dual_port(dp_read, dp_write);
         m_ioboard.set_input(0, [this] { return m_inputs.in0; });
         m_ioboard.set_input(1, [this] { return m_inputs.in1; });
-        m_ioboard.set_input(2, [this] { return m_inputs.in2; });
+        m_ioboard.set_input(2, [this] {
+            // Virtua Racing's drive board answers on this port.
+            return m_game.drive_protocol == rom::DriveProtocol::Vr
+                       ? drive_reply_or(m_vr_reply.read(steering_value(m_game)))
+                       : m_inputs.in2;
+        });
         for (u32 channel = 0; channel < Model1io::kAnalogCount; ++channel) {
             m_ioboard.set_analog(channel, [this, channel] { return m_inputs.analog[channel]; });
         }
         m_ioboard.set_output([this](u8 value) { lamp_output_w(value); });
         if (m_game.drive_board) {
-            m_ioboard.set_drive([] { return u8{0xff}; }, [this](u8 value) { record_drive_board_write(value); });
+            m_ioboard.set_drive([] { return u8{0xff}; }, [this](u8 value) {
+                m_vr_reply.command = value;
+                record_drive_board_write(value);
+            });
         }
     }
     if (!m_roms.has("ioboard")) {
@@ -226,6 +235,7 @@ void Model1::reset()
     m_bank_offset = 0x1000000;
     m_listctl[0] = m_listctl[1] = 0;
     m_r360_state = 0xff;
+    m_vr_reply   = {};
     m_irq_status = 0;
     m_irq_mask   = 0xff;
     m_last_irq   = 0;
@@ -752,7 +762,7 @@ void Model1::load_nvram()
     (void)apply_default_image(m_roms.region("nvram"), m_nvram);
     (void)apply_default_image(m_roms.region("eeprom"), m_uses_io2 ? m_ioboard2.eeprom().bytes() : m_ioboard.eeprom().bytes());
     if ((m_game.parent.empty() ? m_game.name : m_game.parent) == "vr") {
-        vr_special_cabinet(m_uses_io2 ? m_ioboard2.eeprom().bytes() : m_ioboard.eeprom().bytes());
+        vr_upright_cabinet(m_uses_io2 ? m_ioboard2.eeprom().bytes() : m_ioboard.eeprom().bytes());
     }
 
     const std::filesystem::path base = m_nvram_directory;

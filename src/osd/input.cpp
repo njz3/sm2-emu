@@ -1480,13 +1480,15 @@ void Input::update_drive_board(const rom::GameSpec& game, std::span<const u8> wr
         SM2_TRACE("drive board: %02X", written);
         u8 value = written;
         if (game.drive_protocol == rom::DriveProtocol::Vr) {
+            m_vr.command(written);
+            // The rest, for pads and plain rumble, takes Daytona's commands.
             const std::optional<u8> board = vr_to_daytona(written);
             if (!board) {
                 continue;
             }
             value = *board;
         }
-        if (daytona_board(game.drive_protocol)) {
+        if (game.drive_protocol == rom::DriveProtocol::Daytona) {
             m_daytona.command(value);
         } else if (game.drive_protocol == rom::DriveProtocol::Indy) {
             m_indy.command(value);
@@ -1512,14 +1514,15 @@ void Input::reset_drive_board()
     m_drive_ticks   = 0.0;
     m_daytona.reset();
     m_indy.reset();
+    m_vr.reset();
 }
 
 void Input::serialize_drive_board(Archive& ar)
 {
     // The layout of this section, for a later one to read this one.
-    u8 version = 1;
+    u8 version = 2;
     ar.raw(version);
-    if (ar.loading() && version != 1) {
+    if (ar.loading() && (version < 1 || version > 2)) {
         ar.mark_failed();
         return;
     }
@@ -1544,6 +1547,9 @@ void Input::serialize_drive_board(Archive& ar)
     ar.raw(m_drive_ticks);
     m_daytona.serialize(ar);
     m_indy.serialize(ar);
+    if (version >= 2) {
+        m_vr.serialize(ar);
+    }
 }
 
 bool Input::wheel_ffb_active(const rom::GameSpec& game) const
@@ -1647,7 +1653,41 @@ void Input::update_force_feedback(const rom::GameSpec& game)
         int game_force = 0;
         m_daytona.set_dip(static_cast<int>(m_wheel_settings.drive_dip));
         m_indy.set_dip(static_cast<int>(m_wheel_settings.drive_dip));
-        if (daytona_board(game.drive_protocol)) {
+        m_vr.set_dip(static_cast<int>(m_wheel_settings.drive_dip));
+        // The pot the game reads, for the boards that work from it: an "up"
+        // follows the channel's direction.
+        const auto game_pot = [&](bool* up_is_left) {
+            int position = 0x80 + board_counts(deflection, m_wheel_settings.steer_degrees,
+                                               m_wheel_settings.lock_degrees);
+            *up_is_left = false;
+            for (const rom::AnalogChannel& channel : game.analog) {
+                if (u8 value = 0; channel.control == rom::AnalogControl::Steer
+                                  && (virtual_wheel() || sample_wheel_channel(channel, &value))) {
+                    position    = virtual_wheel() ? m_agent->steer_value : value;
+                    *up_is_left = channel.reverse;
+                    break;
+                }
+            }
+            return position;
+        };
+        if (game.drive_protocol == rom::DriveProtocol::Vr) {
+            bool      up_is_left = false;
+            const int position   = game_pot(&up_is_left);
+            const VrBoard::Output out = m_vr.step(position, VrBoard::kIrqHz / kMachineHz);
+            const int force = out.power * board_full / kBoardFullRange;
+            constexpr int kFullSpeed = 1024;
+            switch (out.way) {
+                case VrBoard::Way::Down: game_force = up_is_left ? -force : force; break;
+                case VrBoard::Way::Up:   game_force = up_is_left ? force : -force; break;
+                case VrBoard::Way::None:
+                    // No way set: the clutch brakes against the turn.
+                    game_force = force * std::clamp(velocity, -kFullSpeed, kFullSpeed) / kFullSpeed;
+                    break;
+            }
+            SM2_DEBUG("ffb vr: on=%d effect=%02X position=%d way=%d power=%d",
+                      m_vr.forces_on() ? 1 : 0, m_vr.effect(), position,
+                      static_cast<int>(out.way), out.power);
+        } else if (daytona_board(game.drive_protocol)) {
             // The board's start-up calibration is run against the simulated
             // spring.
             const u32 steer       = m_wheel_settings.steer_degrees;
@@ -1680,17 +1720,8 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             // The board sends two powers, one each way, and what they have in
             // common brakes the motor. It reads the game's own steering pot, so
             // "up" follows the channel's direction.
-            int  position = 0x80 + board_counts(deflection, m_wheel_settings.steer_degrees,
-                                                m_wheel_settings.lock_degrees);
-            bool up_is_left = false;
-            for (const rom::AnalogChannel& channel : game.analog) {
-                if (u8 value = 0; channel.control == rom::AnalogControl::Steer
-                                  && (virtual_wheel() || sample_wheel_channel(channel, &value))) {
-                    position   = virtual_wheel() ? m_agent->steer_value : value;
-                    up_is_left = channel.reverse;
-                    break;
-                }
-            }
+            bool      up_is_left = false;
+            const int position   = game_pot(&up_is_left);
             const double nmis = IndyBoard::kNmiHz / kMachineHz;
             const IndyBoard::Output out = m_agent != nullptr && m_agent->indy
                                               ? m_agent->indy(m_indy, position, nmis)

@@ -299,6 +299,7 @@ add_library(sm2_osd STATIC
     osd/gui.cpp
     osd/i18n.cpp
     osd/indy_board.cpp
+    osd/vr_board.cpp
     osd/input.cpp
     osd/scraper.cpp
     osd/ui_text.cpp

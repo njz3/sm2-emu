@@ -19,6 +19,7 @@
 #include "osd/daytona_board.h"
 #include "osd/drive_command.h"
 #include "osd/indy_board.h"
+#include "osd/vr_board.h"
 #include "render/backend.h"
 #include "rom/game.h"
 
@@ -675,6 +676,8 @@ private:
 
     /// Indy 500's drive board (Touring Car, Over Rev, Super GT), the same way.
     IndyBoard                        m_indy;
+    /// Virtua Racing's, likewise.
+    VrBoard                          m_vr;
 
     /// The Sega Rally board's interrupts counted since start, simulated: its
     /// chopping flips on bits of this count.
