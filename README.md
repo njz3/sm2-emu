@@ -254,7 +254,10 @@ Both are set up in the settings menu (`F10`):
   case and the spaces around aside: `auto` (the default) is the wheel the
   steering is read from; a device named gets the forces alone, wherever the
   steering comes from. A change takes effect at once. While the device named
-  is not connected, the wheel plays them, as `auto`.
+  is not connected, the wheel plays them, as `auto`. Devices sharing a name
+  (a Fanatec base's wheel, pedals and shifter) are all listed, the next ones
+  as `Name #2`, `Name #3`... in the order the system lists them; the plain
+  name is the first.
 - **Light guns:** the first gun found is player 1, the second player 2.
   - **Linux:** any device tagged `ID_INPUT_GUN` works, and guns with a motor
     get recoil.

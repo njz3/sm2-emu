@@ -18,7 +18,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <string_view>
+#include <utility>
 
 #ifdef __linux__
 #include <fcntl.h>
@@ -135,9 +137,34 @@ bool WheelForce::open(SDL_Joystick* joystick)
     return haptic != nullptr && open_sdl(haptic);
 }
 
-bool WheelForce::open_named(const std::string& name, SDL_Joystick* wheel)
+namespace {
+
+// A device's label in the settings, "Name" or "Name #N": the name and which of
+// those of that name, 1 first. Several devices can share a name (a Fanatec base
+// exposes its wheel, pedals and shifter under one).
+std::pair<std::string, int> split_label(const std::string& label)
 {
-    if (wheel != nullptr && same_device(SDL_GetJoystickName(wheel), name)) {
+    const usize hash = label.rfind(" #");
+    if (hash != std::string::npos && hash + 2 < label.size()
+        && std::all_of(label.begin() + static_cast<std::ptrdiff_t>(hash + 2), label.end(),
+                       [](char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; })) {
+        const int n = std::atoi(label.c_str() + hash + 2);
+        if (n >= 1) {
+            return {label.substr(0, hash), n};
+        }
+    }
+    return {label, 1};
+}
+
+}  // namespace
+
+bool WheelForce::open_named(const std::string& label, SDL_Joystick* wheel)
+{
+    const auto [name, which] = split_label(label);
+    // The wheel's own haptic when the plain name is its, else the which-th of
+    // that name among the haptic devices.
+    if (which == 1 && label == name && wheel != nullptr
+        && same_device(SDL_GetJoystickName(wheel), name)) {
         return open(wheel);
     }
     close();
@@ -162,8 +189,9 @@ bool WheelForce::open_named(const std::string& name, SDL_Joystick* wheel)
         return false;
     }
     SDL_Haptic* haptic = nullptr;
+    int         seen   = 0;
     for (int index = 0; index < count && haptic == nullptr; ++index) {
-        if (same_device(SDL_GetHapticNameForID(ids[index]), name)) {
+        if (same_device(SDL_GetHapticNameForID(ids[index]), name) && ++seen == which) {
             haptic = SDL_OpenHaptic(ids[index]);
         }
     }
@@ -179,13 +207,16 @@ std::vector<std::string> WheelForce::device_names()
     if (ids == nullptr) {
         return names;
     }
+    // Every device, in SDL's order; a name already listed gets " #N".
+    std::vector<std::string> bases;
     for (int index = 0; index < count; ++index) {
         const char* name = SDL_GetHapticNameForID(ids[index]);
-        if (name != nullptr && name[0] != '\0'
-            && std::none_of(names.begin(), names.end(),
-                            [&](const std::string& known) { return same_device(name, known); })) {
-            names.emplace_back(name);
-        }
+        const std::string base = name != nullptr && name[0] != '\0' ? name : "?";
+        const auto n = 1 + std::count_if(bases.begin(), bases.end(), [&](const std::string& known) {
+                           return same_device(base.c_str(), known);
+                       });
+        bases.push_back(base);
+        names.push_back(n == 1 ? base : base + " #" + std::to_string(n));
     }
     SDL_free(ids);
     return names;

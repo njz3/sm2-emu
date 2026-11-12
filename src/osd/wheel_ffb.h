@@ -42,12 +42,14 @@ public:
     /// Returns false if the wheel has no constant-force effect.
     [[nodiscard]] bool open(SDL_Joystick* joystick);
 
-    /// The same on the device of that name (see same_device()): `wheel` itself
-    /// when it is the one, else the first of that name. False when none is
-    /// connected or it has no constant-force effect.
-    [[nodiscard]] bool open_named(const std::string& name, SDL_Joystick* wheel);
+    /// The same on the device of that label (see device_names()): "Name" is
+    /// `wheel` itself when it has that name, else the first of that name;
+    /// "Name #N" the N-th of that name. False when none is connected or it has
+    /// no constant-force effect.
+    [[nodiscard]] bool open_named(const std::string& label, SDL_Joystick* wheel);
 
-    /// The connected devices with force feedback, by name, each once.
+    /// The connected devices with force feedback, every one in SDL's order:
+    /// its name, then " #2", " #3"... for the next ones of the same name.
     [[nodiscard]] static std::vector<std::string> device_names();
 
     /// Whether a device's name is the one the settings give: the same once

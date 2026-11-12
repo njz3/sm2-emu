@@ -1273,7 +1273,10 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
                        "chosen here gets the forces alone, wherever the steering\n"
                        "is read from: read from vJoy and felt on a wheel, or the\n"
                        "other way round. While it is not connected, Automatic\n"
-                       "plays them. Takes effect at once; kept by its name."));
+                       "plays them. Takes effect at once; kept by its name.\n"
+                       "Devices sharing a name (a base's wheel, pedals and\n"
+                       "shifter) are numbered #2, #3... in the order Windows\n"
+                       "lists them."));
         }
     }
     int resistance = static_cast<int>(config.wheel_ffb_strength);
