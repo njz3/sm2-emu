@@ -1034,6 +1034,11 @@ msgid "axis %d"
 msgstr "axe %d"
 
 #: src/osd/gui.cpp
+#, c-format
+msgid "on %s"
+msgstr "sur %s"
+
+#: src/osd/gui.cpp
 #, no-c-format
 msgid "operate it..."
 msgstr "actionnez-le..."
@@ -1919,6 +1924,27 @@ msgstr "Relié : borne %u sur %u."
 #, no-c-format
 msgid "Force feedback device"
 msgstr "Dispositif de retour de force"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid "Wheel device"
+msgstr "Dispositif du volant"
+
+#: src/osd/gui.cpp
+#, no-c-format
+msgid ""
+"The device the steering and pedals are read from.\n"
+"Automatic: the first that looks like a wheel. Devices\n"
+"sharing a name (a base's wheel, pedals and shifter) are\n"
+"numbered #2, #3... in the order the system lists them.\n"
+"While the one chosen is not connected, Automatic reads."
+msgstr ""
+"Le dispositif d'où la direction et les pédales sont lues.\n"
+"Automatique : le premier qui ressemble à un volant. Les\n"
+"dispositifs de même nom (volant, pédalier et levier d'une\n"
+"même base) sont numérotés #2, #3... dans l'ordre où le\n"
+"système les liste. Tant que celui choisi n'est pas\n"
+"branché, Automatique est lu."
 
 #: src/osd/gui.cpp
 #, c-format

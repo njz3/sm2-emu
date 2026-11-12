@@ -960,6 +960,12 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
         } else if (key == "wheel_ffb_device" || key == "ffb_device") {
             // ffb_device: the front ends' FFB_DEVICE, as Supermodel takes it.
             out->wheel_ffb_device = lowered(value) == "auto" ? std::string() : value;
+        } else if (key == "wheel_device") {
+            out->wheel_device = lowered(value) == "auto" ? std::string() : value;
+        } else if (key == "wheel_accel_device") {
+            out->wheel_accel_device = lowered(value) == "wheel" ? std::string() : value;
+        } else if (key == "wheel_brake_device") {
+            out->wheel_brake_device = lowered(value) == "wheel" ? std::string() : value;
         } else if (key == "wheel_rumble") {
             if (!parse_bool(value, &out->wheel_rumble)) {
                 bad_value();
@@ -1470,6 +1476,12 @@ void write_config(std::ostream& out, const Config& config)
         << "wheel_ffb_invert = " << bool_text(config.wheel_ffb_invert) << "\n"
         << "wheel_ffb_device = "
         << (config.wheel_ffb_device.empty() ? std::string("auto") : config.wheel_ffb_device) << "\n"
+        << "wheel_device = "
+        << (config.wheel_device.empty() ? std::string("auto") : config.wheel_device) << "\n"
+        << "wheel_accel_device = "
+        << (config.wheel_accel_device.empty() ? std::string("wheel") : config.wheel_accel_device) << "\n"
+        << "wheel_brake_device = "
+        << (config.wheel_brake_device.empty() ? std::string("wheel") : config.wheel_brake_device) << "\n"
         << "wheel_panel_spring = " << config.wheel_panel_spring << "\n"
         << "wheel_indy_deadband = " << config.wheel_indy_deadband << "\n"
         << "wheel_indy_full_power = " << config.wheel_indy_full_power << "\n"

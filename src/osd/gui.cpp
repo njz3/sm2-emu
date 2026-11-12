@@ -1230,6 +1230,40 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
     } else {
         ImGui::TextDisabled("%s", tr("No wheel connected. Settings still apply once one is."));
     }
+
+    // The joystick the steering and pedals are read from.
+    {
+        const std::vector<std::string> devices = Input::wheel_devices();
+        const std::string&             chosen  = config.wheel_device;
+        const bool connected_device =
+            std::any_of(devices.begin(), devices.end(), [&](const std::string& name) {
+                return WheelForce::same_device(name.c_str(), chosen);
+            });
+        const std::string shown =
+            chosen.empty() ? std::string(tr("Automatic"))
+                           : connected_device ? chosen : trf("%s (not connected)", chosen.c_str());
+        ImGui::SetNextItemWidth(320.0f);
+        if (ImGui::BeginCombo(tr_id("Wheel device"), shown.c_str())) {
+            if (ImGui::Selectable(tr("Automatic"), chosen.empty())) {
+                config.wheel_device.clear();
+            }
+            for (const std::string& name : devices) {
+                if (ImGui::Selectable(name.c_str(), WheelForce::same_device(name.c_str(), chosen))) {
+                    config.wheel_device = name;
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            tooltip(tr("The device the steering and pedals are read from.\n"
+                       "Automatic: the first that looks like a wheel. Devices\n"
+                       "sharing a name (a base's wheel, pedals and shifter) are\n"
+                       "numbered #2, #3... in the order the system lists them.\n"
+                       "While the one chosen is not connected, Automatic reads."));
+        }
+    }
     ImGui::Spacing();
 
     // -- feel ---------------------------------------------------------------
@@ -1418,12 +1452,15 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
     ImGui::TextUnformatted(tr("Axes"));
     ImGui::TextDisabled("%s", tr("Auto-detected. Recalibrate if steering or a pedal is wrong."));
 
-    struct AxisRow { const char* name; s32* axis; bool* invert; bool* half; };
+    // A pedal may be on another device than the wheel (a base's pedals): its
+    // calibration watches every joystick, and keeps the one it was caught on.
+    struct AxisRow { const char* name; s32* axis; bool* invert; bool* half; std::string* device; };
     const AxisRow axis_rows[] = {
-        {N_("Steering"), &config.wheel_steer_axis, nullptr, nullptr},
+        {N_("Steering"), &config.wheel_steer_axis, nullptr, nullptr, nullptr},
         {N_("Accelerator"), &config.wheel_accel_axis, &config.wheel_accel_invert,
-         &config.wheel_accel_half},
-        {N_("Brake"), &config.wheel_brake_axis, &config.wheel_brake_invert, &config.wheel_brake_half},
+         &config.wheel_accel_half, &config.wheel_accel_device},
+        {N_("Brake"), &config.wheel_brake_axis, &config.wheel_brake_invert, &config.wheel_brake_half,
+         &config.wheel_brake_device},
     };
     const float axis_column = value_column(axis_rows, [](const AxisRow& r) { return r.name; });
 
@@ -1445,50 +1482,53 @@ void Gui::draw_wheel_tab(Config& config, Input* input)
         } else {
             ImGui::TextUnformatted(trf("axis %d", *r.axis).c_str());
         }
+        if (r.device != nullptr && !r.device->empty()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", trf("on %s", r.device->c_str()).c_str());
+        }
         ImGui::SameLine();
         const bool capturing = m_capture == Capture::Axis && m_capture_axis == row;
         if (capturing) {
             ImGui::TextColored(ImVec4(1, 0.8f, 0.2f, 1), "%s", tr("operate it..."));
-            if (input != nullptr) {
-                bool positive = true;
-                const s32 got = input->captured_axis(
-                    m_axis_baseline.data(),
-                    std::min<int>(input->wheel_axis_count(),
-                                  static_cast<int>(m_axis_baseline.size())),
-                    &positive);
-                if (got >= 0) {
-                    *r.axis = got;
-                    // A pedal read as "released high, pressed low" is inverted; a
-                    // downward move at capture time means exactly that.
-                    if (r.invert != nullptr) {
-                        *r.invert = !positive;
-                    }
-                    // A pedal that rested at the centre of its axis, rather than
-                    // at an end, uses half of it: the half it moved into.
-                    if (r.half != nullptr) {
-                        *r.half = std::abs(static_cast<int>(m_axis_baseline[static_cast<usize>(got)]))
-                                  <= 16384;
-                    }
-                    m_capture = Capture::None;
+            Input::CapturedAxis got;
+            if (input != nullptr && input->axis_captured(&got)) {
+                *r.axis = got.axis;
+                if (r.device != nullptr) {
+                    *r.device = got.device;
                 }
+                // A pedal read as "released high, pressed low" is inverted; a
+                // downward move at capture time means exactly that.
+                if (r.invert != nullptr) {
+                    *r.invert = !got.positive;
+                }
+                // A pedal that rested at the centre of its axis, rather than
+                // at an end, uses half of it: the half it moved into.
+                if (r.half != nullptr) {
+                    *r.half = got.centred;
+                }
+                m_capture = Capture::None;
+                input->axis_capture_end();
             }
             ImGui::SameLine();
             if (ImGui::SmallButton(tr_id("cancel"))) {
                 m_capture = Capture::None;
+                if (input != nullptr) {
+                    input->axis_capture_end();
+                }
             }
         } else if (ImGui::SmallButton(tr_id("Calibrate"))) {
             m_capture      = Capture::Axis;
             m_capture_axis = row;
             if (input != nullptr) {
-                input->wheel_axis_baseline(
-                    m_axis_baseline.data(),
-                    std::min<int>(input->wheel_axis_count(),
-                                  static_cast<int>(m_axis_baseline.size())));
+                input->axis_capture_begin(r.device != nullptr);
             }
         }
         ImGui::SameLine();
         if (ImGui::SmallButton(tr_id("auto"))) {
             *r.axis = -1;
+            if (r.device != nullptr) {
+                r.device->clear();
+            }
             if (r.invert != nullptr) {
                 *r.invert = false;
             }

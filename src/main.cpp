@@ -155,6 +155,9 @@ void apply_input_background(bool on)
     w.drive_dip       = c.wheel_drive_dip;
     w.ffb_invert      = c.wheel_ffb_invert;
     w.ffb_device      = c.wheel_ffb_device;
+    w.device          = c.wheel_device;
+    w.accel_device    = c.wheel_accel_device;
+    w.brake_device    = c.wheel_brake_device;
     w.steer_degrees   = c.wheel_steer_degrees;
     w.lock_degrees    = c.wheel_lock_degrees;
     w.steer_deadzone  = c.wheel_steer_deadzone;
@@ -1224,6 +1227,9 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
     options->config.wheel_drive_dip       = from_file.wheel_drive_dip;
     options->config.wheel_ffb_invert    = from_file.wheel_ffb_invert;
     options->config.wheel_ffb_device    = from_file.wheel_ffb_device;
+    options->config.wheel_device        = from_file.wheel_device;
+    options->config.wheel_accel_device  = from_file.wheel_accel_device;
+    options->config.wheel_brake_device  = from_file.wheel_brake_device;
     options->config.input_background    = from_file.input_background;
     options->config.wheel_steer_degrees = from_file.wheel_steer_degrees;
     options->config.wheel_lock_degrees  = from_file.wheel_lock_degrees;

@@ -188,14 +188,32 @@ bool WheelForce::open_named(const std::string& label, SDL_Joystick* wheel)
     if (ids == nullptr) {
         return false;
     }
-    SDL_Haptic* haptic = nullptr;
-    int         seen   = 0;
-    for (int index = 0; index < count && haptic == nullptr; ++index) {
+    SDL_HapticID target = 0;
+    int          seen   = 0;
+    for (int index = 0; index < count && target == 0; ++index) {
         if (same_device(SDL_GetHapticNameForID(ids[index]), name) && ++seen == which) {
-            haptic = SDL_OpenHaptic(ids[index]);
+            target = ids[index];
         }
     }
     SDL_free(ids);
+    if (target == 0) {
+        return false;
+    }
+    // The wheel read from may be that device: its joystick holds it (exclusive
+    // under DirectInput), so opening it again fails; it is reached through the
+    // joystick then, as Automatic does.
+    if (wheel != nullptr) {
+        if (SDL_Haptic* own = SDL_OpenHapticFromJoystick(wheel)) {
+            if (SDL_GetHapticID(own) == target) {
+                return open_sdl(own);
+            }
+            SDL_CloseHaptic(own);
+        }
+    }
+    SDL_Haptic* haptic = SDL_OpenHaptic(target);
+    if (haptic == nullptr) {
+        SM2_INFO("wheel FFB: cannot open \"%s\": %s", label.c_str(), SDL_GetError());
+    }
     return haptic != nullptr && open_sdl(haptic);
 }
 

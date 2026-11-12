@@ -126,6 +126,13 @@ public:
         /// The device that plays the force, by name; empty: the wheel itself
         /// (see Config::wheel_ffb_device).
         std::string ffb_device;
+        /// The joystick read as the wheel, by label; empty: the first that
+        /// looks like one (see Config::wheel_device).
+        std::string device;
+        /// The joystick each pedal is read from, by label; empty: the wheel
+        /// (see Config::wheel_accel_device).
+        std::string accel_device;
+        std::string brake_device;
         u32  steer_degrees = 270;
         u32  lock_degrees  = 240;  ///< physical rotation for full game lock.
         u32  steer_deadzone = 0;   ///< percent of travel about centre read as centre.
@@ -201,6 +208,10 @@ public:
     /// The connected devices with force feedback, by name, for the settings.
     [[nodiscard]] static std::vector<std::string> force_feedback_devices();
 
+    /// The connected joysticks, by label ("Name", "Name #2"... in SDL's
+    /// order), for the settings to choose the wheel from.
+    [[nodiscard]] static std::vector<std::string> wheel_devices();
+
     /// True when a wheel is connected, for the settings UI to show its controls.
     [[nodiscard]] bool wheel_connected() const { return m_wheel.handle != nullptr; }
 
@@ -249,22 +260,27 @@ public:
     /// read or hidden, for a host that maps the hotkeys itself.
     [[nodiscard]] PadShortcuts update_pad_shortcuts(bool enabled);
 
-    /// Number of axes on the connected wheel, or 0 if none.
-    [[nodiscard]] int wheel_axis_count() const;
+    /// Axis calibration: begin() notes where every axis rests, on the wheel
+    /// alone (`any_device` false, for the steering) or on every joystick
+    /// connected (the pedals, which may be another device of the base).
+    void axis_capture_begin(bool any_device);
 
-    /// Snapshot the current value of every wheel axis into `out` (up to `count`),
-    /// for the calibration UI to record a resting baseline before the user
-    /// operates a control.
-    void wheel_axis_baseline(s16* out, int count) const;
+    /// What the calibration caught since begin(): the axis that moved
+    /// furthest, once past a threshold. False while none has.
+    struct CapturedAxis {
+        std::string device;           ///< its joystick's label; empty: the wheel.
+        int         axis     = -1;
+        bool        positive = true;  ///< moved up (a pedal pressed low reports false).
+        bool        centred  = false; ///< rested about the centre (a pedal on half its axis).
+    };
+    [[nodiscard]] bool axis_captured(CapturedAxis* out) const;
+
+    /// Ends the calibration, closing the joysticks it opened.
+    void axis_capture_end();
 
     /// The raw reading of the wheel's steering axis, for the deadzone display.
     /// 0 without a wheel.
     [[nodiscard]] s16 wheel_steer_raw() const;
-
-    /// The axis that has moved furthest from `baseline`, once past a threshold,
-    /// or -1 if none has moved enough yet. `positive` is set to whether it moved
-    /// up from its baseline (a pedal that reads low when pressed reports false).
-    [[nodiscard]] s32 captured_axis(const s16* baseline, int count, bool* positive) const;
 
     /// Decode the drive-board bytes written during the last frame. The last
     /// force command stays in effect until the game sends another.
@@ -516,8 +532,36 @@ private:
 
     [[nodiscard]] s16 wheel_axis(int axis) const;
 
+    /// A joystick read for its axes beside the wheel: a pedal on another
+    /// device, or one a calibration watches. Its axes rest as read at open
+    /// until they move, as the wheel's.
+    struct AxisSource {
+        SDL_Joystick*                     handle = nullptr;
+        SDL_JoystickID                    id     = 0;
+        std::array<s16, Wheel::kMaxAxes>  rest{};
+        u32                               moved  = 0;
+        std::array<s16, Wheel::kMaxAxes>  baseline{};  ///< for a calibration.
+    };
+    [[nodiscard]] static bool open_source(SDL_JoystickID id, AxisSource* source);
+    static void close_source(AxisSource* source);
+    [[nodiscard]] static s16 source_axis(const AxisSource& source, int axis);
+
+    /// Each pedal's own joystick, accel then brake; no handle: the wheel's.
+    std::array<AxisSource, 2> m_pedal_sources{};
+    /// A pedal the settings put on a device that is not connected: not read.
+    std::array<bool, 2> m_pedal_lost{};
+    /// (Re)opens the pedals' joysticks the settings name.
+    void open_pedal_sources();
+
+    /// The joysticks a calibration watches; the first is the wheel's.
+    std::vector<AxisSource> m_capture_sources;
+    bool                    m_capture_any = false;
+
+    /// A pedal's raw axis, 0 accel, 1 brake: on its own device, or the wheel.
+    [[nodiscard]] s16 pedal_axis(int pedal, int axis) const;
+
     /// How far a pedal is pressed, from 0 to 1.
-    [[nodiscard]] float pedal_travel(int axis, bool invert, bool half) const;
+    [[nodiscard]] float pedal_travel(int pedal, int axis, bool invert, bool half) const;
 
 
     void add_gamepad(SDL_JoystickID id);
@@ -525,6 +569,10 @@ private:
 
     /// Open `id` as a wheel if it looks like one and no wheel is open yet.
     void add_wheel(SDL_JoystickID id);
+    /// Whether the settings name this joystick as the wheel.
+    [[nodiscard]] bool chosen_wheel(SDL_JoystickID id) const;
+    /// Closes the wheel and opens it again from the joysticks connected.
+    void reopen_wheel();
     /// The wheel's force feedback (again), on the device the settings choose.
     void open_force_feedback();
     void remove_wheel(SDL_JoystickID id);

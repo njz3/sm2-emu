@@ -277,6 +277,18 @@ struct Config {
     /// while it is not connected, the wheel plays them, as with empty.
     std::string wheel_ffb_device;
 
+    /// The joystick the steering and pedals are read from, by its label
+    /// ("Name", or "Name #N" for the N-th of a name, as several devices of one
+    /// base share it); empty: the first that looks like a wheel. While it is
+    /// not connected, that first one is read.
+    std::string wheel_device;
+
+    /// The joystick the accelerator and the brake are read from, by label as
+    /// wheel_device; empty: the wheel. A pedal whose device is not connected
+    /// is not read (the keyboard or a pad stands in).
+    std::string wheel_accel_device;
+    std::string wheel_brake_device;
+
     /// A synthesised road/engine rumble: a vibration that rises with the
     /// throttle and with hard steering. Used on games without force feedback;
     /// a wheel delivering force feedback does not also rumble.

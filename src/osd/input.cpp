@@ -207,6 +207,28 @@ bool is_wheel_typed(SDL_JoystickID id)
     return SDL_GetJoystickTypeForID(id) == SDL_JOYSTICK_TYPE_WHEEL;
 }
 
+/// A joystick's label in the settings: its name, then " #2", " #3"... for the
+/// next ones of the same name in SDL's order (a Fanatec base exposes its wheel,
+/// pedals and shifter under one), as WheelForce::device_names() does.
+std::string joystick_label(SDL_JoystickID id)
+{
+    const auto named = [](SDL_JoystickID joystick) {
+        const char* name = SDL_GetJoystickNameForID(joystick);
+        return std::string(name != nullptr && name[0] != '\0' ? name : "?");
+    };
+    const std::string base  = named(id);
+    int               count = 0;
+    SDL_JoystickID*   ids   = SDL_GetJoysticks(&count);
+    int               n     = 1;
+    for (int index = 0; ids != nullptr && index < count && ids[index] != id; ++index) {
+        if (WheelForce::same_device(named(ids[index]).c_str(), base)) {
+            ++n;
+        }
+    }
+    SDL_free(ids);
+    return n == 1 ? base : base + " #" + std::to_string(n);
+}
+
 /// Light guns also expose a joystick interface, its axes the aim.
 bool is_gun_named(SDL_JoystickID id)
 {
@@ -414,15 +436,7 @@ bool Input::init(const WheelSettings& wheel)
         SDL_free(ids);
     }
 
-    ids = SDL_GetJoysticks(&count);
-    if (ids != nullptr) {
-        for (int index = 0; index < count; ++index) {
-            if (is_wheel_typed(ids[index]) || !SDL_IsGamepad(ids[index])) {
-                add_wheel(ids[index]);
-            }
-        }
-        SDL_free(ids);
-    }
+    reopen_wheel();
 
     if (m_pads.empty() && m_wheel.handle == nullptr) {
         SM2_INFO("no gamepad found; the keyboard covers both players");
@@ -452,6 +466,10 @@ void Input::shutdown()
         }
     }
     m_pads.clear();
+    axis_capture_end();
+    for (AxisSource& source : m_pedal_sources) {
+        close_source(&source);
+    }
     remove_wheel(m_wheel.id);
     if (m_started) {
         SDL_QuitSubSystem(SDL_INIT_HAPTIC);
@@ -471,13 +489,21 @@ void Input::handle_event(const SDL_Event& event)
             break;
         case SDL_EVENT_JOYSTICK_ADDED: {
             const bool had_wheel = m_wheel.handle != nullptr;
-            if (is_wheel_typed(event.jdevice.which) || !SDL_IsGamepad(event.jdevice.which)) {
+            if (chosen_wheel(event.jdevice.which) || is_wheel_typed(event.jdevice.which)
+                || !SDL_IsGamepad(event.jdevice.which)) {
                 add_wheel(event.jdevice.which);
             }
             // The device chosen for the force may be the one that came (a new
             // wheel has opened it already).
             if (had_wheel && !m_wheel_settings.ffb_device.empty()) {
                 open_force_feedback();
+            }
+            // Or a pedal's (the labels may have moved too).
+            if (!m_wheel_settings.accel_device.empty() || !m_wheel_settings.brake_device.empty()) {
+                open_pedal_sources();
+                if (m_wheel.handle != nullptr) {
+                    assign_wheel_axes();
+                }
             }
             break;
         }
@@ -487,10 +513,34 @@ void Input::handle_event(const SDL_Event& event)
             if (!m_wheel_settings.ffb_device.empty() && m_wheel.handle != nullptr) {
                 open_force_feedback();
             }
+            if (!m_wheel_settings.accel_device.empty() || !m_wheel_settings.brake_device.empty()) {
+                open_pedal_sources();
+                if (m_wheel.handle != nullptr) {
+                    assign_wheel_axes();
+                }
+            }
+            for (AxisSource& source : m_capture_sources) {
+                if (source.id == event.jdevice.which) {
+                    close_source(&source);
+                }
+            }
             break;
         case SDL_EVENT_JOYSTICK_AXIS_MOTION:
-            if (event.jaxis.which == m_wheel.id && event.jaxis.axis < Wheel::kMaxAxes) {
-                m_wheel.axes_moved |= 1u << event.jaxis.axis;
+            if (event.jaxis.axis < Wheel::kMaxAxes) {
+                const u32 bit = 1u << event.jaxis.axis;
+                if (event.jaxis.which == m_wheel.id) {
+                    m_wheel.axes_moved |= bit;
+                }
+                for (AxisSource& source : m_pedal_sources) {
+                    if (source.handle != nullptr && source.id == event.jaxis.which) {
+                        source.moved |= bit;
+                    }
+                }
+                for (AxisSource& source : m_capture_sources) {
+                    if (source.id == event.jaxis.which) {
+                        source.moved |= bit;
+                    }
+                }
             }
             break;
         default:
@@ -536,6 +586,9 @@ void Input::add_gamepad(SDL_JoystickID id)
     if (std::any_of(m_pads.begin(), m_pads.end(),
                     [id](const Pad& pad) { return pad.id == id; })) {
         return;
+    }
+    if (chosen_wheel(id)) {
+        return;  // read as the wheel, as the settings say
     }
     if (is_wheel_typed(id)) {
         SM2_DEBUG("joystick %u type=%d treated as a wheel, not a gamepad",
@@ -595,15 +648,51 @@ SDL_Gamepad* Input::pad_for(u32 player) const
     return match != m_pads.end() ? match->handle : nullptr;
 }
 
+bool Input::chosen_wheel(SDL_JoystickID id) const
+{
+    return !m_wheel_settings.device.empty()
+        && WheelForce::same_device(joystick_label(id).c_str(), m_wheel_settings.device);
+}
+
+void Input::reopen_wheel()
+{
+    remove_wheel(m_wheel.id);
+    int             count = 0;
+    SDL_JoystickID* ids   = SDL_GetJoysticks(&count);
+    if (ids == nullptr) {
+        return;
+    }
+    // The one the settings name first, then the first that looks like a wheel.
+    for (int index = 0; index < count && m_wheel.handle == nullptr; ++index) {
+        if (chosen_wheel(ids[index])) {
+            remove_gamepad(ids[index]);  // if it was taken as one
+            add_wheel(ids[index]);
+        }
+    }
+    for (int index = 0; index < count && m_wheel.handle == nullptr; ++index) {
+        if (is_wheel_typed(ids[index]) || !SDL_IsGamepad(ids[index])) {
+            add_wheel(ids[index]);
+        }
+    }
+    SDL_free(ids);
+}
+
 void Input::add_wheel(SDL_JoystickID id)
 {
+    const bool chosen = chosen_wheel(id);
     if (m_wheel.handle != nullptr) {
-        return;  // One wheel, driving player one, is all a Model 2 cabinet wires.
+        // One wheel, driving player one, is all a Model 2 cabinet wires; the one
+        // the settings name takes over when it comes.
+        if (!chosen || chosen_wheel(m_wheel.id)) {
+            return;
+        }
+        remove_wheel(m_wheel.id);
     }
 
     // UNKNOWN passes: it only reaches here when nothing else claimed the device.
-    // A named device skips the check, having whatever type uinput gave it.
-    const SDL_JoystickType type = SDL_GetJoystickTypeForID(id);
+    // A named device skips the check, having whatever type uinput gave it, and
+    // so does the one the settings name.
+    const SDL_JoystickType type = chosen ? SDL_JOYSTICK_TYPE_WHEEL : SDL_GetJoystickTypeForID(id);
     if (type != SDL_JOYSTICK_TYPE_WHEEL && type != SDL_JOYSTICK_TYPE_UNKNOWN) {
         return;
     }
@@ -631,6 +720,7 @@ void Input::add_wheel(SDL_JoystickID id)
         return;
     }
 
+    SM2_INFO("wheel: %s%s", joystick_label(id).c_str(), chosen ? " (as the settings name)" : "");
     m_wheel            = Wheel{};
     m_wheel.handle     = handle;
     m_wheel.id         = id;
@@ -641,6 +731,7 @@ void Input::add_wheel(SDL_JoystickID id)
     for (int axis = 0; axis < axes && axis < Wheel::kMaxAxes; ++axis) {
         m_wheel.axis_rest[static_cast<usize>(axis)] = SDL_GetJoystickAxis(handle, axis);
     }
+    open_pedal_sources();
     assign_wheel_axes();
 
     open_force_feedback();
@@ -697,12 +788,28 @@ std::vector<std::string> Input::force_feedback_devices()
     return WheelForce::device_names();
 }
 
+std::vector<std::string> Input::wheel_devices()
+{
+    std::vector<std::string> labels;
+    int                      count = 0;
+    SDL_JoystickID*          ids   = SDL_GetJoysticks(&count);
+    for (int index = 0; ids != nullptr && index < count; ++index) {
+        labels.push_back(joystick_label(ids[index]));
+    }
+    SDL_free(ids);
+    return labels;
+}
+
 void Input::set_wheel_settings(const WheelSettings& wheel)
 {
     const WheelSettings& old = m_wheel_settings;
     const bool device_changed = !WheelForce::same_device(wheel.ffb_device.c_str(), old.ffb_device);
+    const bool wheel_changed  = !WheelForce::same_device(wheel.device.c_str(), old.device);
+    const bool pedals_moved   = !WheelForce::same_device(wheel.accel_device.c_str(), old.accel_device)
+                             || !WheelForce::same_device(wheel.brake_device.c_str(), old.brake_device);
     const bool axes_changed =
-        wheel.steer_axis != old.steer_axis || wheel.accel_axis != old.accel_axis
+        pedals_moved
+        || wheel.steer_axis != old.steer_axis || wheel.accel_axis != old.accel_axis
         || wheel.brake_axis != old.brake_axis || wheel.accel_invert != old.accel_invert
         || wheel.brake_invert != old.brake_invert || wheel.accel_half != old.accel_half
         || wheel.brake_half != old.brake_half;
@@ -710,9 +817,16 @@ void Input::set_wheel_settings(const WheelSettings& wheel)
     if (m_wheel_settings.keys != m_wheel_key_names) {
         resolve_keys();
     }
-    // Another device for the force: at once, the effects moved over.
-    if (device_changed && m_wheel.handle != nullptr) {
+    // Another joystick read as the wheel: at once (its force reopened with it).
+    if (wheel_changed && m_started) {
+        reopen_wheel();
+    } else if (device_changed && m_wheel.handle != nullptr) {
+        // Another device for the force: at once, the effects moved over.
         open_force_feedback();
+    }
+    // A pedal on another device: opened at once.
+    if (pedals_moved && m_started) {
+        open_pedal_sources();
     }
     // A calibration takes effect at once, not at the wheel's next connection.
     if (axes_changed && m_wheel.handle != nullptr) {
@@ -868,21 +982,25 @@ void Input::assign_wheel_axes()
     m_wheel.accel_half   = cal.accel_axis >= 0 && cal.accel_half;
     m_wheel.brake_half   = cal.brake_axis >= 0 && cal.brake_half;
 
+    // A pedal on another device takes none of the wheel's axes.
+    const bool accel_here = m_pedal_sources[0].handle == nullptr && !m_pedal_lost[0];
+    const bool brake_here = m_pedal_sources[1].handle == nullptr && !m_pedal_lost[1];
     const auto taken = [&](int axis) {
-        return axis == cal.steer_axis || axis == cal.accel_axis || axis == cal.brake_axis;
+        return axis == cal.steer_axis || (accel_here && axis == cal.accel_axis)
+            || (brake_here && axis == cal.brake_axis);
     };
     if (m_wheel.steer_axis < 0 && axes > 0 && !taken(0)) {
         m_wheel.steer_axis = 0;
     }
 
-    // The pedals that are not calibrated, in order.
+    // The pedals that are not calibrated, in order, on the wheel...
     struct Pedal { int* axis; bool* invert; };
     Pedal pedals[2];
     int   wanted = 0;
-    if (m_wheel.accel_axis < 0) {
+    if (m_wheel.accel_axis < 0 && accel_here) {
         pedals[wanted++] = {&m_wheel.accel_axis, &m_wheel.accel_invert};
     }
-    if (m_wheel.brake_axis < 0) {
+    if (m_wheel.brake_axis < 0 && brake_here) {
         pedals[wanted++] = {&m_wheel.brake_axis, &m_wheel.brake_invert};
     }
     int found = 0;
@@ -903,11 +1021,112 @@ void Input::assign_wheel_axes()
         }
     }
 
+    // ... and on their own devices: an axis resting at an end, not the other
+    // pedal's on the same device.
+    int* const  pedal_axes[2]    = {&m_wheel.accel_axis, &m_wheel.brake_axis};
+    bool* const pedal_invert[2]  = {&m_wheel.accel_invert, &m_wheel.brake_invert};
+    for (int pedal = 0; pedal < 2; ++pedal) {
+        const AxisSource& source = m_pedal_sources[static_cast<usize>(pedal)];
+        if (source.handle == nullptr || *pedal_axes[pedal] >= 0) {
+            continue;
+        }
+        const AxisSource& other   = m_pedal_sources[static_cast<usize>(1 - pedal)];
+        const bool        sharing = other.handle != nullptr && other.id == source.id;
+        const int         count   = SDL_GetNumJoystickAxes(source.handle);
+        for (int axis = 0; axis < count && *pedal_axes[pedal] < 0; ++axis) {
+            const int rest = static_cast<int>(source_axis(source, axis));
+            if ((sharing && axis == *pedal_axes[1 - pedal]) || (rest >= -16384 && rest <= 16384)) {
+                continue;
+            }
+            *pedal_axes[pedal]   = axis;
+            *pedal_invert[pedal] = rest > 0;
+        }
+    }
+
     const char* name = SDL_GetJoystickName(m_wheel.handle);
-    SM2_INFO("wheel: %s (%d axes; steer %d accel %d(inv %d half %d) brake %d(inv %d half %d))",
+    SM2_INFO("wheel: %s (%d axes; steer %d accel %d(inv %d half %d)%s%s brake %d(inv %d half %d)%s%s)",
              name != nullptr ? name : "steering wheel", axes,
              m_wheel.steer_axis, m_wheel.accel_axis, m_wheel.accel_invert, m_wheel.accel_half,
-             m_wheel.brake_axis, m_wheel.brake_invert, m_wheel.brake_half);
+             cal.accel_device.empty() ? "" : " on ", cal.accel_device.c_str(),
+             m_wheel.brake_axis, m_wheel.brake_invert, m_wheel.brake_half,
+             cal.brake_device.empty() ? "" : " on ", cal.brake_device.c_str());
+}
+
+bool Input::open_source(SDL_JoystickID id, AxisSource* source)
+{
+    *source        = AxisSource{};
+    source->handle = SDL_OpenJoystick(id);
+    if (source->handle == nullptr) {
+        return false;
+    }
+    source->id = id;
+    const int axes = SDL_GetNumJoystickAxes(source->handle);
+    for (int axis = 0; axis < axes && axis < Wheel::kMaxAxes; ++axis) {
+        source->rest[static_cast<usize>(axis)] = SDL_GetJoystickAxis(source->handle, axis);
+    }
+    return true;
+}
+
+void Input::close_source(AxisSource* source)
+{
+    if (source->handle != nullptr) {
+        SDL_CloseJoystick(source->handle);  // counted: the wheel or a pad stays open
+    }
+    *source = AxisSource{};
+}
+
+s16 Input::source_axis(const AxisSource& source, int axis)
+{
+    if (source.handle == nullptr) {
+        return 0;
+    }
+    if (axis >= 0 && axis < Wheel::kMaxAxes && (source.moved & (1u << axis)) == 0) {
+        return source.rest[static_cast<usize>(axis)];
+    }
+    return SDL_GetJoystickAxis(source.handle, axis);
+}
+
+void Input::open_pedal_sources()
+{
+    const std::string* const labels[2] = {&m_wheel_settings.accel_device,
+                                          &m_wheel_settings.brake_device};
+    const std::string wheel_label = m_wheel.handle != nullptr ? joystick_label(m_wheel.id) : "";
+    int             count = 0;
+    SDL_JoystickID* ids   = SDL_GetJoysticks(&count);
+    for (usize pedal = 0; pedal < 2; ++pedal) {
+        const std::string& label  = *labels[pedal];
+        AxisSource&        source = m_pedal_sources[pedal];
+        m_pedal_lost[pedal]       = false;
+        // Kept open while it is still the one named, so its axes keep moving.
+        if (source.handle != nullptr && !label.empty()
+            && WheelForce::same_device(joystick_label(source.id).c_str(), label)
+            && source.id != m_wheel.id) {
+            continue;
+        }
+        close_source(&source);
+        if (label.empty() || (m_wheel.handle != nullptr
+                              && WheelForce::same_device(wheel_label.c_str(), label))) {
+            continue;  // on the wheel
+        }
+        SDL_JoystickID id = 0;
+        for (int index = 0; ids != nullptr && index < count && id == 0; ++index) {
+            if (WheelForce::same_device(joystick_label(ids[index]).c_str(), label)) {
+                id = ids[index];
+            }
+        }
+        if (id == 0 || !open_source(id, &source)) {
+            m_pedal_lost[pedal] = true;
+            SM2_INFO("wheel: %s's device \"%s\" not connected",
+                     pedal == 0 ? "the accelerator" : "the brake", label.c_str());
+        }
+    }
+    SDL_free(ids);
+}
+
+s16 Input::pedal_axis(int pedal, int axis) const
+{
+    const AxisSource& source = m_pedal_sources[static_cast<usize>(pedal)];
+    return source.handle != nullptr ? source_axis(source, axis) : wheel_axis(axis);
 }
 
 void Input::remove_wheel(SDL_JoystickID id)
@@ -931,9 +1150,9 @@ s16 Input::wheel_axis(int axis) const
     return SDL_GetJoystickAxis(m_wheel.handle, axis);
 }
 
-float Input::pedal_travel(int axis, bool invert, bool half) const
+float Input::pedal_travel(int pedal, int axis, bool invert, bool half) const
 {
-    const float raw = static_cast<float>(wheel_axis(axis));
+    const float raw = static_cast<float>(pedal_axis(pedal, axis));
     float travel;
     if (half) {
         // Released at the centre, pressed towards one end.
@@ -973,8 +1192,14 @@ bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) con
     if (axis < 0) {
         return false;
     }
+    const bool brake = channel.control == rom::AnalogControl::Brake;
+    const bool is_pedal = channel.control == rom::AnalogControl::Accel
+                       || channel.control == rom::AnalogControl::Throttle || brake;
+    if (is_pedal && m_pedal_lost[brake ? 1 : 0]) {
+        return false;  // its device is not connected
+    }
 
-    const s16 raw = wheel_axis(axis);
+    const s16 raw = is_pedal ? pedal_axis(brake ? 1 : 0, axis) : wheel_axis(axis);
 
     const auto scaled = [&channel](float fraction) {
         const float span  = static_cast<float>(channel.maximum - channel.minimum);
@@ -1025,8 +1250,8 @@ bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) con
     }
 
     // A pedal: 0 is released, 1 fully pressed.
-    const bool brake = channel.control == rom::AnalogControl::Brake;
-    fraction = pedal_travel(axis, brake ? m_wheel.brake_invert : m_wheel.accel_invert,
+    fraction = pedal_travel(brake ? 1 : 0, axis,
+                            brake ? m_wheel.brake_invert : m_wheel.accel_invert,
                             brake ? m_wheel.brake_half : m_wheel.accel_half);
 
     // Map the pedal the way MAME's PORT_BIT does. A PORT_REVERSE pedal (Over
@@ -1435,43 +1660,86 @@ bool Input::operator_chord(const Pad& pad, u8* port0)
     return true;
 }
 
-int Input::wheel_axis_count() const
+void Input::axis_capture_begin(bool any_device)
 {
-    return m_wheel.handle != nullptr ? SDL_GetNumJoystickAxes(m_wheel.handle) : 0;
-}
-
-void Input::wheel_axis_baseline(s16* out, int count) const
-{
-    for (int axis = 0; axis < count; ++axis) {
-        out[axis] = m_wheel.handle != nullptr ? wheel_axis(axis) : 0;
+    axis_capture_end();
+    m_capture_any = any_device;
+    if (m_wheel.handle == nullptr) {
+        return;
+    }
+    // The wheel first (its own reading, as the game gets it), then the others.
+    AxisSource wheel;
+    wheel.id = m_wheel.id;
+    m_capture_sources.push_back(wheel);
+    if (any_device) {
+        int             count = 0;
+        SDL_JoystickID* ids   = SDL_GetJoysticks(&count);
+        for (int index = 0; ids != nullptr && index < count; ++index) {
+            AxisSource source;
+            if (ids[index] != m_wheel.id && open_source(ids[index], &source)) {
+                m_capture_sources.push_back(source);
+            }
+        }
+        SDL_free(ids);
+    }
+    for (usize index = 0; index < m_capture_sources.size(); ++index) {
+        AxisSource& source = m_capture_sources[index];
+        for (int axis = 0; axis < Wheel::kMaxAxes; ++axis) {
+            source.baseline[static_cast<usize>(axis)] =
+                index == 0 ? wheel_axis(axis) : source_axis(source, axis);
+        }
     }
 }
 
-s32 Input::captured_axis(const s16* baseline, int count, bool* positive) const
+bool Input::axis_captured(CapturedAxis* out) const
 {
-    if (m_wheel.handle == nullptr) {
-        return -1;
+    if (m_wheel.handle == nullptr || m_capture_sources.empty()) {
+        return false;
     }
     // The axis that has travelled furthest from where it rested, once clearly
     // past the noise: a deliberate turn or full pedal press swamps everything
     // else, so the largest delta is the control the user is operating.
     constexpr int kMoveThreshold = 12000;
-    int best_axis  = -1;
-    int best_delta = kMoveThreshold;
-    bool best_pos  = true;
-    for (int axis = 0; axis < count; ++axis) {
-        const int delta = static_cast<int>(wheel_axis(axis))
-                        - static_cast<int>(baseline[axis]);
-        if (std::abs(delta) > best_delta) {
-            best_delta = std::abs(delta);
-            best_axis  = axis;
-            best_pos   = delta > 0;
+    int   best_delta  = kMoveThreshold;
+    usize best_source = 0;
+    int   best_axis   = -1;
+    bool  best_pos    = true;
+    for (usize index = 0; index < m_capture_sources.size(); ++index) {
+        const AxisSource& source = m_capture_sources[index];
+        if (index > 0 && source.handle == nullptr) {
+            continue;  // unplugged since
+        }
+        const int axes = std::min<int>(Wheel::kMaxAxes, SDL_GetNumJoystickAxes(
+                                                            index == 0 ? m_wheel.handle : source.handle));
+        for (int axis = 0; axis < axes; ++axis) {
+            const int now   = index == 0 ? wheel_axis(axis) : source_axis(source, axis);
+            const int delta = now - static_cast<int>(source.baseline[static_cast<usize>(axis)]);
+            if (std::abs(delta) > best_delta) {
+                best_delta  = std::abs(delta);
+                best_source = index;
+                best_axis   = axis;
+                best_pos    = delta > 0;
+            }
         }
     }
-    if (best_axis >= 0 && positive != nullptr) {
-        *positive = best_pos;
+    if (best_axis < 0) {
+        return false;
     }
-    return best_axis;
+    const AxisSource& source = m_capture_sources[best_source];
+    out->device   = best_source == 0 ? std::string() : joystick_label(source.id);
+    out->axis     = best_axis;
+    out->positive = best_pos;
+    out->centred  = std::abs(static_cast<int>(source.baseline[static_cast<usize>(best_axis)]))
+                 <= 16384;
+    return true;
+}
+
+void Input::axis_capture_end()
+{
+    for (usize index = 1; index < m_capture_sources.size(); ++index) {
+        close_source(&m_capture_sources[index]);
+    }
+    m_capture_sources.clear();
 }
 
 void Input::update_drive_board(const rom::GameSpec& game, std::span<const u8> writes)
@@ -1853,13 +2121,13 @@ void Input::update_force_feedback(const rom::GameSpec& game)
     // Kept deliberately subtle: even at full strength it is a fraction of the
     // device maximum, so it reads as an engine hum rather than a jackhammer.
     if (!ffb_active && game.has_steering() && m_wheel_settings.rumble
-        && m_wheel_settings.rumble_engine && m_wheel.accel_axis >= 0) {
+        && m_wheel_settings.rumble_engine && m_wheel.accel_axis >= 0 && !m_pedal_lost[0]) {
         // Full strength maps to ~12% of the device max at full throttle; the
         // G923's motor is strong, so even a small sine magnitude is plenty.
         const int rmax = static_cast<int>(
             std::clamp(m_wheel_settings.rumble_strength, 0u, 100u) * 4000 / 100);
         const float throttle =
-            pedal_travel(m_wheel.accel_axis, m_wheel.accel_invert, m_wheel.accel_half);
+            pedal_travel(0, m_wheel.accel_axis, m_wheel.accel_invert, m_wheel.accel_half);
         // A faint idle hum (a fifth of the range) rising to the full engine level.
         const int engine = rmax / 5 + static_cast<int>(static_cast<float>(rmax * 4 / 5) * throttle);
         rumble = std::max(rumble, engine);

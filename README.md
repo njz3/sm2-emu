@@ -257,7 +257,12 @@ Both are set up in the settings menu (`F10`):
   is not connected, the wheel plays them, as `auto`. Devices sharing a name
   (a Fanatec base's wheel, pedals and shifter) are all listed, the next ones
   as `Name #2`, `Name #3`... in the order the system lists them; the plain
-  name is the first.
+  name is the first. **Wheel device** (`wheel_device`) picks the same way
+  the joystick the steering and pedals are read from: `auto` (the default)
+  is the first that looks like a wheel. The pedals may be on another device
+  (`wheel_accel_device`, `wheel_brake_device`; `wheel`, the default, reads
+  them on the wheel): **Calibrate** on a pedal watches every joystick and
+  keeps the one it was pressed on.
 - **Light guns:** the first gun found is player 1, the second player 2.
   - **Linux:** any device tagged `ID_INPUT_GUN` works, and guns with a motor
     get recoil.
