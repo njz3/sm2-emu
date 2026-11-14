@@ -658,9 +658,10 @@ struct Config {
 /// into Keisho's (settings, each game's own, saves, states and screenshots),
 /// their paths in the inis changed with them. The old files are left in place.
 /// Returns the file to read: `config_path`, or the sm2-emu ini itself, left
-/// alone, when it names a write_dir (that folder then takes the settings).
+/// alone, when it names a write_dir or `may_write` is off (a --write-dir: that
+/// folder then takes the settings).
 [[nodiscard]] std::string migrate_legacy_settings(const std::string& config_path,
-                                                  bool default_location);
+                                                  bool default_location, bool may_write);
 
 /// The default configuration path: keisho.ini in the working directory if it
 /// exists, otherwise the platform's preferences directory.

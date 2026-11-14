@@ -1400,8 +1400,10 @@ int main(int argc, char** argv)
     // --config names a directory; the file within it is keisho.ini.
     std::string config_path =
         options.config_path.empty() ? default_config_path() : config_file_in(options.config_path);
-    config_path = migrate_legacy_settings(config_path, options.config_path.empty()
-                                             && !std::filesystem::path(config_path).parent_path().empty());
+    config_path = migrate_legacy_settings(config_path,
+                                          options.config_path.empty()
+                                              && !std::filesystem::path(config_path).parent_path().empty(),
+                                          options.write_dir.empty());
 
     Config                   from_file = defaults;
     std::vector<std::string> problems;

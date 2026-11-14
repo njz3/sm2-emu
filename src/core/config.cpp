@@ -381,7 +381,8 @@ void copy_legacy_tree(const std::filesystem::path& from, const std::filesystem::
 
 }  // namespace
 
-std::string migrate_legacy_settings(const std::string& config_path, bool default_location)
+std::string migrate_legacy_settings(const std::string& config_path, bool default_location,
+                                    bool may_write)
 {
     namespace fs = std::filesystem;
     std::error_code error;
@@ -401,7 +402,7 @@ std::string migrate_legacy_settings(const std::string& config_path, bool default
     if (!default_location || dir.empty()) {
         // Beside the new name, in the same folder: sm2-emu.ini becomes it.
         if (fs::exists(legacy, error)) {
-            if (writes_elsewhere(legacy)) {
+            if (!may_write || writes_elsewhere(legacy)) {
                 return legacy.string();
             }
             fs::copy_file(legacy, path, error);
@@ -419,7 +420,7 @@ std::string migrate_legacy_settings(const std::string& config_path, bool default
     if (!fs::exists(old_config / kLegacyFileName, error)) {
         return config_path;
     }
-    if (writes_elsewhere(old_config / kLegacyFileName)) {
+    if (!may_write || writes_elsewhere(old_config / kLegacyFileName)) {
         return (old_config / kLegacyFileName).string();
     }
     copy_legacy_tree(old_config, dir);
@@ -445,9 +446,10 @@ std::string default_config_path()
     if (std::filesystem::exists(kFileName, error) && !error) {
         return kFileName;
     }
-    // An sm2-emu checkout's: the same file under the new name.
+    // sm2-emu's in the working directory: the new name there, which
+    // migrate_legacy_settings makes of it.
     if (std::filesystem::exists(kLegacyFileName, error)) {
-        return migrate_legacy_settings(kFileName, false);
+        return kFileName;
     }
 
     const std::filesystem::path directory = config_directory();
