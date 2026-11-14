@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -30,9 +32,7 @@
 
 namespace sm2::hw {
 
-/// CPU cycles per programmed wait state, fitted to hardware captures: attract
-/// scenes that load from data ROM (Dynamite Cop, Motor Raid) then keep pace
-/// with the real board.
+/// CPU cycles per programmed wait state, fitted to hardware captures.
 constexpr s32 kCyclesPerWait = 3;
 
 /// Extra cycles one data access to address costs, given the 0x38-byte register

@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -59,10 +61,8 @@ M68000::M68000(Bus& bus) : m_bus(&bus)
         g_musashi_inited = true;
     }
 
-    // Seed from Musashi's initialised state (cpu type + callback pointers set),
-    // not a zero blob -- a zero context wipes those and the next pulse_reset
-    // segfaults. Snapshot the live context and restore it so a currently-active
-    // instance is left undisturbed.
+    // Seed from Musashi's initialised state, not zeros: a zero context wipes the
+    // cpu type and callbacks and the next pulse_reset segfaults.
     m_context.assign(m68k_context_size(), 0);
     std::vector<u8> saved(m68k_context_size(), 0);
     m68k_get_context(saved.data());
@@ -211,25 +211,26 @@ u32 M68000::address_reg(int index) const
 void M68000::serialize(Archive& ar)
 {
     if (ar.saving()) {
-        // The live state is in Musashi's globals when this instance is current,
-        // so pull it back into m_context before writing. make_current also
-        // flushes whatever other instance was current into its own blob.
         make_current();
         m68k_get_context(m_context.data());
+        // m68ki_cpu_core ends with 13 host pointers (cycle tables, callbacks),
+        // rebound on load; zero them so a state does not depend on the process.
+        std::vector<u8> blob = m_context;
+        constexpr usize kPointerTail = 13 * sizeof(void*);
+        if (blob.size() >= kPointerTail) {
+            std::fill(blob.end() - static_cast<std::ptrdiff_t>(kPointerTail), blob.end(), u8{0});
+        }
+        ar.vector_pod(blob);
+    } else {
+        ar.vector_pod(m_context);
     }
-    ar.vector_pod(m_context);
     ar.raw(m_irq_mask);
     ar.raw(m_total_cycles);
     if (ar.loading() && !ar.failed()) {
-        // Install the restored blob. g_current is left pointing here with the
-        // restored context loaded; the next entry point on any instance will
-        // save/swap correctly. Never zero-fill (documented to segfault).
-        g_current = nullptr;  // force make_current to actually set the context
+        g_current = nullptr;  // force make_current to load the restored blob
         make_current();
-        // The blob holds host pointers from whichever process saved it.
         rebind_host_pointers();
         m68k_get_context(m_context.data());
-        apply_irq();
     }
 }
 
@@ -250,12 +251,8 @@ std::string M68000::state_string() const
 // ---------------------------------------------------------------------------
 // Musashi's memory interface
 // ---------------------------------------------------------------------------
-// M68K_SEPARATE_READS is off, so instruction and PC-relative fetches come
-// through these same six functions.
-//
-// Reads before reset() (or with no bus, which cannot happen in practice) return
-// 0 rather than dereferencing null, because Musashi calls the read callbacks
-// from m68k_pulse_reset to fetch the reset vector.
+// M68K_SEPARATE_READS is off, so instruction fetches come through these too.
+// Reads with no bus return 0: m68k_pulse_reset fetches the reset vector.
 
 extern "C" {
 
@@ -333,7 +330,7 @@ void trace_hook(unsigned int pc)
         if (g_trace_remaining == 0 && g_trace_file) {
             fclose(g_trace_file);
             g_trace_file = nullptr;
-            fprintf(stderr, "sm2-emu: trace complete\n");
+            fprintf(stderr, "keisho: trace complete\n");
         }
     }
 }

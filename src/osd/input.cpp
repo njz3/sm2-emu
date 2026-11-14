@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -65,14 +67,9 @@ int push_direction(const DriveCommand& command, int deflection)
     }
 }
 
-// Which host axis each logical control reads. The channel a control occupies is
-// the game's business (rom::GameSpec::analog); this table is only about how a
-// gamepad stands in for the cabinet's own hardware.
-//
-// Two shapes cover everything Model 2 uses: a self-centring axis (wheel,
-// handlebars, stick, motion platform) and a pedal, which rests at one end of its
-// travel. Pedals go on the triggers so both can be held at once, which a driving
-// game expects.
+// Which host axis each logical control reads; the channel itself comes from
+// rom::GameSpec::analog. Self-centring controls go on sticks, pedals on the
+// triggers so both can be held at once.
 enum class HostAxis : u8 {
     None,
     PadLeftX,       ///< Player 1's left stick, horizontal.
@@ -191,8 +188,7 @@ void gather_keys(u8* port, const bool* keys, int key_count,
 // Gamepad
 // ---------------------------------------------------------------------------
 
-/// Half travel. Wide enough that a resting stick stays quiet and the diagonal band
-/// is comfortable to hold.
+/// Half travel, so a resting stick stays quiet.
 constexpr int kStickThreshold = 16384;
 
 /// A pedal rests at zero, so it needs no centre band, only a floor under the noise.
@@ -256,8 +252,8 @@ int centring_spring(int deflection, int full)
     return deflection < 0 ? -force : force;
 }
 
-// The Sega Rally / Daytona board's interrupt rate. It has not been measured,
-// so it is taken as the 8 MHz crystal divided by 8192.
+// The Sega Rally / Daytona board's interrupt rate, unmeasured: taken as the
+// 8 MHz crystal divided by 8192.
 constexpr double kDriveBoardIrqHz = 1000.0;
 constexpr double kMachineHz       = 57.5245;
 
@@ -333,12 +329,9 @@ constexpr u16 kKeyConfig = 0x171;
 
 /// Scale a screen fraction into one lightgun axis's calibrated travel.
 ///
-/// The gun board is 10-bit and each title calibrates its own travel, so an edge
-/// fraction must land on that title's own min/max rather than 0 or 0x3ff, or the
-/// crosshair is misplaced and the offscreen test fires early. The axis ends mark
-/// the gun as off screen, so the picture maps one step inside them and only an
-/// aim past its edge reaches them. Both the mouse pointer and an evdev gun feed
-/// through here so the two sources agree.
+/// Each title calibrates its own travel, so edges must land on its min/max, not
+/// 0 or 0x3ff. The axis ends mean off screen, so the picture maps one step
+/// inside them. Both the mouse and evdev guns use this.
 [[nodiscard]] u16 fraction_to_gun(float fraction, const rom::LightgunAxis& axis)
 {
     if (fraction < 0.0f) {
@@ -377,12 +370,8 @@ struct PointerState {
     state.left  = (buttons & SDL_BUTTON_LMASK) != 0;
     state.right = (buttons & SDL_BUTTON_RMASK) != 0;
     if (SDL_Window* focus = SDL_GetMouseFocus(); focus != nullptr) {
-        // The renderer computes its letterbox from the window's pixel size, and
-        // the gun coordinate is mapped against that same letterbox, so the
-        // pointer and its extent must be in pixels too. SDL_GetMouseState reports
-        // logical units; on a HiDPI or fullscreen surface those differ from
-        // pixels, which otherwise scales the aim to the wrong width. Convert the
-        // pointer to pixels and take the pixel size for the extent.
+        // The letterbox and gun mapping work in pixels, but SDL_GetMouseState reports
+        // logical units, which differ on HiDPI or fullscreen surfaces.
         int logical_w = 0;
         int logical_h = 0;
         SDL_GetWindowSize(focus, &logical_w, &logical_h);
@@ -417,9 +406,8 @@ bool Input::init(const WheelSettings& wheel)
     }
     m_started = true;
 
-    // Devices already plugged in do not generate connection events, so they have
-    // to be collected once at startup; the two lists are walked separately, same
-    // routing as handle_event()'s SDL_EVENT_GAMEPAD_ADDED/JOYSTICK_ADDED cases.
+    // Devices already plugged in generate no connection events, so collect them
+    // once here, routed as in handle_event().
     int             count = 0;
     SDL_JoystickID* ids   = SDL_GetGamepads(&count);
     if (ids != nullptr) {
@@ -443,8 +431,7 @@ bool Input::init(const WheelSettings& wheel)
     }
 
 #ifdef SM2_HAVE_LIGHTGUNS
-    // Open any per-device light guns. If none are present the pointer stays the
-    // gun source, so this failing to find anything is not an error.
+    // Open any per-device light guns; without one the pointer stays the gun.
     m_guns = std::make_unique<LightGuns>();
     m_guns->set_preferred_devices(m_gun_devices);
     if (!m_guns->init() || m_guns->count() == 0) {
@@ -596,8 +583,7 @@ void Input::add_gamepad(SDL_JoystickID id)
         return;
     }
     if (!SDL_IsGamepad(id)) {
-        // A joystick SDL has no mapping for. Reporting it is worth doing, because
-        // the user's device is plugged in and doing nothing.
+        // A joystick SDL has no mapping for. Worth reporting, as it does nothing.
         SM2_INFO("joystick %u has no gamepad mapping and is ignored",
                  static_cast<unsigned>(id));
         return;
@@ -634,8 +620,7 @@ void Input::remove_gamepad(SDL_JoystickID id)
         SDL_RumbleGamepad(found->handle, 0, 0, 0);
         SDL_CloseGamepad(found->handle);
     }
-    // The remaining pads keep their positions. Compacting would move a player
-    // mid-game, and a pad that comes back finds its old slot free anyway.
+    // The remaining pads keep their slots, so no player moves mid-game.
     m_pads.erase(found);
 }
 
@@ -709,9 +694,8 @@ void Input::add_wheel(SDL_JoystickID id)
         return;
     }
 
-    // An untyped device needs steering plus a pedal axis. Keyboard and mouse
-    // receivers expose a one-axis "System Control" joystick that would otherwise
-    // take the driving controls from the gamepad.
+    // An untyped device needs steering plus a pedal axis, or a receiver's one-axis
+    // "System Control" joystick would take the driving controls.
     if (type != SDL_JOYSTICK_TYPE_WHEEL && SDL_GetNumJoystickAxes(handle) < 2) {
         const char* name = SDL_GetJoystickName(handle);
         SM2_DEBUG("joystick %s has %d axis, not taken as a wheel",
@@ -1178,9 +1162,7 @@ bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) con
     // controls come off the wheel; anything else falls through to the gamepad.
     int axis = -1;
     switch (channel.control) {
-        // Steer, and the bike's lean (Bank) and jetski's handlebar (Handle), are
-        // all the self-centring "which way am I pointing" control -- the wheel
-        // drives them the same way.
+        // Steer, Bank and Handle are all the self-centring control.
         case rom::AnalogControl::Steer:
         case rom::AnalogControl::Bank:
         case rom::AnalogControl::Handle:   axis = m_wheel.steer_axis; break;
@@ -1208,10 +1190,8 @@ bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) con
         return static_cast<u8>(value + 0.5f);
     };
 
-    // SDL normalises every joystick axis to -32768..32767. A wheel's steering
-    // rests at 0 (centre); its pedals rest at -32768 (released) and reach 32767
-    // fully pressed. So both are the same 0..1 map from the raw value -- the
-    // difference is only that a pedal at rest reads 0 and a wheel at rest 0.5.
+    // SDL normalises axes to -32768..32767. Steering rests at 0 and pedals at
+    // -32768, so both map to 0..1 the same way.
     float fraction = static_cast<float>(static_cast<int>(raw) + 32768) / 65535.0f;
 
     const bool is_steering = channel.control == rom::AnalogControl::Steer
@@ -1232,12 +1212,8 @@ bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) con
                                     : 0.5f + std::copysign(past / (0.5f - dead), off) * 0.5f;
         }
 
-        // steer_degrees is the wheel's own physical rotation range; lock_degrees
-        // is the physical rotation (total) at which the game reaches full lock.
-        // Mapping one onto the other makes full lock arrive after turning about
-        // lock_degrees, regardless of how far the wheel can spin. Scale the
-        // deflection about centre and clamp; past the mapped angle the game is
-        // already at full lock.
+        // steer_degrees is the wheel's physical range; lock_degrees the rotation at
+        // which the game reaches full lock. Scale the deflection about centre and clamp.
         const float scale = static_cast<float>(std::max(1u, m_wheel_settings.steer_degrees))
                           / static_cast<float>(std::max(1u, m_wheel_settings.lock_degrees));
         fraction = 0.5f + (fraction - 0.5f) * scale;
@@ -1254,11 +1230,9 @@ bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) con
                             brake ? m_wheel.brake_invert : m_wheel.accel_invert,
                             brake ? m_wheel.brake_half : m_wheel.accel_half);
 
-    // Map the pedal the way MAME's PORT_BIT does. A PORT_REVERSE pedal (Over
-    // Rev, Super GT) reads inverted -- released at the maximum, pressed at the
-    // minimum -- because the game treats the resting ADC value as idle; feeding
-    // it non-reversed makes the game read a released pedal (0x00) as full
-    // throttle, which is the "accelerates on its own" fault.
+    // Map the pedal as MAME's PORT_BIT does. A PORT_REVERSE pedal (Over Rev, Super
+    // GT) reads released at the maximum; otherwise the game sees full throttle at
+    // rest.
     const float span = static_cast<float>(channel.maximum - channel.minimum);
     const float value = channel.reverse
                             ? static_cast<float>(channel.maximum) - fraction * span
@@ -1267,7 +1241,37 @@ bool Input::sample_wheel_channel(const rom::AnalogChannel& channel, u8* out) con
     return true;
 }
 
-u8 Input::sample_channel(const rom::AnalogChannel& channel, float curve) const
+Config::PadAxisRole Input::pad_axis_role(rom::AnalogControl control, bool one_player)
+{
+    switch (host_axis_for(control)) {
+        case HostAxis::PadLeftX:     return Config::PadAxisRole::AimX;
+        case HostAxis::PadLeftY:     return Config::PadAxisRole::AimY;
+        case HostAxis::Pad2LeftX:    return one_player ? Config::PadAxisRole::LeverX : Config::PadAxisRole::AimX;
+        case HostAxis::Pad2LeftY:    return one_player ? Config::PadAxisRole::LeverY : Config::PadAxisRole::AimY;
+        case HostAxis::RightTrigger: return Config::PadAxisRole::Accel;
+        case HostAxis::LeftTrigger:  return Config::PadAxisRole::Brake;
+        default:                     return Config::PadAxisRole::kCount;
+    }
+}
+
+Config::PadLayout Input::game_layout(const Config& config, const std::string& family, u32 inputs)
+{
+    if (const auto found = config.pad_layouts.find(family); found != config.pad_layouts.end()) {
+        return found->second;
+    }
+    Config::PadLayout layout = config.pad;
+    // Star Wars Trilogy's triggers sit where the stick's up and down switches
+    // would: put them on the pad's triggers.
+    if (rom::has_input(static_cast<rom::InputFlags>(inputs), rom::InputFlags::AnalogJoystick)) {
+        for (auto& buttons : layout.buttons) {
+            buttons[static_cast<u32>(Config::PadRole::Up)]   = Config::kPadAxisPlus + SDL_GAMEPAD_AXIS_RIGHT_TRIGGER;
+            buttons[static_cast<u32>(Config::PadRole::Down)] = Config::kPadAxisPlus + SDL_GAMEPAD_AXIS_LEFT_TRIGGER;
+        }
+    }
+    return layout;
+}
+
+u8 Input::sample_channel(const rom::AnalogChannel& channel, float curve, bool one_player) const
 {
     // A wheel, when present, owns the driving controls; everything else, and any
     // control the wheel has no axis for, falls through to the gamepad.
@@ -1280,20 +1284,17 @@ u8 Input::sample_channel(const rom::AnalogChannel& channel, float curve) const
         return channel.rest;
     }
 
-    SDL_Gamepad* pad = pad_for(axis == HostAxis::Pad2LeftX || axis == HostAxis::Pad2LeftY
-                                   ? 1u
-                                   : 0u);
+    const bool second = axis == HostAxis::Pad2LeftX || axis == HostAxis::Pad2LeftY;
+    const bool lever  = second && one_player;
+    SDL_Gamepad* pad = pad_for(second && !lever ? 1u : 0u);
     if (pad == nullptr) {
-        // No pad for this control: hand back the value the hardware reads with
-        // nobody touching it. A wheel at rest is centred and a pedal is
-        // released, and the difference matters -- a game that sees full lock or
-        // full throttle at boot can refuse to leave its self-test.
+        // No pad for this control: return the hardware's rest value. Full lock or full
+        // throttle at boot can stop a game leaving its self-test.
         return channel.rest;
     }
 
-    // Scale into the channel's own calibrated travel rather than the full byte:
-    // several titles declare a narrow PORT_MINMAX and treat anything outside it
-    // as a fault or as an off-screen gun.
+    // Scale into the channel's calibrated travel: some titles treat values outside
+    // a narrow PORT_MINMAX as a fault or an off-screen gun.
     const auto scaled = [&channel](float fraction) {
         const float span  = static_cast<float>(channel.maximum - channel.minimum);
         const float value = static_cast<float>(channel.minimum)
@@ -1307,9 +1308,7 @@ u8 Input::sample_channel(const rom::AnalogChannel& channel, float curve) const
 
     // The axis a role reads: the user's override, else the default. Player
     // two's aim reads its own pad.
-    const u32 which_player = (axis == HostAxis::Pad2LeftX || axis == HostAxis::Pad2LeftY)
-                                 ? 1u
-                                 : 0u;
+    const u32 which_player = second && !lever ? 1u : 0u;
     const auto role_axis = [&](Config::PadAxisRole role, SDL_GamepadAxis fallback,
                                bool* inverted) {
         const s32 override_axis = m_pad_axes[which_player][static_cast<u32>(role)];
@@ -1323,7 +1322,8 @@ u8 Input::sample_channel(const rom::AnalogChannel& channel, float curve) const
         case HostAxis::Pad2LeftX: {
             bool inv = false;
             const SDL_GamepadAxis sdl =
-                role_axis(Config::PadAxisRole::AimX, SDL_GAMEPAD_AXIS_LEFTX, &inv);
+                lever ? role_axis(Config::PadAxisRole::LeverX, SDL_GAMEPAD_AXIS_RIGHTX, &inv)
+                      : role_axis(Config::PadAxisRole::AimX, SDL_GAMEPAD_AXIS_LEFTX, &inv);
             s16 raw = SDL_GetGamepadAxis(pad, sdl);
             if (inv) raw = static_cast<s16>(-static_cast<int>(raw));
             fraction = centred(raw);
@@ -1333,7 +1333,8 @@ u8 Input::sample_channel(const rom::AnalogChannel& channel, float curve) const
         case HostAxis::Pad2LeftY: {
             bool inv = false;
             const SDL_GamepadAxis sdl =
-                role_axis(Config::PadAxisRole::AimY, SDL_GAMEPAD_AXIS_LEFTY, &inv);
+                lever ? role_axis(Config::PadAxisRole::LeverY, SDL_GAMEPAD_AXIS_RIGHTY, &inv)
+                      : role_axis(Config::PadAxisRole::AimY, SDL_GAMEPAD_AXIS_LEFTY, &inv);
             s16 raw = SDL_GetGamepadAxis(pad, sdl);
             if (inv) raw = static_cast<s16>(-static_cast<int>(raw));
             fraction = centred(raw);
@@ -1373,9 +1374,8 @@ u8 Input::sample_channel(const rom::AnalogChannel& channel, float curve) const
             return channel.rest;
     }
 
-    // A pedal's rest value is its minimum, so an untouched trigger has to read
-    // as rest rather than as the bottom of the scaled range; they coincide for
-    // every title in the database, but not by construction.
+    // An untouched trigger reads the pedal's rest value, not the bottom of the
+    // scaled range.
     if (is_pedal(axis) && fraction <= 0.0f) {
         return channel.reverse ? static_cast<u8>(channel.maximum - (channel.rest - channel.minimum))
                                : channel.rest;
@@ -1696,9 +1696,8 @@ bool Input::axis_captured(CapturedAxis* out) const
     if (m_wheel.handle == nullptr || m_capture_sources.empty()) {
         return false;
     }
-    // The axis that has travelled furthest from where it rested, once clearly
-    // past the noise: a deliberate turn or full pedal press swamps everything
-    // else, so the largest delta is the control the user is operating.
+    // The axis that has travelled furthest from rest, once clearly past the noise,
+    // is the control the user is operating.
     constexpr int kMoveThreshold = 12000;
     int   best_delta  = kMoveThreshold;
     usize best_source = 0;
@@ -1824,7 +1823,7 @@ bool Input::wheel_ffb_active(const rom::GameSpec& game) const
 {
     const bool wheel =
         virtual_wheel() || (m_wheel.handle != nullptr && m_wheel.ffb && m_wheel.steer_axis >= 0);
-    return wheel && m_wheel_settings.ffb && game.drive_board;
+    return wheel && m_wheel_settings.ffb && (game.drive_board || m_board_force.active);
 }
 
 void Input::update_force_feedback(const rom::GameSpec& game)
@@ -1938,7 +1937,17 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             }
             return position;
         };
-        if (game.drive_protocol == rom::DriveProtocol::Vr) {
+        if (m_board_force.active) {
+            const float full = static_cast<float>(board_full);
+            constexpr int kFullSpeed = 1024;
+            game_force = static_cast<int>(-m_board_force.constant * full)
+                       + spring(static_cast<int>(m_board_force.self_center * full))
+                       + static_cast<int>(m_board_force.friction * full)
+                             * std::clamp(velocity, -kFullSpeed, kFullSpeed) / kFullSpeed;
+            if (m_wheel.ffb->has_rumble()) {
+                chop_swing = std::min(static_cast<int>(m_board_force.vibrate * full), 32767);
+            }
+        } else if (game.drive_protocol == rom::DriveProtocol::Vr) {
             bool      up_is_left = false;
             const int position   = game_pot(&up_is_left);
             const VrBoard::Output out = m_vr.step(position, VrBoard::kIrqHz / kMachineHz);
@@ -2055,10 +2064,9 @@ void Input::update_force_feedback(const rom::GameSpec& game)
             game_force        = dir * force;
         } else if (command.is_push()) {
             const int dir = push_direction(command, pot);
-            // A push is a jolt from the road, so it also drives the vibration; a
-            // change of direction is the sharpest. A sustained push is held for a
-            // brief kick then decayed, as a free PC wheel would otherwise spin to
-            // the stop where the cabinet's heavy geared wheel barely moved.
+            // A push is a jolt from the road, so it also drives the vibration, a change of
+            // direction most sharply. A sustained push is a brief kick then decays, or a
+            // free PC wheel would spin to the stop.
             rumble = mag;
             if (dir == m_wheel.constant_dir) {
                 m_wheel.constant_hold++;
@@ -2111,15 +2119,18 @@ void Input::update_force_feedback(const rom::GameSpec& game)
         rumble = std::max(rumble, command.strength * ceiling / kDriveFull);
     }
 
+    if (!ffb_active && m_board_force.active && m_wheel_settings.rumble) {
+        const int ceiling = static_cast<int>(
+            std::clamp(m_wheel_settings.rumble_strength, 0u, 100u) * 16383 / 100);
+        const float felt = std::max(m_board_force.vibrate, std::abs(m_board_force.constant));
+        rumble = std::max(rumble, static_cast<int>(felt * static_cast<float>(ceiling)));
+    }
+
     // Boost the impact rumble so a hit is clearly felt.
     rumble *= 2;
 
-    // Daytona streams no continuous road/engine buzz -- its command stream is
-    // centring plus directional jolts -- so a light engine rumble is synthesised
-    // from the throttle, giving constant feel while driving that rises with the
-    // gas. This is a feel, not replayed game data, with its own on/off + strength.
-    // Kept deliberately subtle: even at full strength it is a fraction of the
-    // device maximum, so it reads as an engine hum rather than a jackhammer.
+    // Daytona streams no road or engine buzz, so a subtle engine rumble rising with
+    // the throttle is synthesised (its own setting, not game data).
     if (!ffb_active && game.has_steering() && m_wheel_settings.rumble
         && m_wheel_settings.rumble_engine && m_wheel.accel_axis >= 0 && !m_pedal_lost[0]) {
         // Full strength maps to ~12% of the device max at full throttle; the
@@ -2133,9 +2144,8 @@ void Input::update_force_feedback(const rom::GameSpec& game)
         rumble = std::max(rumble, engine);
     }
 
-    // Smooth it: a trigger is a single-frame spike, so decay the running
-    // magnitude and hold it a few frames into a sustained felt vibration.
-    // A wheel delivering force feedback rumbles only with the board's chopping.
+    // Smooth it: decay the running magnitude so a single-frame trigger is felt. A
+    // wheel delivering force feedback rumbles only with the board's chopping.
     int rumble_now = std::max(rumble, (m_wheel.rumble_mag < 0 ? 0 : m_wheel.rumble_mag) * 4 / 5);
     rumble_now     = ffb_active ? chop_swing : std::clamp(rumble_now, 0, 32767);
     const u16 rumble_period = chop_swing != 0 ? chop_period_ms : WheelForce::kRumblePeriod;
@@ -2214,7 +2224,8 @@ void Input::update_pad_rumble(const rom::GameSpec& game)
 
     const int ceiling = static_cast<int>(
         std::clamp(m_pad_rumble_strength, 0u, 100u) * 65535 / 100);
-    const bool active = m_pad_rumble_enabled && game.has_steering() && !wheel_ffb_active(game);
+    const bool active = m_pad_rumble_enabled && (game.has_steering() || m_board_force.active)
+                     && !wheel_ffb_active(game);
     if (!active) {
         m_pad_rumble_hold = 0;
         m_pad_rumble_level = 0;
@@ -2246,6 +2257,11 @@ void Input::update_pad_rumble(const rom::GameSpec& game)
             impact = std::min(impact * 3 / 2, 65535);  // a flip is the sharper hit
             m_pad_rumble_dir = dir;
         }
+    }
+
+    if (active && m_board_force.active) {
+        const float felt = std::max(m_board_force.vibrate, std::abs(m_board_force.constant));
+        if (felt > 0.05f) impact = std::max(impact, static_cast<int>(felt * static_cast<float>(ceiling)));
     }
 
     // Cornering load: the board's answer is a centring spring, so synthesise a buzz instead.
@@ -2299,12 +2315,10 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
 {
     const rom::LightgunSpec& spec = game.lightgun;
 
-    // Two kinds of gun cabinet. The RS-422 lightgun titles (Virtua Cop, House of
-    // the Dead) declare a <lightgun> spec and take their aim through the serial
-    // gun board (inputs->gun_p1x/y). The positional-gun titles (Gunblade NY,
-    // Behind Enemy Lines, Rail Chase 2) have no such board: their aim is an
-    // analogue stick, wired to analog[] channels carrying the Gun1X/Y, Gun2X/Y
-    // controls. Both aim with the mouse here, but write to different places.
+    // Two kinds of gun cabinet: RS-422 lightgun titles (Virtua Cop, House of the
+    // Dead) aim through the serial gun board (gun_p1x/y); positional-gun titles
+    // (Gunblade NY, Rail Chase 2) aim through analog[] channels carrying the
+    // Gun1X/Y, Gun2X/Y controls.
     int pos_gun_ch[4] = {-1, -1, -1, -1};  // p1x, p1y, p2x, p2y -> analog channel
     for (usize ch = 0; ch < game.analog.size(); ++ch) {
         switch (game.analog[ch].control) {
@@ -2323,10 +2337,8 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         return;
     }
 
-    // The single system pointer, used for any player without a dedicated gun.
-    // The finished frame is letterboxed to 4:3 inside the window, so the pointer
-    // has to be mapped onto that game-image rectangle, not the whole window, or
-    // the shot lands offset from the cursor by the size of the bars.
+    // The system pointer, for any player without a dedicated gun, mapped onto the
+    // letterboxed 4:3 image rather than the whole window.
     const PointerState pointer = pointer_state();
     float ptr_fx = 0.5f;
     float ptr_fy = 0.5f;
@@ -2338,14 +2350,10 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         }
     }
 
-    // Resolve each player's aim, trigger and reload from either a dedicated
-    // evdev gun or the shared mouse pointer.
+    // Resolve each player's aim, trigger and reload from an evdev gun or the mouse.
     //
-    // These titles have no reload button: the gun reloads when fired while aimed
-    // off screen (`lightgun_offscreen_read` treats a coordinate near the edge of
-    // the calibrated travel as off-screen). So a reload -- the mouse's right
-    // button, or a gun's reload button -- forces the aim to the corner and pulls
-    // the trigger.
+    // These titles reload when fired off screen (`lightgun_offscreen_read`), so a
+    // reload forces the aim to the corner and pulls the trigger.
     struct GunInput {
         float x           = 0.5f;  ///< Fraction of the game image; outside 0..1 is off screen.
         float y           = 0.5f;
@@ -2381,28 +2389,37 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         }
         return gi;
     };
-    GunInput p1 = from_mouse();
-    GunInput p2 = from_mouse();
+    // Each player aims with their own light gun, else the mouse for player 1
+    // and a gamepad for player 2, so one mouse never fires both players.
+    usize guns = 0;
+#ifdef SM2_HAVE_LIGHTGUNS
+    if (m_guns) {
+        m_guns->poll();
+        guns = m_guns->count();
+    }
+#endif
+    const std::array<bool, kPlayers> on_gun   = {guns >= 1, guns >= 2};
+    std::array<bool, kPlayers>       on_mouse = {guns == 0, false};
+    GunInput p1 = on_mouse[0] ? from_mouse() : GunInput{};
+    GunInput p2;
 
     // Moving the mouse hands the aim back to it from the pad/keyboard cursor.
     if (pointer.x != m_gun_last_ptr_x || pointer.y != m_gun_last_ptr_y) {
-        m_gun_cursor_owns = {false, false};
-        m_gun_last_ptr_x  = pointer.x;
-        m_gun_last_ptr_y  = pointer.y;
+        for (usize p = 0; p < kPlayers; ++p) {
+            // A gun moves the pointer too.
+            if (on_mouse[p] || on_gun[p]) m_gun_cursor_owns[p] = false;
+        }
+        m_gun_last_ptr_x = pointer.x;
+        m_gun_last_ptr_y = pointer.y;
     }
-    std::array<bool, kPlayers> on_mouse = {true, true};
 
 #ifdef SM2_HAVE_LIGHTGUNS
-    // Gun 0 drives player 1, gun 1 player 2. A gun also moves the system
-    // pointer, so with one gun player 2 leaves the mouse alone.
+    // Gun 0 drives player 1, gun 1 player 2.
     if (m_guns) {
-        m_guns->poll();
 
-        // A gun reports where it points on the whole screen, so map that through
-        // the window onto the letterboxed image; aiming at a side bar then reads
-        // as off screen. A fullscreen window is the screen; only a windowed one
-        // needs the display geometry. A gun aiming against the Sinden border
-        // already reports positions on the image.
+        // A gun reports where it points on the whole screen, so map that through the
+        // window onto the letterboxed image; a side bar reads as off screen. Sinden
+        // guns already report positions on the image.
         float screen_x = 0.0f;
         float screen_y = 0.0f;
         float screen_w = 1.0f;
@@ -2491,16 +2508,12 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
             gi.right = held(GrHatRight);
             return gi;
         };
-        if (m_guns->count() >= 1) {
-            p1          = from_gun(m_guns->gun(0), 0);
-            on_mouse[0] = false;
+        if (on_gun[0]) {
+            p1 = from_gun(m_guns->gun(0), 0);
         }
-        if (m_guns->count() >= 2) {
+        if (on_gun[1]) {
             p2 = from_gun(m_guns->gun(1), 1);
-        } else {
-            p2 = GunInput{};
         }
-        on_mouse[1] = false;
 
         // Recoil: pulse a gun's motor once on the trigger's press edge, keyed on
         // the bound trigger code (not reload) so racking off-screen does not kick.
@@ -2517,14 +2530,15 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
     }
 #endif
 
-    // Keyboard/pad aiming fallback (mouse and dedicated guns stay preferred): a
-    // per-player cursor nudged by the pad's sticks or the keyboard arrows, fired
-    // with the pad's Accelerator slot / Left Ctrl, reload-or-missile on its Brake
-    // slot / Right Alt. It
-    // overrides the mouse aim only while actually driven, so the mouse is
-    // untouched when the pad/keys are idle.
+    // Keyboard/pad aiming fallback: a per-player cursor nudged by the sticks or
+    // arrows, fired with the Accelerator slot / Left Ctrl, reload-or-missile on
+    // Brake / Right Alt. It overrides the mouse only while driven.
     {
         const auto aim_from = [&](usize player, GunInput& gi) {
+            // Without a mouse or gun under it, the cursor is the aim from the start.
+            if (!on_mouse[player] && !on_gun[player]) {
+                m_gun_cursor_owns[player] = true;
+            }
             bool active = false;
             float dx = 0.0f;
             float dy = 0.0f;
@@ -2618,17 +2632,11 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         aim_from(1, p2);
     }
 
-    // Record the aim (before the reload snap) for the crosshair overlay. Player
-    // 2's crosshair only shows when a second gun is actually aiming it, so a
-    // single-mouse session does not paint two overlapping crosshairs.
-    bool p2_active = pad_for(1) != nullptr;  // a 2nd pad aims player 2
-#ifdef SM2_HAVE_LIGHTGUNS
-    p2_active = p2_active || (m_guns && m_guns->count() >= 2);
-#endif
-    // Positional-gun titles draw their own in-game crosshair, so suppress ours
-    // to avoid two overlapping reticles; the RS-422 lightgun titles do not.
-    // Widescreen: how far past the screen's edges, as a fraction of its width,
-    // the picture reaches.
+    // Record the aim (before the reload snap) for the crosshair overlay. Player 2's
+    // shows only when a second gun or pad aims it.
+    const bool p2_active = on_gun[1] || pad_for(1) != nullptr;
+    // Positional-gun titles draw their own crosshair. `side` is how far the
+    // widescreen picture reaches past the screen, as a fraction of its width.
     const float side = static_cast<float>(m_wide_columns) / static_cast<float>(render::kNativeWidth);
     const auto record = [side](bool active, bool mouse, const GunInput& g) {
         return GunAim{active, mouse, std::clamp(g.x, -side, 1.0f + side),
@@ -2656,12 +2664,9 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
     m_gun_aims[1].idle = idle(1, p2);
 
     if (positional) {
-        // Positional gun: the aim is an analogue axis. Scale the mouse fraction
-        // into each channel's calibrated travel and overwrite the value the
-        // stick sampled. No off-screen reload here, so the reload snap is not
-        // applied; these titles use an explicit missile/reload button instead.
-        // X reaches into the widescreen columns: the end segments carry on
-        // past the screen's edges, as far as the 8-bit value allows.
+        // Positional gun: scale the aim into each channel's calibrated travel,
+        // overriding the stick. No off-screen reload. X reaches into the widescreen
+        // columns as far as the 8-bit value allows.
         const auto write_channel = [&](int idx, float fraction, float reach) {
             if (idx < 0) {
                 return;
@@ -2728,9 +2733,13 @@ void Input::gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) cons
         inputs->gun_p2y = fraction_to_gun(p2.y, spec.p2y);
     }
 
-    // Triggers, active low: player 1 on IN1 bit 0, player 2 on IN1 bit 1.
+    // Triggers, active low: player 1 on IN1 bit 0, player 2 on IN1 bit 1
+    // (Model 3: each on bit 0 of their own port).
     if (p1.trigger) inputs->in1 &= static_cast<u8>(~kButton1);
-    if (p2.trigger) inputs->in1 &= static_cast<u8>(~kButton2);
+    if (p2.trigger) {
+        if (game.board == rom::Board::Model3) inputs->in2 &= static_cast<u8>(~kButton1);
+        else inputs->in1 &= static_cast<u8>(~kButton2);
+    }
 
     // Missile (bel): P1 IN1 0x10, P2 IN1 0x20.
     if (p1.missile) inputs->in1 &= static_cast<u8>(~0x10);
@@ -2768,15 +2777,12 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
 
     u8 ports[1 + kPlayers] = {0xff, 0xff, 0xff};
 
-    // Sega Ski Super G drives itself entirely from three Select buttons and two
-    // Zoom buttons, spread across IN0 (0x10/0x20/0x40/0x80) and IN1 (0x01) --
-    // not the generic IN1 button nibble. It gets its own key and pad map below
-    // and is excluded from the generic ones so those bits are not driven twice.
+    // Sega Ski Super G uses three Select and two Zoom buttons across IN0 and IN1,
+    // not the generic nibble, so it has its own maps and is excluded from these.
     const bool is_ski = game.name == "skisuprg" || game.parent == "skisuprg";
+    const bool is_skichamp = rom::has_input(game.inputs, rom::InputFlags::Ski);
 
-    // Sega Water Ski: six buttons on their own IN0/IN1 bits (two Pitch/trick,
-    // Select Up/Down, Set), not the generic nibble. Own map below, excluded
-    // from the generic ones.
+    // Sega Water Ski: six buttons on their own IN0/IN1 bits; own map below.
     const bool is_wski = game.name == "segawski" || game.parent == "segawski";
 
     // Model 1 cabinets whose IN1 is not the generic layout: Virtua Racing's
@@ -2785,8 +2791,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
     const bool is_wingwar = game.name == "wingwar" || game.parent == "wingwar";
     const bool is_swa     = game.name == "swa" || game.parent == "swa";
 
-    // Sky Target: fire buttons are Machine Gun (IN1 0x10) and Missile (IN1
-    // 0x20), not the generic button nibble, so a pad never fired. Own map below.
+    // Sky Target: Machine Gun (IN1 0x10) and Missile (IN1 0x20); own map below.
     const bool is_skytgt = game.name == "skytargt" || game.parent == "skytargt";
 
     // The default key map, without the keys bound to a role.
@@ -2797,7 +2802,7 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         gather_keys(&ports[0], keys, key_count, kOperatorKeys);
         // These fly or steer on the arrows' analog driver and keep their own
         // buttons.
-        if (!is_ski && !is_wski && !is_skytgt && !is_vr && !is_wingwar && !is_swa) {
+        if (!is_ski && !is_skichamp && !is_wski && !is_skytgt && !is_vr && !is_wingwar && !is_swa) {
             gather_keys(&ports[1], keys, key_count, kPlayerOneKeys);
         }
         gather_keys(&ports[2], keys, key_count, kPlayerTwoKeys);
@@ -2819,11 +2824,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             key(SDL_SCANCODE_H, 1, 0x08);
         }
 
-        // kOperatorKeys pressed the default start1 bit (kStart1 = 0x10); some
-        // titles (Indy 500, Sky Target, Manx TT and Top Skater family) move
-        // START1 to another IN0 bit. Redirect the press to the real bit so the
-        // keyboard start key works on those sets, matching the scripted and
-        // gun/wheel paths which already honour start1_bit.
+        // Some titles move START1 off kStart1 (0x10) to another IN0 bit; redirect the
+        // press to the real bit, as the gun and wheel paths do.
         const u8 start1 = game.start1_bit != 0 ? game.start1_bit : kStart1;
         if (start1 != kStart1 && (ports[0] & kStart1) == 0) {
             ports[0] |= kStart1;                        // release the wrong bit
@@ -2849,7 +2851,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
 
     // Virtual On is a single-cabinet twin-stick title: both 8-way sticks and all
     // four buttons are player one's, split across IN1 and IN2.
-    const bool is_von = game.name == "von" || game.parent == "von";
+    const bool is_von = game.name == "von" || game.parent == "von"
+                     || rom::has_input(game.inputs, rom::InputFlags::TwinJoysticks);
 
     // Desert Tank is a single-cabinet vehicle title whose buttons do not follow
     // the generic per-player layout.
@@ -2861,9 +2864,21 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
                                         return c.control == rom::AnalogControl::Gun1X;
                                     });
 
+    // A left stick that is one of the game's analogue controls is read for
+    // that alone: also pressing the direction bits would fire Star Wars
+    // Trilogy's triggers or shift a sequential gearbox.
+    std::array<bool, kPlayers> stick_analog{};
+    for (const rom::AnalogChannel& channel : game.analog) {
+        for (const ControlBinding& binding : kControlBindings) {
+            if (binding.control != channel.control) continue;
+            if (binding.axis == HostAxis::PadLeftX || binding.axis == HostAxis::PadLeftY) stick_analog[0] = true;
+            if (binding.axis == HostAxis::Pad2LeftX || binding.axis == HostAxis::Pad2LeftY) stick_analog[1] = true;
+        }
+    }
+
     for (const Pad& pad : m_pads) {
         if (!plays(pad) || pad.player >= kPlayers || is_von || is_desert
-            || is_ski || is_wski || is_skytgt) {
+            || is_ski || is_skichamp || is_wski || is_skytgt) {
             continue;
         }
         u8& port = ports[1 + pad.player];
@@ -2905,9 +2920,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             port &= static_cast<u8>(~kButton4);
         }
 
-        // Pad VR buttons: A/B/X/Y -> VR1-4 through the declared port/bit, for
-        // titles that wire them off the default IN1 nibble (Daytona) where the
-        // generic face-button mapping above cannot reach them. Player one only.
+        // Pad VR buttons: A/B/X/Y -> VR1-4 through the declared port/bit, for titles
+        // that wire them off the default IN1 nibble (Daytona). Player one only.
         if (game.vr_buttons_declared && pad.player == 0 && !is_wingwar) {
             static constexpr SDL_GamepadButton kVrPadButtons[4] = {
                 SDL_GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_EAST,
@@ -2923,9 +2937,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             }
         }
 
-        // The left stick drives the same four switches as the d-pad, so either works
-        // and holding both is harmless.
-        if (!own_controls) {
+        // The left stick drives the same four switches as the d-pad.
+        if (!own_controls && !stick_analog[pad.player]) {
             port &= static_cast<u8>(
                 ~stick_bits(SDL_GetGamepadAxis(pad.handle, SDL_GAMEPAD_AXIS_LEFTX),
                             SDL_GetGamepadAxis(pad.handle, SDL_GAMEPAD_AXIS_LEFTY)));
@@ -3051,6 +3064,47 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
     }
 
+    // Ski Champ: the left pole and the three Selects share IN0 with Start 1/2,
+    // and the right pole is IN1 0x01. The poles go on the shoulders (the gear
+    // roles, which it has no use for) and the Selects on X/Y/B, as on Ski
+    // Super G. Keyboard: Q/E poles, Z/X/C Selects.
+    if (is_skichamp) {
+        struct SkiBit { u8 port; u8 bit; };
+        constexpr SkiBit kPoleLeft {0, 0x20};
+        constexpr SkiBit kPoleRight{1, 0x01};
+        constexpr SkiBit kSelect1  {0, 0x40};
+        constexpr SkiBit kSelect2  {0, 0x80};
+        constexpr SkiBit kSelect3  {0, 0x10};
+        const auto press = [&](SkiBit b) { ports[b.port] &= static_cast<u8>(~b.bit); };
+
+        if (keys != nullptr) {
+            const auto kdown = [&](SDL_Scancode sc) {
+                return static_cast<int>(sc) < key_count && keys[sc];
+            };
+            if (kdown(SDL_SCANCODE_Q)) press(kPoleLeft);
+            if (kdown(SDL_SCANCODE_E)) press(kPoleRight);
+            if (kdown(SDL_SCANCODE_Z)) press(kSelect1);
+            if (kdown(SDL_SCANCODE_X)) press(kSelect2);
+            if (kdown(SDL_SCANCODE_C)) press(kSelect3);
+        }
+
+        for (const Pad& pad : m_pads) {
+            if (!plays(pad) || pad.player != 0) {
+                continue;
+            }
+            const auto held = [&](SDL_GamepadButton b) { return pad_button_held(pad, b); };
+            if (held(SDL_GAMEPAD_BUTTON_LEFT_SHOULDER))  press(kPoleLeft);
+            if (held(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)) press(kPoleRight);
+            if (held(SDL_GAMEPAD_BUTTON_WEST))           press(kSelect1);
+            if (held(SDL_GAMEPAD_BUTTON_NORTH))          press(kSelect2);
+            if (held(SDL_GAMEPAD_BUTTON_EAST))           press(kSelect3);
+            if (!operator_chord(pad, &ports[0])) {
+                if (held(SDL_GAMEPAD_BUTTON_START)) ports[0] &= static_cast<u8>(~kStart1);
+                if (held(SDL_GAMEPAD_BUTTON_BACK))  ports[0] &= static_cast<u8>(~kCoin1);
+            }
+        }
+    }
+
     // Sega Water Ski: Pitch Left/Right (the jump/trick buttons) on the shoulders
     // so they work while steering; Select Up/Down on the d-pad; Set on A. Start
     // and coin keep their defaults. Keyboard -- Pitch L/R = Z/X, Select Up/Down =
@@ -3095,10 +3149,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
     }
 
-    // Sky Target: a flight-stick shooter. Machine Gun (IN1 0x10) on the right
-    // trigger and Missile (IN1 0x20) on the left, View Change (IN0 0x20) on Y;
-    // the left stick is the flight stick. Keyboard -- gun = Left Ctrl, missile =
-    // X, view = keep the VR key. Start (IN0 0x40) and coin keep their defaults.
+    // Sky Target: Machine Gun on the right trigger, Missile on the left, View
+    // Change (IN0 0x20) on Y; the left stick is the flight stick. Keyboard: gun =
+    // Left Ctrl, missile = X, view = the VR key.
     if (is_skytgt) {
         constexpr int kTriggerPress = 8000;  // half pull counts as a press
         if (keys != nullptr) {
@@ -3168,19 +3221,20 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
     inputs->in1 = ports[1];
     inputs->in2 = ports[2];
 
-    // Analogue channels follow the title's own machine config: which channel a
-    // control sits on, how far it travels and where it rests are all per-title.
-    // An unconnected channel reads zero, as an unbound an_port_callback does.
-    // Top Skater wants fine carving and Virtua Racing fine steering; the rest
-    // are linear.
+    // Analogue channels follow the title's machine config: channel, travel and rest
+    // are per title, and an unconnected channel reads zero. Top Skater and Virtua
+    // Racing get a response curve; the rest are linear.
     const bool  fine_stick = game.name == "topskatr" || game.parent == "topskatr"
                           || game.name == "vr" || game.parent == "vr";
     const float curve      = fine_stick ? 2.0f : 1.0f;
+    // Bass Fishing is one angler: the cabinet's joystick is on the same pad's
+    // right stick, beside the rod on the left.
+    const bool one_player = rom::has_input(game.inputs, rom::InputFlags::Fishing);
     for (usize channel = 0; channel < inputs->analog.size(); ++channel) {
         const rom::AnalogChannel& wiring = game.analog[channel];
         inputs->analog[channel] = wiring.control == rom::AnalogControl::None
                                       ? 0x00
-                                      : sample_channel(wiring, curve);
+                                      : sample_channel(wiring, curve, one_player);
     }
 
     // Throttle lever on the flying games: forward accelerates, back slows.
@@ -3223,11 +3277,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
     }
 
-    // Keyboard analog driver, so any analog title is playable without a pad:
-    // Left/Right drive the centring X axes, Up/Down the centring Y axes, Left
-    // Ctrl the gas and Left Alt the brake. Only overrides a channel while a key
-    // is held, so the pad axis still works otherwise; the game-specific blocks
-    // below run after and win for their own channels.
+    // Keyboard analogue driver: Left/Right drive the centring X axes, Up/Down the Y
+    // axes, Left Ctrl the gas and Left Alt the brake. A channel is overridden only
+    // while a key is held; the game-specific blocks below win for their channels.
     if (keys != nullptr) {
         const auto down = [&](SDL_Scancode sc) {
             return static_cast<int>(sc) < key_count && keys[sc];
@@ -3287,10 +3339,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (game.analog[ch].control == rom::AnalogControl::Swing)     swing_ch   = ch;
         }
         if (incline_ch < inputs->analog.size() && swing_ch < inputs->analog.size()) {
-            // D-pad / arrow left-right snaps the steer to full lock instantly
-            // for quick right-to-left flicks a stick cannot make; reverse means
-            // full lock left is the channel maximum. The stick still steers
-            // proportionally when the d-pad is idle.
+            // The d-pad / arrows snap the steer to full lock for flicks a stick cannot
+            // make; the stick still steers proportionally.
             const rom::AnalogChannel& inc = game.analog[incline_ch];
             bool snap_left  = false;
             bool snap_right = false;
@@ -3320,14 +3370,10 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
     }
 
-    // Top Skater special-case. The game has no digital d-pad; it steers with an
-    // analog board (Curving) and navigates its menus with digital "Select
-    // Left/Right" buttons on IN0 (0x80/0x10), plus Jump Front (IN0 0x20) and
-    // Jump Tail (IN1 0x01). The generic keyboard/pad mapping puts buttons on the 
-    // player port, so neither the menu nor keyboard steering worked.
-    // Wire it directly: arrow Left/Right (and the d-pad) drive BOTH the digital
-    // Select bits (menu) and the Curving analog (in-game steer), 
-    // so one control is correct in both states.
+    // Top Skater steers with an analogue board (Curving) and navigates menus with
+    // digital Select Left/Right on IN0 (0x80/0x10), plus Jump Front (IN0 0x20) and
+    // Jump Tail (IN1 0x01). The arrows and d-pad drive both the Select bits and
+    // Curving, so one control works in menus and in game.
     if (game.name == "topskatr" || game.parent == "topskatr") {
         constexpr u8 kSelectLeft  = 0x80;  // IN0
         constexpr u8 kSelectRight = 0x10;  // IN0
@@ -3393,10 +3439,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
                 static_cast<float>(wiring.minimum) + fraction * span + 0.5f);
         }
 
-        // Keyboard steer: nudge the Curving channel off its centre rest so the
-        // skater turns without a pad stick. The pad left stick already drives
-        // this through sample_channel; only override when a key is actually held
-        // so the stick still works when no arrow is pressed.
+        // Keyboard steer: nudge Curving off centre only while a key is held, so the
+        // stick still works.
         for (usize channel = 0; channel < inputs->analog.size(); ++channel) {
             if (game.analog[channel].control != rom::AnalogControl::Curving) {
                 continue;
@@ -3407,10 +3451,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         }
     }
 
-    // Power Sled. Entry and Call are IN1 buttons 1 and 2, which the generic
-    // player-one mapping already covers. Its two cabinet-only buttons are not:
-    // Cancel Error on IN0 0x80 and Cancel Network Check on IN3 0x02, the latter
-    // letting a lone unit give up waiting for the rest of the linked set.
+    // Power Sled: Entry and Call are the generic buttons 1 and 2. Its cabinet-only
+    // buttons are Cancel Error (IN0 0x80) and Cancel Network Check (IN3 0x02), which
+    // lets a lone unit stop waiting for the linked set.
     if (game.name == "powsled" || game.parent == "powsled") {
         constexpr u8 kCancelError   = 0x80;  // IN0
         constexpr u8 kCancelNetwork = 0x02;  // IN3
@@ -3447,14 +3490,11 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
         if (!p2_call)  inputs->in1 |= kP2Call;
     }
 
-    // Virtual On twin-stick layout. port map puts the whole cabinet on player one,
-    // split across two ports:
-    //   IN1: 0x01 Left Shot, 0x02 Left Dash, and the LEFT stick's four directions
-    //   IN2: 0x01 Right Shot, 0x02 Right Dash, and the RIGHT stick's directions
-    // One pad drives both levers: the analog sticks are the two levers, 
-    // the d-pad and face buttons double the left and right levers respectively 
-    // for the custom twin-stick feel, the bumpers are the dash (boost) buttons
-    // and the triggers are the shot buttons.
+    // Virtual On twin-stick layout, all player one:
+    //   IN1: 0x01 Left Shot, 0x02 Left Dash, and the left stick's four directions
+    //   IN2: 0x01 Right Shot, 0x02 Right Dash, and the right stick's directions
+    // The analogue sticks are the levers, doubled by the d-pad (left) and face
+    // buttons (right); bumpers dash and triggers shoot.
     if (is_von) {
         u8 in1 = 0;  // bits to press (active high here; folded in active-low below)
         u8 in2 = 0;
@@ -3472,8 +3512,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (pad_button_held(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT))  in1 |= kLeft;
             if (pad_button_held(pad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT)) in1 |= kRight;
 
-            // Right lever: right analog stick, doubled by the face buttons
-            // (Y/A up/down, X/B left/right) to account for the custom twin-stick.
+            // Right lever: right analogue stick, doubled by the face buttons (Y/A up/down,
+            // X/B left/right).
             {
                 const auto lx = static_cast<u32>(Config::PadAxisRole::LeverX);
                 const auto ly = static_cast<u32>(Config::PadAxisRole::LeverY);
@@ -3491,10 +3531,10 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (pad_button_held(pad, SDL_GAMEPAD_BUTTON_EAST))  in2 |= kRight;
 
             // Shots on the triggers, dashes (boost) on the bumpers.
-            if (SDL_GetGamepadAxis(pad.handle, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > kPedalFloor) {
+            if (pad_pedal_pressed(pad.handle, 0, Config::PadAxisRole::Brake)) {
                 in1 |= kButton1;  // Left Shot
             }
-            if (SDL_GetGamepadAxis(pad.handle, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > kPedalFloor) {
+            if (pad_pedal_pressed(pad.handle, 0, Config::PadAxisRole::Accel)) {
                 in2 |= kButton1;  // Right Shot (IN2 0x01)
             }
             if (pad_button_held(pad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)) {
@@ -3534,26 +3574,20 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             if (kd(SDL_SCANCODE_RCTRL))  in2 |= kButton2;  // Right Dash
         }
 
-        // Rebuild both ports from the twin-stick state, dropping the stray bits
-        // the generic keyboard/pad pass wrote (they do not match this layout).
+        // Rebuild both ports from the twin-stick state, dropping the generic pass's
+        // bits.
         inputs->in1 = static_cast<u8>(~in1);
         inputs->in2 = static_cast<u8>(~in2);
     }
 
-    // Desert Tank layout. MAME's `desert` port map (see model2o_state::desert):
+    // Desert Tank, after MAME's `desert` port map:
     //   analog: ch0 STEER (paddle), ch1 ACCEL (pedal), ch2 turret elevation
     //           (IPT_AD_STICK_Y);
     //   IN0: 0x20 VR1, 0x40 VR2, 0x80 VR3 (the three coloured view buttons);
     //   IN1: 0x01 Shift (PORT_TOGGLE, forward/reverse), 0x10 Machine Gun,
     //        0x20 Cannon.
-    // Steer (ch0 -> left stick X), turret elevation (ch2 sticky -> left stick Y)
-    // and accel (ch1 -> right trigger) all come through the generic analog
-    // sampler; this block owns the digital buttons and the shift toggle. The
-    // d-pad doubles the two left-stick axes and the three views sit on the face
-    // buttons (B/Y/X = VR1/VR2/VR3). One pad drives the whole cabinet.
-    //
-    // Keyboard: arrows steer (L/R) and elevate the turret (up/down), Left Shift
-    // is gas, Z/X are the guns, B/N/M are the views and Space taps the shift.
+    // The analogue channels come through the generic sampler; this block owns the
+    // buttons, the shift toggle and the d-pad.
     if (is_desert) {
         // Steer (ch0) and turret elevation (ch2, sticky) by control, not index.
         int steer_ch  = -1;
@@ -3591,9 +3625,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
 
             // Steer and turret elevation are both on the left stick (X and Y)
 
-            // The d-pad doubles the two analog axes, slamming them to an extreme
-            // while held (SDL's stick Y grows downward, so Up is the minimum end
-            // and raises the turret the same way pushing the stick up does).
+            // The d-pad slams the axes to an extreme while held. SDL's stick Y grows
+            // downward, so Up is the minimum end, matching the stick.
             const bool dl = pad_button_held(pad, SDL_GAMEPAD_BUTTON_DPAD_LEFT);
             const bool dr = pad_button_held(pad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
             const bool du = pad_button_held(pad, SDL_GAMEPAD_BUTTON_DPAD_UP);
@@ -3621,10 +3654,8 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             }
         }
 
-        // The generic player-one keyboard put arrows and Z/X/C/V on IN1's
-        // direction and low-nibble bits, none of which are desert's layout (its
-        // IN1 is Shift 0x01, Machine Gun 0x10, Cannon 0x20). Release the whole
-        // port and drive only the real bits from here.
+        // The generic keyboard pass wrote IN1 bits that are not desert's layout, so
+        // release the port and drive only the real bits.
         inputs->in1 = 0xff;
 
         // Keyboard guns: Z = Machine Gun, X = Cannon.
@@ -3635,11 +3666,9 @@ void Input::poll(hw::Inputs* inputs, const rom::GameSpec& game) const
             mg     |= down(SDL_SCANCODE_Z);
             cannon |= down(SDL_SCANCODE_X);
 
-            // Keyboard analog: arrows steer (L/R) and elevate the turret (up/down),
-            // Left Shift is the gas. Each drives its channel to an extreme while
-            // held and leaves it at rest otherwise, so the pad axes still work
-            // when no key is down. Up is the turret's minimum end, matching the
-            // pad (SDL stick Y grows downward, so pushing up is the low value).
+            // Keyboard analogue: arrows steer and elevate the turret, Left Shift is gas,
+            // each driving its channel to an extreme only while held. Up is the minimum end,
+            // as on the pad.
             const bool kb_left  = down(SDL_SCANCODE_LEFT);
             const bool kb_right = down(SDL_SCANCODE_RIGHT);
             const bool kb_up    = down(SDL_SCANCODE_UP);
@@ -3931,10 +3960,8 @@ void Input::print_bindings()
 
 Input::ScriptedPress Input::scripted_press(u32 frame, u32 coin_frame, u8 start1_bit)
 {
-    // Each press is a pulse rather than a hold: the program looks for the
-    // transition, so a permanently held coin counts once and a permanently held
-    // button can be read as a hold instead of a tap. Twelve frames is about a fifth
-    // of a second, roughly the shortest a person manages.
+    // Each press is a pulse, not a hold: the program looks for the transition.
+    // Twelve frames is about a fifth of a second.
     constexpr u32 kPulse = 12;
     constexpr u32 kGap   = 30;
     constexpr u32 kStep  = kPulse + kGap;
@@ -3944,15 +3971,9 @@ Input::ScriptedPress Input::scripted_press(u32 frame, u32 coin_frame, u8 start1_
         u8  in0;
         u8  in1;
     };
-    // Two coins because the default setting asks for two per credit, then a
-    // run of start presses to walk through however many confirmation screens
-    // stand between the coin and gameplay -- a fighting game needs only one
-    // (the character highlighted at boot is already fine), but a menu-heavy
-    // racer like Motor Raid asks for player, then mode, then course, each on
-    // its own screen with its own dwell time before the next input reads.
-    // Pressing start on a screen that does not need it is harmless: Model 2's
-    // start button has no effect once play has begun. Start1's bit varies by
-    // game (several PORT_MODIFY it away from 0x10), hence the parameter.
+    // Two coins for the default two per credit, then a run of start presses to walk
+    // through menu screens (Motor Raid asks for player, mode and course). Extra
+    // presses are harmless once play has begun. Start1's bit varies by game.
     const Event kScript[] = {
         {0 * kStep, kCoin1, 0},
         {1 * kStep, kCoin1, 0},
@@ -3969,6 +3990,15 @@ Input::ScriptedPress Input::scripted_press(u32 frame, u32 coin_frame, u8 start1_
         if (frame >= begin && frame < begin + kPulse) {
             press.in0 |= event.in0;
             press.in1 |= event.in1;
+        }
+    }
+    // Keep tapping start for slow menus that ignore the early presses.
+    constexpr u32 kLateFirst = 10 * kStep;
+    constexpr u32 kLateCount = 40;
+    if (frame >= coin_frame + kLateFirst) {
+        const u32 since = frame - coin_frame - kLateFirst;
+        if (since < kLateCount * 2 * kStep && since % (2 * kStep) < kPulse) {
+            press.in0 |= start1_bit;
         }
     }
     return press;

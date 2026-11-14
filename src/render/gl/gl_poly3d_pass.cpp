@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -85,6 +87,10 @@ void Poly3DPass::shutdown()
         DeleteBuffers(1, &m_polygon_push_ubo);
         m_polygon_push_ubo = 0;
     }
+    if (m_buffer_textures[0] != 0) {
+        DeleteTextures(3, m_buffer_textures);
+        std::fill(std::begin(m_buffer_textures), std::end(m_buffer_textures), 0U);
+    }
     destroy_persistent_buffer(&m_vertex_buffer);
     destroy_persistent_buffer(&m_polygon_buffer);
     destroy_persistent_buffer(&m_geometry_buffer);
@@ -105,17 +111,17 @@ bool Poly3DPass::create_programs()
         return false;
     }
 
+    // GL 4.1 has no early_fragment_tests, so there the variant is the same program.
     const std::string fragment_source_early = prepare_gl_source(
         shaders::kPolygonFragEarlyGlsl, active_version_directive(),
-        "SM2_EARLY_FRAGMENT_TESTS");
+        is_gl41() ? nullptr : "SM2_EARLY_FRAGMENT_TESTS");
     m_polygon_program_early =
         compile_program(vertex_source.c_str(), fragment_source_early.c_str());
     if (m_polygon_program_early == 0) {
         return false;
     }
 
-    // polygon.vert's Push block took binding 4 under SM2_TARGET_GL -- see
-    // that shader's own SM2_TARGET_GL comment.
+    // polygon.vert's Push block is at binding 4 under SM2_TARGET_GL.
     const u32 polygon_block = GetUniformBlockIndex(m_polygon_program, "Push");
     UniformBlockBinding(m_polygon_program, polygon_block, 4);
     const u32 polygon_block_early = GetUniformBlockIndex(m_polygon_program_early, "Push");
@@ -125,6 +131,9 @@ bool Poly3DPass::create_programs()
     // vec2 invRaster + uint renderScale + uint textureQuality = 16 bytes (std140).
     BufferData(GL_UNIFORM_BUFFER, 16, nullptr, GL_DYNAMIC_DRAW);
 
+    if (is_gl41()) {
+        return true;  // decoded on the CPU
+    }
     const std::string decode_source =
         prepare_gl_source(shaders::kTexelDecodeCompGlsl, active_version_directive());
     m_decode_program = compile_compute_program(decode_source.c_str());
@@ -140,16 +149,39 @@ bool Poly3DPass::create_buffers()
     m_vertex_buffer =
         create_persistent_buffer(static_cast<usize>(render::kMaxVertices) * sizeof(render::Vertex),
                                  GL_ARRAY_BUFFER);
+    const bool gl41   = is_gl41();
+    const u32  target = gl41 ? GL_TEXTURE_BUFFER : GL_SHADER_STORAGE_BUFFER;
     m_polygon_buffer = create_persistent_buffer(
-        static_cast<usize>(render::kMaxPolygons) * sizeof(render::PolyParams),
-        GL_SHADER_STORAGE_BUFFER);
+        static_cast<usize>(render::kMaxPolygons) * sizeof(render::PolyParams), target);
     m_geometry_buffer = create_persistent_buffer(
-        static_cast<usize>(render::kMaxPolygons) * sizeof(render::PolyGeom),
-        GL_SHADER_STORAGE_BUFFER);
-    m_sheets_buffer =
-        create_persistent_buffer(static_cast<usize>(kSheetWords) * 2 * sizeof(u32),
-                                 GL_SHADER_STORAGE_BUFFER);
-    m_luma_buffer = create_persistent_buffer(kLumaBytes, GL_SHADER_STORAGE_BUFFER);
+        static_cast<usize>(render::kMaxPolygons) * sizeof(render::PolyGeom), target);
+    if (!gl41) {
+        m_sheets_buffer =
+            create_persistent_buffer(static_cast<usize>(kSheetWords) * 2 * sizeof(u32),
+                                     GL_SHADER_STORAGE_BUFFER);
+    }
+    m_luma_buffer = create_persistent_buffer(kLumaBytes, target);
+
+    if (gl41) {
+        s32 max_texels = 0;
+        GetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &max_texels);
+        const usize needed = m_geometry_buffer.size / 16;
+        if (static_cast<usize>(max_texels) < needed) {
+            SM2_ERROR("gl: GL_MAX_TEXTURE_BUFFER_SIZE %d is below the %zu texels the 3D pass "
+                      "needs", max_texels, needed);
+            return false;
+        }
+        // Units 6..8, matching polygon.frag's SM2_GL41 samplers.
+        const u32    buffers[3] = {m_luma_buffer.handle, m_polygon_buffer.handle,
+                                   m_geometry_buffer.handle};
+        const GLenum formats[3] = {GL_R32UI, GL_RGBA32UI, GL_RGBA32UI};
+        GenTextures(3, m_buffer_textures);
+        for (u32 i = 0; i < 3; ++i) {
+            BindTexture(GL_TEXTURE_BUFFER, m_buffer_textures[i]);
+            TexBuffer(GL_TEXTURE_BUFFER, formats[i], buffers[i]);
+        }
+        BindTexture(GL_TEXTURE_BUFFER, 0);
+    }
 
     GenTextures(1, &m_decoded_texture);
     BindTexture(GL_TEXTURE_2D_ARRAY, m_decoded_texture);
@@ -168,7 +200,7 @@ bool Poly3DPass::create_buffers()
 
     return m_vertex_buffer.handle != 0 && m_polygon_buffer.handle != 0
         && m_geometry_buffer.handle != 0
-        && m_sheets_buffer.handle != 0 && m_luma_buffer.handle != 0
+        && (gl41 || m_sheets_buffer.handle != 0) && m_luma_buffer.handle != 0
         && m_decoded_texture != 0 && m_tone_texture != 0;
 }
 
@@ -176,9 +208,8 @@ void Poly3DPass::refresh_machine_data(const hw::Model2MachineBase& machine,
                                       const hw::Model2Video&       video)
 {
     if (m_texture_generation != machine.texture_generation()) {
-        // Only the low half of each two-megabyte window is addressable by
-        // the texel arithmetic and only that half is ever written, matching
-        // render::vk::Poly3DPass::refresh_machine_data() exactly.
+        // Only the low half of each two-megabyte window is addressable by the
+        // texel arithmetic, as in the Vulkan pass.
         std::vector<u32> words(static_cast<usize>(kSheetWords) * 2, 0);
         for (int sheet = 0; sheet < 2; ++sheet) {
             const std::span<const u32> source = machine.texture_ram(sheet);
@@ -186,9 +217,13 @@ void Poly3DPass::refresh_machine_data(const hw::Model2MachineBase& machine,
             std::memcpy(words.data() + static_cast<usize>(sheet) * kSheetWords, source.data(),
                         count * sizeof(u32));
         }
-        m_sheets_buffer.write(words.data(), words.size() * sizeof(u32));
+        if (is_gl41()) {
+            decode_textures_cpu(words);
+        } else {
+            m_sheets_buffer.write(words.data(), words.size() * sizeof(u32));
+            decode_textures();
+        }
         m_texture_generation = machine.texture_generation();
-        decode_textures();
     }
 
     if (m_table_generation == machine.table_generation()) {
@@ -217,11 +252,33 @@ void Poly3DPass::decode_textures()
     const u32 groups_y = (kDecodedHeight + 15) / 16;
     DispatchCompute(groups_x, groups_y, 2);
 
-    // The polygon pass's fragment shader samples this image next; its
-    // writes must be visible first. GL analogue of the one
-    // record_image_barrier() call render::vk::Poly3DPass::decode_textures()
-    // issues for the same reason.
+    // The polygon pass samples this image next.
     MemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+}
+
+void Poly3DPass::decode_textures_cpu(const std::vector<u32>& words)
+{
+    // texel_decode.comp, one RGBA8UI pixel per 2x2 texel container.
+    constexpr usize kContainers = static_cast<usize>(kDecodedWidth) * kDecodedHeight;
+    std::vector<u8> decoded(kContainers * 2 * 4);
+    u8* out = decoded.data();
+    for (usize layer = 0; layer < 2; ++layer) {
+        for (usize offset = 0; offset < kContainers; ++offset, out += 4) {
+            const usize index = offset >> 1;
+            const u32   word  = index < kSheetWords ? words[layer * kSheetWords + index] : 0;
+            const u32   half  = (offset & 1) != 0 ? (word >> 16) : (word & 0xffff);
+            const u32   even  = (half >> 8) & 0xff;
+            const u32   odd   = half & 0xff;
+            out[0] = static_cast<u8>(even >> 4);
+            out[1] = static_cast<u8>(even & 0xf);
+            out[2] = static_cast<u8>(odd >> 4);
+            out[3] = static_cast<u8>(odd & 0xf);
+        }
+    }
+    BindTexture(GL_TEXTURE_2D_ARRAY, m_decoded_texture);
+    TexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, static_cast<GLsizei>(kDecodedWidth),
+                  static_cast<GLsizei>(kDecodedHeight), 2, GL_RGBA_INTEGER, GL_UNSIGNED_BYTE,
+                  decoded.data());
 }
 
 void Poly3DPass::sync_replacements()
@@ -289,11 +346,8 @@ void Poly3DPass::build(const hw::Model2MachineBase* machine, const hw::Model2Vid
 
 void Poly3DPass::draw_polygons()
 {
-    // Runs with the native framebuffer bound and the below-tilemap already in
-    // it, between draw_below() and draw_above(); the premultiplied-over blend
-    // merges the 3D onto it directly, with no offscreen colour texture to store
-    // and re-sample. Only the fill-mask stencil is cleared -- clearing colour
-    // would wipe the below-tilemap.
+    // Runs between draw_below() and draw_above(), blending straight onto the
+    // below-tilemap already in the framebuffer, so colour is not cleared.
     ClearStencil(0);
     DepthMask(GL_TRUE);
     Clear(GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -302,9 +356,7 @@ void Poly3DPass::draw_polygons()
         return;
     }
 
-    // Matches polygon.{vert,frag}'s shared Push block under std140: invRaster at
-    // offset 0, renderScale at offset 8. The frag stage reads renderScale for the
-    // native-grid stipple.
+    // polygon.{vert,frag}'s shared Push block under std140.
     struct PushBlock {
         float inv_raster[2];
         u32   render_scale;
@@ -318,9 +370,8 @@ void Poly3DPass::draw_polygons()
     BufferSubData(GL_UNIFORM_BUFFER, 0, static_cast<GLsizeiptr>(sizeof(push)), &push);
     BindBufferBase(GL_UNIFORM_BUFFER, 4, m_polygon_push_ubo);
 
-    // The fill mask: polygons arrive nearest first, and a fragment draws
-    // only where nothing has drawn yet, claiming the pixel when it does.
-    // Same rule render::vk::Poly3DPass's stencil state expresses, in GL's terms.
+    // The fill mask: polygons arrive nearest first, and a fragment draws only
+    // where nothing has drawn yet, claiming the pixel when it does.
     Enable(GL_STENCIL_TEST);
     StencilFunc(GL_EQUAL, 0, 0xff);
     StencilOp(GL_KEEP, GL_KEEP, GL_INCR);
@@ -333,27 +384,28 @@ void Poly3DPass::draw_polygons()
         DepthFunc(GL_ALWAYS);
     }
 
-    // Premultiplied over: the shader writes alpha 1 for every non-discarded
-    // pixel, so this overwrites where a polygon draws and leaves the
-    // below-tilemap where it does not. Matches the Vulkan polygon blend state.
+    // Premultiplied over, as in the Vulkan polygon blend state.
     Enable(GL_BLEND);
     BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Texture units and buffer bindings match polygon.frag's own layout(...)
-    // qualifiers exactly: uSheets binding 0, Luma binding 1, uTone binding 2,
-    // Polys binding 3. layout(binding=N) on a sampler is honoured by the
-    // driver from GLSL 4.20 (GL 4.2 core) onward -- below this project's 4.3
-    // floor, so no per-shader glUniform1i call is needed, only binding the
-    // right texture to the matching unit.
+    // Units and bindings match polygon.frag's layout qualifiers; on GL 4.1
+    // compile_program() sets the sampler units with glUniform1i instead.
     ActiveTexture(GL_TEXTURE0);
     BindTexture(GL_TEXTURE_2D_ARRAY, m_decoded_texture);
     ActiveTexture(GL_TEXTURE4);
     BindTexture(GL_TEXTURE_2D_ARRAY, m_atlas_texture);
     ActiveTexture(GL_TEXTURE2);
     BindTexture(GL_TEXTURE_2D, m_tone_texture);
-    BindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_luma_buffer.handle);
-    BindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, m_polygon_buffer.handle);
-    BindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, m_geometry_buffer.handle);
+    if (is_gl41()) {
+        for (u32 i = 0; i < 3; ++i) {
+            ActiveTexture(GL_TEXTURE6 + i);
+            BindTexture(GL_TEXTURE_BUFFER, m_buffer_textures[i]);
+        }
+    } else {
+        BindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_luma_buffer.handle);
+        BindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, m_polygon_buffer.handle);
+        BindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, m_geometry_buffer.handle);
+    }
 
     BindVertexArray(m_vao);
     BindBuffer(GL_ARRAY_BUFFER, m_vertex_buffer.handle);

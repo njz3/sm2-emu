@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -67,9 +69,8 @@ public:
 
     /// Device autocentre strength, 0..100.
     void set_autocenter(int percent);
-    /// Signed constant force: positive pushes the wheel left, negative right.
-    /// The convention of DirectInput, SDL and Linux: a force along the
-    /// steering axis comes from its positive end, the right.
+    /// Signed constant force: positive pushes the wheel left, negative right,
+    /// as in DirectInput, SDL and Linux.
     void set_force(s16 level);
     /// Default sine period in ms (~50 Hz), felt as a buzz.
     static constexpr u16 kRumblePeriod = 20;

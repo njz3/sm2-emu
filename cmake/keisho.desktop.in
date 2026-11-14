@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Keisho
+GenericName=Arcade Emulator
+Comment=Sega Model 1, 2 & 3 arcade emulator
+Exec=keisho %f
+Icon=keisho
+Terminal=false
+Categories=Game;Emulator;
+Keywords=sega;model1;model2;model3;arcade;emulator;

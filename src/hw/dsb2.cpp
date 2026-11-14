@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
 // See dsb2.h. Ported from MAME's src/mame/sega/dsb2.cpp (BSD-3-Clause).
+//
+// Portions derived from Supermodel's Src/Model3/DSB.cpp, Copyright (c)
+// 2003-2026 The Supermodel Team, GPL-3.0-or-later: fifo_w_model3 and the
+// Model 3 branch of mix(). Supermodel's DSB code is "based on code donated by
+// R. Belmont".
 
 #include "hw/dsb2.h"
 
@@ -65,9 +70,13 @@ void Dsb2::reset()
     m_mp_pos   = 0;
     m_mp_state = 0;
     m_command  = Command::Idle;
+    m_param     = 0;
+    m_volume[0] = m_volume[1] = 0xff;  // full, in case the volume commands are missed
+    m_stereo    = 0;
     m_cycle_debt    = 0;
     m_timer_debt    = 0;
     m_resample_frac = 0;
+    m_prev[0] = m_prev[1] = 0;
     m_counters      = Counters{};
 
     if (!present()) {
@@ -115,13 +124,21 @@ void Dsb2::serialize(Archive& ar)
     ar.raw(m_resample_frac);
     ar.bytes(m_audio_buf, 1152 * 2);
 
-    // The decoder exists only on a set that actually carries a DSB2. Save/load
-    // are always the same game, so its presence is symmetric; a flag guards the
-    // inert case regardless.
+    // The decoder exists only on a set that carries a DSB2.
     bool has_decoder = m_decoder != nullptr;
     ar.raw(has_decoder);
     if (has_decoder && m_decoder) {
         m_decoder->serialize(ar);
+    }
+
+    // Model 3 only, so Model 2 save states keep their layout.
+    if (m_model3) {
+        ar.raw(m_param);
+        ar.bytes(m_volume, 2);
+        ar.raw(m_stereo);
+    }
+    if (m_interpolate) {
+        ar.bytes(m_prev, 2);
     }
 }
 
@@ -225,7 +242,11 @@ void Dsb2::write8(u32 address, u8 value)
         return;
     }
     if (address == 0xe00003) {
-        fifo_w(value);
+        if (m_model3) {
+            fifo_w_model3(value);
+        } else {
+            fifo_w(value);
+        }
         return;
     }
     // ROM and unmapped writes are discarded.
@@ -249,10 +270,66 @@ void Dsb2::write32(u32 address, u32 value)
 
 void Dsb2::system_control_w(u8 data)
 {
-    // Bit 3 (inverted) is the MPEG ROM bank (A24). Only meaningful with more
-    // than 16 MB of MPEG ROM, which no Model 2 DSB2 title has, so this is
-    // effectively always bank 0 here -- kept for fidelity.
+    // Bit 3 (inverted) is the MPEG ROM bank (A24), meaningful only with more
+    // than 16 MB of MPEG ROM.
     m_rom_bank = (~data >> 3) & 1;
+}
+
+void Dsb2::play()
+{
+    m_mp_state = open_window(m_mp_start, m_mp_end) ? 1 : 0;
+}
+
+void Dsb2::stop()
+{
+    m_mp_state    = 0;
+    m_audio_pos   = 0;
+    m_audio_avail = 0;
+}
+
+// The Model 3 command set: MAME's address sequences plus opcodes that take a
+// one-byte parameter, mostly speaker volumes (Daytona 2 sets its rear pair with
+// B6/A7 and its front pair with B2/A3). dayto2pe plays its attract tune by
+// writing A4 75.
+void Dsb2::fifo_w_model3(u8 data)
+{
+    if (m_param != 0) {
+        const u8 opcode = m_param;
+        m_param = 0;
+        switch (opcode) {
+            case 0xa0: m_stereo = data != 0 ? 1 : 0; break;  // mono, left
+            case 0xb1: m_stereo = data != 0 ? 2 : 0; break;  // mono, right
+            case 0xa4: if (data == 0x75) { play(); } break;
+            case 0xb4: if (data == 0x96) { stop(); } break;
+            case 0xb0:                                       // left volume
+            case 0xb6: m_volume[0] = data; break;            // rear left(?)
+            case 0xa1:                                       // right volume
+            case 0xa7: m_volume[1] = data; break;            // rear right(?)
+            default: break;  // a3, a5, b2, b5: accepted and ignored
+        }
+        return;
+    }
+
+    if (m_command != Command::Idle) {
+        const bool end_lo = m_command == Command::EndLo;
+        fifo_w(data);
+        if (end_lo) {
+            m_stereo = 0;  // each end address resets to stereo
+        }
+        return;
+    }
+
+    switch (data) {
+        case 0x14: case 0x15: m_command = Command::StartHi; break;
+        case 0x24: case 0x25: m_command = Command::EndHi; break;
+        case 0x74: case 0x75: play(); break;
+        case 0x84: case 0x85: stop(); break;
+        case 0xa0: case 0xa1: case 0xa3: case 0xa4: case 0xa5: case 0xa7:
+        case 0xb0: case 0xb1: case 0xb2: case 0xb4: case 0xb5: case 0xb6:
+            m_param = data;
+            break;
+        default: break;
+    }
 }
 
 void Dsb2::fifo_w(u8 data)
@@ -375,12 +452,30 @@ void Dsb2::mix(s16* dst, u32 frames, u32 out_rate)
             }
         }
 
-        const s16 lraw = m_audio_buf[m_audio_pos * 2];
-        const s16 rraw = m_audio_buf[m_audio_pos * 2 + 1];
+        s16 lraw = m_audio_buf[m_audio_pos * 2];
+        s16 rraw = m_audio_buf[m_audio_pos * 2 + 1];
+        if (m_interpolate) {
+            // Linear interpolation from the previous decoded sample.
+            const s64 t = static_cast<s64>(m_resample_frac);
+            lraw = static_cast<s16>(m_prev[0] + (lraw - m_prev[0]) * t / out_rate);
+            rraw = static_cast<s16>(m_prev[1] + (rraw - m_prev[1]) * t / out_rate);
+        }
 
         s32 l;
         s32 r;
-        switch (m_mp_pan) {
+        if (m_model3) {
+            // Per-channel volume and mono routing, scaled to MAME's 32768*128 full scale.
+            s32 src_l = lraw, src_r = rraw, vol_l = m_volume[0], vol_r = m_volume[1];
+            if (m_stereo == 1) {
+                src_r = lraw;
+                vol_r = vol_l;
+            } else if (m_stereo == 2) {
+                src_l = rraw;
+                vol_l = vol_r;
+            }
+            l = src_l * vol_l * 128 / 255;
+            r = src_r * vol_r * 128 / 255;
+        } else switch (m_mp_pan) {
             case 1:
                 l = r = static_cast<s32>(lraw) * static_cast<s32>(m_mp_vol);
                 break;
@@ -403,6 +498,8 @@ void Dsb2::mix(s16* dst, u32 frames, u32 out_rate)
         m_resample_frac += kDecoderRate;
         while (m_resample_frac >= out_rate) {
             m_resample_frac -= out_rate;
+            m_prev[0] = m_audio_buf[m_audio_pos * 2];
+            m_prev[1] = m_audio_buf[m_audio_pos * 2 + 1];
             ++m_audio_pos;
         }
     }

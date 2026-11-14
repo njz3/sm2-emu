@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -17,6 +19,7 @@
 #include "core/log.h"
 #include "osd/app_icon.h"
 
+#include <cstdio>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
@@ -44,9 +47,8 @@ bool Window::create(const WindowConfig& config)
     SDL_WindowFlags flags = 0;
 
     if (m_graphics_api == GraphicsApi::Vulkan) {
-        // Loading the Vulkan library up front means a missing or broken loader
-        // is reported here, with SDL's diagnostics, rather than as a confusing
-        // instance-creation failure later.
+        // Load the Vulkan library up front so a missing loader is reported
+        // here, with SDL's diagnostics, rather than at instance creation.
         if (!SDL_Vulkan_LoadLibrary(nullptr)) {
             SM2_ERROR("SDL_Vulkan_LoadLibrary failed: %s", SDL_GetError());
             SM2_ERROR("A Vulkan loader is required. On Linux install "
@@ -56,9 +58,7 @@ bool Window::create(const WindowConfig& config)
         }
         flags |= SDL_WINDOW_VULKAN;
     } else {
-        // Same reasoning as the Vulkan branch, for the same failure mode: a
-        // missing GL library is reported here rather than as an opaque
-        // SDL_CreateWindow failure.
+        // As above: report a missing GL library here.
         if (!SDL_GL_LoadLibrary(nullptr)) {
             SM2_ERROR("SDL_GL_LoadLibrary failed: %s", SDL_GetError());
             SM2_ERROR("An OpenGL loader is required. On Linux this is normally "
@@ -96,10 +96,8 @@ bool Window::create(const WindowConfig& config)
         SDL_ShowWindow(m_window);
     }
 
-    // Application icon. The pixels are a static constexpr array, so the surface
-    // may reference them without copying; SDL_SetWindowIcon takes its own copy,
-    // so the surface is freed immediately afterwards. A failure here is not
-    // fatal -- the window just keeps the default icon.
+    // The surface references the static pixels without copying, and
+    // SDL_SetWindowIcon takes its own copy. Failure just keeps the default icon.
     if (SDL_Surface* icon = SDL_CreateSurfaceFrom(
             kAppIconWidth, kAppIconHeight, SDL_PIXELFORMAT_RGBA32,
             const_cast<unsigned char*>(kAppIconRgba), kAppIconWidth * 4)) {

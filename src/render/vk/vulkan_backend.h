@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -16,7 +18,9 @@
 
 #include "render/backend.h"
 #include "render/vk/context.h"
+#include "render/model3/model3_frame.h"
 #include "render/vk/frame_capture.h"
+#include "render/vk/model3_pass.h"
 #include "render/vk/poly3d_pass.h"
 #include "render/vk/present_pass.h"
 #include "render/vk/tilemap_pass.h"
@@ -26,20 +30,8 @@
 
 namespace sm2::render::vk {
 
-/// The Vulkan implementation of render::Backend.
-///
-/// Everything here already existed in 0.7.0's main.cpp as a set of concrete
-/// objects (Context, TilemapPass, Poly3DPass, PresentPass, FrameCapture) that
-/// main.cpp called directly; this class owns the same five objects and wraps
-/// their existing call sequence behind render::Backend's interface. Nothing
-/// about how a frame is drawn changes -- see Backend's own doc comment for
-/// the exact sequence, which is unchanged from what main.cpp did itself.
-///
-/// It also owns the ImGui Vulkan renderer backend (the descriptor pool and
-/// `ImGui_ImplVulkan_*` calls), which used to live inside osd::Gui. Gui now
-/// owns only ImGui's context and its SDL3 platform backend; which GPU API
-/// draws the widgets it builds is exactly the kind of decision a render
-/// backend should own.
+/// The Vulkan implementation of render::Backend. Owns the context, the render
+/// passes, frame capture and ImGui's Vulkan renderer backend.
 class VulkanBackend final : public Backend {
 public:
     VulkanBackend()  = default;
@@ -61,6 +53,7 @@ public:
     [[nodiscard]] void*         texture_imgui_id(TextureHandle handle) const override;
 
     [[nodiscard]] bool begin_frame() override;
+    [[nodiscard]] bool device_lost() const override { return m_context.device_lost(); }
     void compute_tilemap(const hw::Model2MachineBase& machine,
                         const hw::Model2Video&       video) override;
     void upload_tilemap(std::span<const u32> below, std::span<const u32> above) override;
@@ -107,10 +100,42 @@ public:
         *height = extent.height;
     }
 
+    [[nodiscard]] bool supports_model3() const override { return true; }
+    void submit_model3_frame(const hw::model3::VideoFrame& frame) override;
+    void render_model3() override;
+    void set_model3_async(bool async) override { m_model3_async = async; }
+    void release_model3_frames(const hw::model3::VideoFrame& current) override { m_model3_frame.release(&current); }
+    void finish_model3() override { m_model3_frame.wait(); }
+    [[nodiscard]] model3::BuildTimes model3_build_times() const override
+    {
+        model3::BuildTimes times = m_model3_frame.build_times();
+        times.record             = m_model3.prepare_ms();
+        return times;
+    }
+    void reset_model3() override { m_model3_frame.reset(); }
+    void set_model3_texture_dumper(model3::TextureDumper* dumper) override { m_model3_frame.set_texture_dumper(dumper); }
+    [[nodiscard]] model3::LineOfSight model3_line_of_sight() const override
+    {
+        return m_model3.line_of_sight().latest();
+    }
+
 private:
     /// The shader texture-quality value for the current enhancement options,
     /// clamped to the device's anisotropy limit. 0 = faithful single-tap.
     [[nodiscard]] u32 effective_texture_quality() const;
+    [[nodiscard]] u32 model3_aniso_taps() const;
+    [[nodiscard]] bool ensure_model3();
+    [[nodiscard]] model3::SceneGeometry model3_geometry() const
+    {
+        return {m_render_scale, m_columns, m_model3_wide != 0, m_model3_wide == 1};
+    }
+
+    // Model 3, created on the first Model 3 frame.
+    model3::FrameBuilder m_model3_frame;
+    bool                 m_model3_async = false;
+    Model3Pass           m_model3;
+    u32                  m_model3_width = 0;
+    u32                  m_model3_wide  = 0;  // set_widescreen()'s wide_background
 
     Context      m_context;
     TilemapPass  m_tilemaps;
@@ -124,8 +149,7 @@ private:
 
     bool m_capture_requested = false;
 
-    /// Internal 3D render scale (1..kMaxRenderScale). Stored from the config;
-    /// at 1 every target is native size and nothing behaves differently.
+    /// Internal 3D render scale (1..kMaxRenderScale); 1 is native.
     u32 m_render_scale = 1;
 
     u32 m_columns         = 0;
@@ -146,10 +170,8 @@ private:
     bool             m_overlay_renderer_ready    = false;
 
     // -- overlay textures (game-picker box art) ------------------------------
-    // Neither ImGui's Vulkan backend nor this renderer has a deletion queue, so
     // destroy_texture() retires resources here and begin_frame() reclaims them
-    // once kFramesInFlight frames have passed -- a submitted frame may still
-    // sample a just-destroyed texture.
+    // after kFramesInFlight frames, as a submitted frame may still sample them.
     struct OverlayTexture {
         VkImage         image      = VK_NULL_HANDLE;
         VkImageView     view       = VK_NULL_HANDLE;

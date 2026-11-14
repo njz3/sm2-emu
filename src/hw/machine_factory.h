@@ -1,20 +1,22 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
 #pragma once
 
-#include "hw/model2_machine_base.h"
+#include "hw/machine.h"
 #include "rom/game.h"
 #include "rom/rom_set.h"
 
@@ -22,24 +24,9 @@
 
 namespace sm2::hw {
 
-/// Construct and initialise whichever machine variant `game.board` calls for.
-///
-/// Dispatches on `game.board` with an exhaustive switch over every rom::Board
-/// value: a missing case is a compile error (no `default:` label, so
-/// -Wswitch fires) rather than a silently-empty machine at runtime.
-///
-/// All four boards are implemented: Model2A constructs hw::Model2, Model2B
-/// hw::Model2B, Model2C hw::Model2C and Model2 hw::Model2Original. Each case
-/// calls the machine's init() with `roms` and returns it as the shared
-/// interface, or nullptr if that init() fails.
-///
-/// A board whose rom::board_implemented() is false -- there are none today --
-/// returns nullptr and logs a clear rejection, in the same style as
-/// RomLoader::load's own board rejection, without touching `roms` or
-/// allocating any device state, so a later wave's real implementation is never
-/// fighting stale partial construction left behind by an earlier failed
-/// attempt.
-[[nodiscard]] std::unique_ptr<Model2MachineBase> create_machine(const rom::GameSpec& game,
-                                                                 rom::RomSet roms);
+/// Construct and initialise the machine `game.board` calls for, or return
+/// nullptr if init() fails or the board is not implemented. The switch over
+/// rom::Board has no default, so a missing case fails to compile.
+[[nodiscard]] std::unique_ptr<Machine> create_machine(const rom::GameSpec& game, rom::RomSet roms);
 
 }  // namespace sm2::hw

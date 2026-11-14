@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -38,15 +40,9 @@ class Scraper;
 
 /// ImGui overlay drawn on top of the emulator's output.
 ///
-/// The GUI is an overlay that appears when the user presses F1 (or launches
-/// without a ROM). It provides access to settings that persist to sm2-emu.ini
-/// and a game browser for selecting ROMs.
-///
-/// This class owns ImGui's context and its SDL3 platform backend only. Which
-/// GPU API draws the widgets it builds is a render backend's concern, not
-/// this one's -- see render::Backend::draw_overlay(), which calls new_frame()
-/// and draw() here, then renders ImGui's resulting draw data through whatever
-/// renderer backend (Vulkan today) it owns.
+/// Shown on F1 or when launched without a ROM: settings that persist to
+/// keisho.ini and a game browser. Owns ImGui's context and SDL3 platform backend
+/// only; render::Backend::draw_overlay() renders the draw data.
 class Gui {
 public:
     Gui() = default;
@@ -68,10 +64,8 @@ public:
     /// render backend's own new-frame call for its ImGui renderer backend.
     void new_frame();
 
-    /// Draw the GUI windows: the always-on FPS counter, plus the F1 settings
-    /// overlay when visible. Always returns true, since the FPS counter draws
-    /// every frame regardless of `visible()` — the caller should always open a
-    /// rendering scope for the backend's draw_overlay().
+    /// Draw the always-on FPS counter, plus the settings overlay when visible.
+    /// Always returns true, so the caller always opens a draw_overlay() scope.
     [[nodiscard]] bool draw(Config& config,
                             const std::vector<std::string>& gpu_names,
                             float measured_hz,
@@ -112,6 +106,12 @@ public:
     /// Where the bezels and crosshairs folders sit when their settings are
     /// empty: beside the ini, or beside the one --write-dir copied it from.
     void set_content_dir(std::string dir) { m_content_dir = std::move(dir); }
+
+    /// What Save writes for the live settings (command-line values held back).
+    void set_save_filter(std::function<Config(const Config&)> filter)
+    {
+        m_save_filter = std::move(filter);
+    }
 
     /// The renderer names this build offers, for the Settings dropdown.
     void set_available_renderers(std::vector<std::string> names)
@@ -158,6 +158,14 @@ public:
         std::string title;  ///< the parent's title, shown in lists
         bool        gun     = false;
         bool        missile = false;
+        u32         inputs  = 0;  ///< rom::InputFlags of its sets
+        /// Which pad controls the family reads: its analogue controls on the
+        /// aim stick, pedals and right lever, and a gear shift.
+        bool        aim     = false;
+        bool        accel   = false;
+        bool        brake   = false;
+        bool        lever   = false;
+        bool        gears   = false;
     };
 
     void set_game_families(std::vector<GameFamily> families)
@@ -177,6 +185,7 @@ public:
     void set_current_family(std::string key) { m_current_family = std::move(key); }
 
     void set_current_game(std::string name) { m_current_game = std::move(name); }
+    void set_model3_running(bool running) { m_model3_running = running; }
 
     [[nodiscard]] render::PictureArea picture_area() const { return m_present_area; }
 
@@ -215,7 +224,7 @@ public:
 
     // -- on-screen notifications -------------------------------------------
 
-    /// Show a brief top-centered message for a couple of seconds while gameplay
+    /// Show a brief top-centred message for a couple of seconds while gameplay
     /// continues (e.g. "State saved"). Gated by config.show_notifications in
     /// draw(); calling this is harmless when they are off.
     /// Shown for `seconds`; `always` even with the notifications turned off.
@@ -284,12 +293,12 @@ public:
         bool metadata_loaded = false;
     };
 
-    /// Turn the picker on with the launchable games (sorted for display), the
-    /// backend (main-thread texture create/destroy) and the scraper (polled
-    /// each frame). A null scraper or empty list still lists/launches by title.
     /// The backend that uploads textures the settings tabs draw.
     void set_texture_backend(render::Backend* backend) { m_backend = backend; }
 
+    /// Turn the picker on with the launchable games (sorted for display), the
+    /// backend (main-thread texture create/destroy) and the scraper (polled
+    /// each frame). A null scraper or empty list still lists/launches by title.
     void enable_picker(std::vector<PickerEntry> entries, render::Backend* backend,
                        Scraper* scraper);
 
@@ -329,7 +338,7 @@ private:
     void draw_calibration_markers(const class Input* input);
     void draw_sinden_border(const Config& config);
 
-    enum class DirPickerTarget { None, RomDir, Model1RomDir, NvramDir, ScreenshotDir, BezelDir, CrosshairDir };
+    enum class DirPickerTarget { None, RomDir, Model1RomDir, Model3RomDir, NvramDir, ScreenshotDir, BezelDir, CrosshairDir };
 
     void open_dir_picker(DirPickerTarget target, const std::string& initial);
 
@@ -337,6 +346,7 @@ private:
     void refresh_dir_picker_entries();
 
     SDL_Window* m_window      = nullptr;
+    std::function<Config(const Config&)> m_save_filter;
     std::string m_config_path;  ///< where Save writes; empty -> default path.
     std::string m_common_config_path;  ///< the file for every game; empty -> m_config_path.
     std::function<bool(const std::string&, const Config&)> m_save;  ///< empty -> save_config.
@@ -353,9 +363,8 @@ private:
     u32         m_framebuffer_width  = 0;  ///< overlay target extent; 0 = use ImGui's own.
     u32         m_framebuffer_height = 0;
 
-    /// Whether the OS cursor is currently hidden for light-gun mode. Tracked so
-    /// Hide/Show is only called on a change: polling SDL_CursorVisible() every
-    /// frame races the compositor re-showing the cursor on motion, which flickers.
+    /// Whether the OS cursor is hidden for light-gun mode. Tracked so Hide/Show
+    /// is only called on a change; polling SDL_CursorVisible() flickers.
     bool        m_cursor_hidden = false;
     bool        m_mouse_grabbed = false;
 
@@ -426,7 +435,7 @@ private:
     std::vector<StateSlot>      m_state_slots;
     std::optional<StateRequest> m_pending_state_request;
 
-    // -- on-screen notification (transient top-centered toast) -------------
+    // -- on-screen notification (transient top-centred toast) -------------
     std::string m_notify_text;
     float       m_notify_seconds_left = 0.0f;  ///< counts down by DeltaTime
     bool        m_notify_always       = false;  ///< shown with the notifications off
@@ -478,6 +487,7 @@ private:
     Bezel       m_bezel;
     std::string m_bezel_lookup;
     std::string m_current_game;
+    bool        m_model3_running = false;
     void draw_bezel(const Config& config);
     void load_bezel(const std::string& path);
     void release_bezel();

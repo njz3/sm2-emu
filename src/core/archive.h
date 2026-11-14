@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -21,17 +23,12 @@
 #include <type_traits>
 #include <vector>
 
-// Binary save-state archive.
+// Binary save-state archive. One `serialize(Archive&)` per class both reads and
+// writes, so the two directions cannot drift out of sync. The direction is fixed
+// at construction.
 //
-// One `serialize(Archive&)` per class both reads and writes, so the two
-// directions cannot drift out of sync (the classic bug where a field is added
-// to save but forgotten in load). The archive's direction is fixed at
-// construction: Save appends host bytes to an output buffer, Load consumes them
-// from an input span.
-//
-// The file is host-endian and NOT portable across endianness; every target
-// this ships to is little-endian and a static_assert enforces it. See
-// .kiro/specs/model2-save-states/design.md §1.
+// The file is host-endian and not portable across endianness; every target is
+// little-endian and a static_assert enforces it.
 
 namespace sm2 {
 
@@ -72,17 +69,14 @@ public:
     /// stored length before its contents are read.
     void vector_pod(std::vector<u8>& v);
 
-    /// A length-prefixed std::deque<u32> (the copro FIFOs, the comm loopback
-    /// queue lengths). Stored as a u32 count followed by the elements.
+    /// A length-prefixed std::deque<u32>: a u32 count followed by the elements.
     void deque_u32(std::deque<u32>& d);
 
-    /// Set once on Load when a read runs past the end of the input. Sticky:
-    /// every subsequent read is a no-op yielding zeroes, so the top level can
-    /// check it once after the whole payload rather than per field.
+    /// Set on Load when a read runs past the end of the input. Sticky: later
+    /// reads yield zeroes, so it can be checked once after the whole payload.
     [[nodiscard]] bool failed() const { return m_failed; }
 
-    /// Marks a load as failed when a value is out of range, so the loader rolls
-    /// the state back.
+    /// Fails the load (e.g. on an out-of-range value) so the state is rolled back.
     void mark_failed() { m_failed = true; }
 
     /// The save-state format version of what is being read, so a serialize()
@@ -118,20 +112,18 @@ private:
 // A save-state file is a small header followed by the machine's serialize()
 // payload:
 //
-//   magic     8 bytes  "SM2STATE"
-//   version   u32      bumped on any serialize-layout change (req 4.2)
+//   magic     8 bytes  "KEISHOST" ("SM2STATE" in files from sm2-emu)
+//   version   u32      bumped on any serialize-layout change
 //   game_len  u32
 //   game      game_len bytes  (GameSpec::name)
-//   board     u32      (rom::Board, cast by the caller — the primitive stays
-//                       ignorant of the rom layer so sm2_core keeps no
-//                       dependency on sm2_rom)
+//   board     u32      (rom::Board, cast by the caller so sm2_core does not
+//                       depend on sm2_rom)
 //   payload   the machine's serialize() output
 //
-// Load reads and validates the header BEFORE the payload, so a wrong magic,
-// version, game or board is rejected without touching the running machine
-// (req 3.2 / 4.1).
+// The header is validated before the payload, so a wrong magic, version, game
+// or board is rejected without touching the running machine.
 //
-// Versions:
+// Versions (this fork's numbering; upstream's own 2 and 3 are not these):
 //   1  the first format
 //   2  the sound board records which SCSP core wrote its state (SCSP.md).
 //      Version 1 files still load: they can only come from the MAME-derived
@@ -144,11 +136,17 @@ private:
 //   5  Model 2B and 2C save the EPR-18261 drive board's answer on port D (its
 //      last command and the centre the game set). Versions 1 to 4 still load,
 //      that answer as it stands.
+//   6  the sound board saves its 68000 bus contention carry. Older versions
+//      load it as zero.
+//   7  the link boards save the frames still in flight (upstream's v0.9.60,
+//      its own format 3). Older versions load with none in flight.
 
 namespace state {
 
-inline constexpr char     kMagic[8]      = {'S', 'M', '2', 'S', 'T', 'A', 'T', 'E'};
-inline constexpr u32      kFormatVersion = 6;
+inline constexpr char     kMagic[8]      = {'K', 'E', 'I', 'S', 'H', 'O', 'S', 'T'};
+/// The magic of states saved by sm2-emu, still read.
+inline constexpr char     kLegacyMagic[8] = {'S', 'M', '2', 'S', 'T', 'A', 'T', 'E'};
+inline constexpr u32      kFormatVersion = 7;
 
 /// The oldest version read_header() accepts. Every serialize() that changed
 /// layout since has to keep reading this one (see Archive::format_version).
@@ -159,19 +157,15 @@ inline constexpr u32 kOldestReadableVersion = 1;
 struct Header {
     u32         version = kFormatVersion;  ///< Filled by read_header; write_header ignores it.
     std::string game;
-    u32         board = 0;
+    u32         board   = 0;
 };
 
-/// Write the header into `ar` (must be Save mode). Follows with the caller's
-/// payload writes.
+/// Write the header into `ar` (Save mode); the caller's payload follows.
 void write_header(Archive& ar, const Header& header);
 
 /// Read and validate a header from a raw file buffer. Returns true and fills
-/// `out` and `payload_offset` (the byte index where the payload begins) only
-/// when the magic and version match; otherwise logs a reason and returns false.
-/// Game/board matching against the running machine is the caller's job (it
-/// alone knows them) — this only guarantees the file is a well-formed state of
-/// the current format version.
+/// `out` and `payload_offset` only when the magic and version match; otherwise
+/// logs a reason. Matching game and board is the caller's job.
 [[nodiscard]] bool read_header(const u8* data, usize size, Header& out,
                                usize& payload_offset);
 

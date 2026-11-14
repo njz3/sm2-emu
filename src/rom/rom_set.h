@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -24,12 +26,8 @@
 
 namespace sm2::rom {
 
-/// Assembled ROM regions for one game.
-///
-/// Each region is a flat byte array in exactly the layout the hardware sees,
-/// so the memory map can point straight at it with no further shuffling. This
-/// is the loader's whole output; the machine takes ownership of it at startup
-/// and the loader is then discarded.
+/// Assembled ROM regions for one game, each a flat byte array in the layout
+/// the hardware sees.
 class RomSet {
 public:
     void add(std::string name, std::vector<u8> data);
@@ -49,9 +47,7 @@ public:
     [[nodiscard]] std::vector<std::string> region_names() const;
 
 private:
-    // Keyed by string because regions are named after MAME's tags, which keeps
-    // ported memory maps readable. There are fewer than a dozen per game and
-    // they are looked up once at startup, so the cost is irrelevant.
+    // Keyed by MAME's region tags, looked up once at startup.
     std::unordered_map<std::string, std::vector<u8>> m_regions;
 };
 

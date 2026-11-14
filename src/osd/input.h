@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -47,14 +49,9 @@ class WheelForce;
 
 /// The cabinet's controls, driven by gamepads and the keyboard.
 ///
-/// Model 2 inputs are levels, not events: what matters is whether a button is held
-/// at the moment the program polls the I/O controller, not when it changed. So this
-/// samples device state once per frame rather than accumulating key presses, and
-/// the sample has to happen before the frame runs.
-///
-/// Gamepads and the keyboard are merged rather than exchanged. Both are always
-/// live, so a second player can join on the keyboard, and the operator controls
-/// stay reachable without a pad. A control is pressed if any device presses it.
+/// Inputs are levels, not events, so device state is sampled once per frame,
+/// before the frame runs. Gamepads and the keyboard are always both live: a
+/// control is pressed if any device presses it.
 class Input {
 public:
     /// Cabinet player positions. Model 2A wires two.
@@ -80,15 +77,9 @@ public:
     static constexpr u8 kLeft    = 0x80;
 
     // -- axis conversion ---------------------------------------------------
-    // Separated out because none of it can be checked with a gamepad in hand: the
-    // interesting cases are the extremes and the rest position, which a person
-    // cannot hold precisely.
 
-    /// Direction bits an analogue stick at (x, y) presses.
-    ///
-    /// The stick stands in for an eight-way switch gate, so the threshold is
-    /// deliberately generous: a shallow lean must mean nothing at all, and a
-    /// diagonal must close both switches at once.
+    /// Direction bits an analogue stick at (x, y) presses, as an eight-way gate:
+    /// a shallow lean means nothing, and a diagonal closes both switches.
     [[nodiscard]] static u8 stick_bits(s16 x, s16 y);
 
     /// An axis that rests in the middle, such as a steering wheel, mapped onto the
@@ -168,9 +159,7 @@ public:
     };
 
     /// Start the gamepad subsystem and open whatever is already plugged in.
-    ///
-    /// Returns false only if the subsystem itself will not start. A machine with no
-    /// gamepad is not an error: the keyboard covers everything.
+    /// False only if the subsystem will not start; no gamepad is not an error.
     [[nodiscard]] bool init(const WheelSettings& wheel);
 
     /// The device path each player's pad must have; set before init().
@@ -187,11 +176,8 @@ public:
     void handle_event(const SDL_Event& event);
 
     /// Overwrite the digital and analogue fields of `inputs` from current device
-    /// state. Call once per frame, before running the frame.
-    ///
-    /// The game is needed in full, not just its input flags: which mux channel
-    /// each control sits on, its travel limits and its value at rest are all
-    /// per-title (`rom::GameSpec::analog`), as is the lightgun calibration.
+    /// state. Call once per frame, before running the frame. The analogue
+    /// channels and lightgun calibration come from the game (`rom::GameSpec::analog`).
     void poll(hw::Inputs* inputs, const rom::GameSpec& game) const;
 
     /// Digital-only overload, for callers with no game metadata. Leaves every
@@ -288,6 +274,18 @@ public:
 
     /// Saves or restores the drive board model, for save states.
     void serialize_drive_board(Archive& ar);
+
+    /// Forces from a board that computes them itself (Model 3). Constant is
+    /// -1..1, positive right; the rest 0..1. Set before update_force_feedback();
+    /// while active it replaces decoding the drive-board bytes.
+    struct BoardForce {
+        bool  active      = false;
+        float constant    = 0.0f;
+        float self_center = 0.0f;
+        float friction    = 0.0f;
+        float vibrate     = 0.0f;
+    };
+    void set_board_force(const BoardForce& force) { m_board_force = force; }
 
     /// Update the wheel's force from the drive board and the steering position.
     /// Call once per frame after update_drive_board(). Does nothing without a
@@ -396,6 +394,15 @@ public:
     static constexpr usize kPadRoles = Config::kPadRoleCount;
     static constexpr usize kPadAxes  = Config::kPadAxisCount;
 
+    /// The pad analogue role a game control reads, or PadAxisRole::kCount for
+    /// none. `one_player` as for sample_channel().
+    [[nodiscard]] static Config::PadAxisRole pad_axis_role(rom::AnalogControl control, bool one_player);
+
+    /// The layout a game plays with: its own if it has one, else the default
+    /// with that game's logical changes (`inputs` is its rom::InputFlags).
+    [[nodiscard]] static Config::PadLayout game_layout(const Config& config, const std::string& family,
+                                                       u32 inputs);
+
     /// The running game's gamepad layout, pushed from the config each frame.
     void set_pad_layout(const Config::PadLayout& layout);
 
@@ -444,15 +451,9 @@ public:
         u8 in1 = 0;  ///< Player 1.
     };
 
-    /// Play a fixed sequence: two coins, start, then confirm a character.
-    ///
-    /// Exists so a capture can reach the game itself without anyone at the
-    /// controls. Enough to get past the attract mode and the selection screens,
-    /// which is what a rendering check needs; it is not a replay system.
-    ///
-    /// `start1_bit` is the game's own IN0 bit for IPT_START1, since several
-    /// titles move it off MAME's default 0x10 (`rom::GameSpec::start1_bit`);
-    /// passing 0x10 reproduces the previous fixed behaviour.
+    /// Play a fixed sequence: two coins, start, then confirm a character, so an
+    /// unattended capture gets past attract mode and the selection screens.
+    /// `start1_bit` is the game's IN0 bit for IPT_START1 (`rom::GameSpec::start1_bit`).
     [[nodiscard]] static ScriptedPress scripted_press(u32 frame, u32 coin_frame,
                                                        u8 start1_bit = kStart1);
 
@@ -482,8 +483,7 @@ private:
 
     /// A steering wheel, opened through the joystick API because a wheel has no
     /// gamepad mapping and its steering axis wants the full 16 bits a gamepad
-    /// stick throws away. Drives player one. Force feedback, when the device and
-    /// the settings allow it, is a synthesised centring spring.
+    /// stick throws away. Drives player one.
     struct Wheel {
         SDL_Joystick*  handle  = nullptr;
         SDL_JoystickID id      = 0;
@@ -618,7 +618,9 @@ private:
 
     /// Sample one logical control and scale it into an analogue channel's own
     /// calibrated range, with the stick deadzone and curve shaping a stick axis.
-    [[nodiscard]] u8 sample_channel(const rom::AnalogChannel& channel, float curve) const;
+    /// `one_player` puts a second stick on player 1's right stick (the lever).
+    [[nodiscard]] u8 sample_channel(const rom::AnalogChannel& channel, float curve,
+                                    bool one_player = false) const;
 
     void gather_lightguns(hw::Inputs* inputs, const rom::GameSpec& game) const;
 
@@ -634,9 +636,7 @@ private:
     WheelSettings    m_wheel_settings;
 
     /// Sequential-shifter state for a wheel's paddles, seeded from the game's
-    /// start_gear and re-seeded when another game is loaded. Mutable because
-    /// poll() is const but must remember the gear between frames and fire once
-    /// per press, not once per frame held.
+    /// start_gear. Mutable because the const poll() must remember the gear.
     mutable u32         m_wheel_gear = 1;    ///< 0 = neutral, 1..4 = the gears.
     mutable std::string m_gear_game;         ///< game the gate was seeded for.
     mutable bool m_gear_up_held    = false;
@@ -685,10 +685,8 @@ private:
     mutable float                      m_gun_last_ptr_x  = -1.0f;
     mutable float                      m_gun_last_ptr_y  = -1.0f;
 
-    /// Per-device light guns, when built and present. Held by pointer so the
-    /// platform detail stays out of this header; null when no guns were
-    /// opened, in which case the single-mouse pointer path is used.
-    /// Mutable because poll() is const but must drain each gun's event queue.
+    /// Per-device light guns, when built and present; null means the single-mouse
+    /// path is used. Mutable because the const poll() drains their event queues.
 #ifdef SM2_HAVE_LIGHTGUNS
     mutable std::unique_ptr<LightGuns> m_guns;
 #endif
@@ -717,6 +715,7 @@ private:
     /// 0 is off, n chops the torque with a period of 2^(n+2) board ticks.
     DriveCommand                     m_drive_command;
     int                              m_drive_pulse = 0;
+    BoardForce                       m_board_force;
 
     /// Daytona's drive board, which works out its forces from the wheel: fed
     /// the game's bytes, it drives a force-feedback wheel.

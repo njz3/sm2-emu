@@ -6,17 +6,19 @@
 #extension GL_EXT_demote_to_helper_invocation : require
 #define DISCARD demote
 #endif
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// sm2-emu — A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -57,9 +59,8 @@ layout(location = 1) in flat uint vPolygon;
 
 layout(location = 0) out vec4 fragColour;
 
-// Shares polygon.vert's Push block (this stage reads only renderScale). GL/GLES
-// have no push constant, so the GL compile takes a uniform block at binding 4
-// while the Vulkan compile keeps the push constant.
+// Shares polygon.vert's Push block. GL has no push constants, so it takes a
+// uniform block at binding 4 instead.
 #ifdef SM2_TARGET_GL
 layout(binding = 4) uniform Push {
 #else
@@ -97,25 +98,44 @@ struct PolyParams {
     uint tint;         ///< 10 bits per channel, 1/512 units
 };
 
-/// Both texture sheets, decoded ahead of time by texel_decode.comp from the
-/// hardware's packed 4-bit form into one pixel per 2x2 texel container: R is the
-/// texel at even y, even x; G at even y, odd x; B at odd y, even x; A at odd y,
-/// odd x. One array layer per sheet. Decoding on the host would defeat the point
-/// -- the mipmap fold below depends on the polygon being drawn, not just the
-/// physical address -- so what moved to the decode pass is only the word/byte/
-/// nibble split, which does not. Sampled with texelFetch, never filtered: this
-/// shader's own bilinear blend below is what combines a container's neighbours,
-/// and a hardware filter would double it.
+/// Both texture sheets, one array layer each, unpacked by texel_decode.comp into
+/// one pixel per 2x2 texel block: R is (even y, even x), G (even y, odd x),
+/// B (odd y, even x), A (odd y, odd x). Only the nibble split is done there, since
+/// the mipmap fold depends on the polygon. Read with texelFetch, never filtered:
+/// this shader does its own bilinear blend.
 layout(set = 0, binding = 0) uniform usampler2DArray uSheets;
 
 /// Luminance RAM, thirty-two kilobytes of tone curves, four bytes to a word.
+#ifdef SM2_GL41
+// GL 4.1 has no storage buffers: the three buffers are buffer textures there.
+layout(binding = 6) uniform usamplerBuffer uLumaBuffer;
+#define LUMA_WORD(i) texelFetch(uLumaBuffer, int(i)).r
+#else
 layout(std430, set = 0, binding = 1) readonly buffer Luma { uint uLuma[]; };
+#define LUMA_WORD(i) uLuma[i]
+#endif
 
 /// The colour translation table and the gamma ramp, flattened by the host: shade
 /// across, colour component down, one channel per component of the texel.
 layout(set = 0, binding = 2) uniform sampler2D uTone;
 
+#ifdef SM2_GL41
+layout(binding = 7) uniform usamplerBuffer uPolygonBuffer;
+
+PolyParams loadPolygon(uint i)
+{
+    uvec4 a = texelFetch(uPolygonBuffer, int(i) * 4);
+    uvec4 b = texelFetch(uPolygonBuffer, int(i) * 4 + 1);
+    uvec4 c = texelFetch(uPolygonBuffer, int(i) * 4 + 2);
+    uvec4 d = texelFetch(uPolygonBuffer, int(i) * 4 + 3);
+    return PolyParams(a.x, a.y, a.z, int(a.w), b.x, b.y, b.z, b.w,
+                      c.x, c.y, c.z, c.w, d.x, d.y, d.z, d.w);
+}
+#define POLYGON(i) loadPolygon(i)
+#else
 layout(std430, set = 0, binding = 3) readonly buffer Polys { PolyParams uPolygon[]; };
+#define POLYGON(i) uPolygon[i]
+#endif
 
 /// One polygon's screen-space vertex ring; see PolyGeom in render/geometry.h.
 struct PolyGeom {
@@ -128,7 +148,36 @@ struct PolyGeom {
     uint  pad[3];
 };
 
+#ifdef SM2_GL41
+layout(binding = 8) uniform usamplerBuffer uGeomBuffer;
+
+PolyGeom loadGeom(uint i)
+{
+    uint w[44];
+    for (int k = 0; k < 11; ++k) {
+        uvec4 t = texelFetch(uGeomBuffer, int(i) * 11 + k);
+        w[k * 4] = t.x;
+        w[k * 4 + 1] = t.y;
+        w[k * 4 + 2] = t.z;
+        w[k * 4 + 3] = t.w;
+    }
+    PolyGeom g;
+    for (int k = 0; k < 8; ++k) {
+        g.x[k]        = uintBitsToFloat(w[k]);
+        g.y[k]        = uintBitsToFloat(w[8 + k]);
+        g.oneOverZ[k] = uintBitsToFloat(w[16 + k]);
+        g.uOverZ[k]   = uintBitsToFloat(w[24 + k]);
+        g.vOverZ[k]   = uintBitsToFloat(w[32 + k]);
+    }
+    g.numVertices = w[40];
+    g.pad = uint[3](0u, 0u, 0u);
+    return g;
+}
+#define GEOM(i) geom
+#else
 layout(std430, set = 0, binding = 5) readonly buffer Geom { PolyGeom uGeom[]; };
+#define GEOM(i) uGeom[i]
+#endif
 
 /// Custom textures, packed into square layers with a wrapped gutter round each
 /// (render/texture_replace.cpp). Filtered and mipmapped like any modern texture.
@@ -162,11 +211,7 @@ const uint kFlagDirect      = 1u << 14;
 /// the stored one, which is how the hardware behaves and what makes a mipmap
 /// level's odd base position work out.
 ///
-/// `sheet` is the array layer, 0 or 1, replacing the packed buffer's byte offset
-/// of a sheet's own base; the decode pass has already turned that into the array
-/// dimension. What is left here is exactly the fold and the four-way channel pick
-/// texel_decode.comp's own header describes, now against a decoded pixel instead
-/// of a raw word.
+/// `sheet` is the array layer, 0 or 1.
 uint fetchTexel(uint sheet, uint baseX, uint baseY, uint x, uint y)
 {
     uint x2 = baseX + x;
@@ -178,8 +223,6 @@ uint fetchTexel(uint sheet, uint baseX, uint baseY, uint x, uint y)
 
     const uvec4 nibbles = texelFetch(uSheets, ivec3(int(x2 >> 1), int(y2 >> 1), int(sheet)), 0);
 
-    // R/G/B/A hold (even y, even x) / (even y, odd x) / (odd y, even x) /
-    // (odd y, odd x), matching texel_decode.comp's layout exactly.
     const uint row    = ((y2 & 1u) == 0u) ? nibbles.x : nibbles.z;  // even-x column
     const uint rowOdd = ((y2 & 1u) == 0u) ? nibbles.y : nibbles.w;  // odd-x column
     return ((x2 & 1u) == 0u) ? row : rowOdd;
@@ -335,9 +378,8 @@ ivec2 filterLevel(PolyParams p, int level, int u, int v, bool translucent)
 /// mantissa bits. MAME takes it from its 3dfx Voodoo renderer; reproducing the
 /// table rather than calling log2 keeps the mipmap level and the blend between
 /// levels identical at every boundary.
-// Module-scope so the compiler materialises it once, not once per fragment:
-// some GLSL compilers (the V3D tiler among them) rebuild a function-local const
-// array on every invocation. Same table, none of the per-pixel cost.
+// Module-scope because some GLSL compilers rebuild a function-local const array
+// on every invocation.
 const uint kLog2Table[128] = uint[128](
       0u,   2u,   5u,   8u,  11u,  14u,  16u,  19u,  22u,  25u,  27u,  30u,
      33u,  35u,  38u,  40u,  43u,  46u,  48u,  51u,  53u,  56u,  58u,  61u,
@@ -364,7 +406,7 @@ int fastLog2(float value)
 /// One byte of luminance RAM.
 uint fetchLuma(uint index)
 {
-    const uint word = uLuma[index >> 2];
+    const uint word = LUMA_WORD(index >> 2);
     return (word >> ((index & 3u) * 8u)) & 0xffu;
 }
 
@@ -434,7 +476,10 @@ vec3 sampleReplacement(PolyParams p, vec2 texelUV, vec2 texelDx, vec2 texelDy)
 /// rightmost crossing, interpolate across in x. Returns vec3(u/z, v/z, 1/z).
 vec3 polygonInterpolate(uint idx, float fx, float fy)
 {
-    const uint n = uGeom[idx].numVertices;
+#ifdef SM2_GL41
+    PolyGeom geom = loadGeom(idx);
+#endif
+    const uint n = GEOM(idx).numVertices;
 
     float leftX  =  1.0e30;
     float rightX = -1.0e30;
@@ -444,8 +489,8 @@ vec3 polygonInterpolate(uint idx, float fx, float fy)
 
     for (uint i = 0u; i < n; ++i) {
         const uint  j  = (i + 1u == n) ? 0u : i + 1u;
-        const float y1 = uGeom[idx].y[i];
-        const float y2 = uGeom[idx].y[j];
+        const float y1 = GEOM(idx).y[i];
+        const float y2 = GEOM(idx).y[j];
         if (y1 == y2) {
             continue;
         }
@@ -457,17 +502,17 @@ vec3 polygonInterpolate(uint idx, float fx, float fy)
             continue;
         }
         const float t   = clamp((fy - y1) / (y2 - y1), 0.0, 1.0);
-        const float x   = mix(uGeom[idx].x[i], uGeom[idx].x[j], t);
-        const vec3  ppp = vec3(mix(uGeom[idx].uOverZ[i],   uGeom[idx].uOverZ[j],   t),
-                               mix(uGeom[idx].vOverZ[i],   uGeom[idx].vOverZ[j],   t),
-                               mix(uGeom[idx].oneOverZ[i], uGeom[idx].oneOverZ[j], t));
+        const float x   = mix(GEOM(idx).x[i], GEOM(idx).x[j], t);
+        const vec3  ppp = vec3(mix(GEOM(idx).uOverZ[i],   GEOM(idx).uOverZ[j],   t),
+                               mix(GEOM(idx).vOverZ[i],   GEOM(idx).vOverZ[j],   t),
+                               mix(GEOM(idx).oneOverZ[i], GEOM(idx).oneOverZ[j], t));
         any = true;
         if (x < leftX)  { leftX  = x; leftP  = ppp; }
         if (x > rightX) { rightX = x; rightP = ppp; }
     }
 
     if (!any) {
-        return vec3(uGeom[idx].uOverZ[0], uGeom[idx].vOverZ[0], uGeom[idx].oneOverZ[0]);
+        return vec3(GEOM(idx).uOverZ[0], GEOM(idx).vOverZ[0], GEOM(idx).oneOverZ[0]);
     }
 
     const float span = rightX - leftX;
@@ -477,28 +522,23 @@ vec3 polygonInterpolate(uint idx, float fx, float fy)
 
 void main()
 {
-    const PolyParams p = uPolygon[vPolygon];
+    const PolyParams p = POLYGON(vPolygon);
 
-    // Texture coordinate from the edge walk, not the rasteriser's per-fan-
-    // triangle interpolation of vTexel, which warps textured quads. The vertex
-    // stage applies no Y flip on either target, so gl_FragCoord is already in
-    // the ring's space (bottom-origin on GL, top on Vulkan, but so is the
-    // geometry); only the render scale is divided back out to reach native.
+    // Texture coordinate from the edge walk, not the rasteriser's per-triangle
+    // interpolation of vTexel, which warps textured quads. gl_FragCoord is already
+    // in the ring's space on both targets; only the render scale is divided out.
     const vec2  nativeCoord = gl_FragCoord.xy / float(pc.renderScale);
     const vec3  interp      = polygonInterpolate(vPolygon, nativeCoord.x, nativeCoord.y);
     const float invZ        = interp.z;
     const float zRecon      = 1.0 / invZ;
-    // Raw u,v in eighths, as vTexel used to carry.
+    // Raw u,v in eighths.
     const vec2  texelUV     = vec2(interp.x, interp.y) * zRecon;
 
     const vec2 texelDx = dFdx(texelUV);
     const vec2 texelDy = dFdy(texelUV);
 
-    // Translucency by stipple: a screen-locked checkerboard on the native raster
-    // grid. When the 3D is rasterised at N*native, gl_FragCoord runs at the
-    // scaled resolution, so it is divided back to native pixels first; otherwise
-    // the checkerboard would come out N times finer than the hardware's. At N=1
-    // this is gl_FragCoord unchanged.
+    // Translucency by stipple: a checkerboard locked to the native pixel grid,
+    // so it does not get finer at higher render scales.
     const ivec2 nativePix = ivec2(gl_FragCoord.xy) / int(pc.renderScale);
     if ((p.flags & kFlagChecker) != 0u
         && ((nativePix.x ^ nativePix.y) & 1) == 0) {
@@ -551,21 +591,16 @@ void main()
 
         ivec2 texel = sampleMipChain(p, u, v, mml, level, maxLevel, translucent);
 
-        // Opt-in anisotropic filtering: sample the same mip chain at a few extra
-        // points spread along the direction the texture is most stretched in
-        // screen space, and average. Faithful (textureQuality == 0) keeps the
-        // single tap above exactly, so it is bit-exact. Only the sample
-        // positions change; LOD selection and the stipple are untouched.
+        // Opt-in anisotropic filtering: average extra taps of the same mip chain
+        // along the axis of greatest screen-space stretch. Quality 0 keeps the
+        // single tap above, bit-exact; LOD selection is unchanged.
         if (pc.textureQuality > 1u) {
-            // The longer screen-space gradient axis is the direction of maximum
-            // stretch; step the extra taps along it.
             const vec2 du = texelDx * 32.0;
             const vec2 dv = texelDy * 32.0;
             const float lenx = dot(du, du);
             const float leny = dot(dv, dv);
             const vec2  major = (lenx > leny) ? du : dv;
 
-            // Tap count from the stretch ratio, capped by the requested quality.
             const float ratio = sqrt(max(lenx, leny) / max(min(lenx, leny), 1.0));
             const int   taps  = clamp(int(ratio), 2, int(pc.textureQuality));
             if (taps > 1) {

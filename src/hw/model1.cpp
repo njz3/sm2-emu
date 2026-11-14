@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -60,10 +62,9 @@ constexpr u64 kTgpDenominator = 6;
 
 constexpr s32 kTgpSyncLimit = 8192;
 
-/// Wait states on a dual-port RAM read. Wing War's boot handshake times out
-/// unless the I/O board finishes reading its EEPROM first, which takes it about
-/// 2.2 s; at MAME's single wait state the V60's timeout loop is a few percent
-/// too short. Four is an estimate, not a measurement.
+/// Wait states on a dual-port RAM read. Deviation: MAME uses one, which makes
+/// the V60's boot timeout in Wing War expire before the I/O board has read its
+/// EEPROM. Four is an estimate.
 constexpr s32 kDualPortWaitCycles = 4;
 
 [[nodiscard]] inline std::span<const u32> as_words(std::span<const u8> bytes)
@@ -212,8 +213,8 @@ bool Model1::init(const rom::GameSpec& game, rom::RomSet roms)
     if (m_roms.has("dsbz80:mpegcpu")) {
         m_m1audio.attach_dsb(m_roms.region("dsbz80:mpegcpu"), m_roms.region("dsbz80:mpeg"));
     }
-    // Per-set level in 1/256 units: the loudest in-game peak measured stays under
-    // about -0.8 dBFS, and Wing War sits at Virtua Racing's loudness.
+    // Per-set level in 1/256 units, keeping peaks just under full scale and
+    // Wing War level with Virtua Racing.
     static const std::unordered_map<std::string, u16> kSoundGain = {
         {"vr", 162}, {"vf", 129}, {"swa", 165}, {"wingwar", 398},
     };

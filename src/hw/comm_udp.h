@@ -1,22 +1,23 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
-// A CommTransport carrying link-board frames over a LAN by UDP. The board is a
-// ring: receive from the previous cabinet, send to the next. A frame maps
-// one-to-one onto a datagram; the ring protocol re-sends state every frame and
-// tolerates a lost datagram, so UDP fits and avoids a TCP ring's head-of-line
-// stall when a cabinet boots late. Driven from vblank(), so it never blocks.
+// A CommTransport carrying link-board frames over UDP, one frame per datagram:
+// receive from the previous cabinet in the ring, send to the next. The ring
+// protocol re-sends state every frame and tolerates loss, so UDP avoids TCP's
+// head-of-line stall when a cabinet boots late. Never blocks.
 #pragma once
 
 #include "core/net.h"
@@ -42,7 +43,7 @@ public:
     /// local_ip listens on every interface; empty next_ip means no forwarding
     /// (tail of a chain). On failure ok() is false and the transport is inert.
     UdpTransport(const std::string& local_ip, u16 local_port,
-                 std::string next_ip, u16 next_port);
+                 std::string next_ip, u16 next_port, std::size_t backlog = kBacklog);
 
     [[nodiscard]] bool               ok() const { return m_socket.valid(); }
     [[nodiscard]] const std::string& error() const { return m_socket.last_error(); }
@@ -60,6 +61,7 @@ private:
     u16            m_next_port = 0;
 
     std::deque<std::vector<u8>> m_rx;
+    std::size_t                 m_backlog = kBacklog;
     bool                        m_send_failed = false;
 };
 

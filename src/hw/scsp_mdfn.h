@@ -15,7 +15,7 @@
 // The second SCSP core, scsp_core = mednafen (see SCSP.md). It follows the
 // chip as Mednafen's hardware tests describe it: interrupts encoded from
 // SCILV, free-running timers aligned to the sample counter, 4-byte MIDI FIFOs
-// with their flags, DMA that leaves its registers alone. Written for sm2-emu;
+// with their flags, DMA that leaves its registers alone. Written for Keisho;
 // Mednafen served as a description of the hardware, not as code to translate.
 //
 // Where the port stands (SCSP.md, step 9): the control side -- register file,

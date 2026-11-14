@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -23,8 +25,8 @@
 namespace sm2::hw {
 
 UdpTransport::UdpTransport(const std::string& local_ip, u16 local_port,
-                           std::string next_ip, u16 next_port)
-    : m_next_ip(std::move(next_ip)), m_next_port(next_port)
+                           std::string next_ip, u16 next_port, std::size_t backlog)
+    : m_next_ip(std::move(next_ip)), m_next_port(next_port), m_backlog(backlog)
 {
     if (!m_socket.open(local_ip, local_port)) {
         SM2_WARN("m2comm: link socket failed: %s", m_socket.last_error().c_str());
@@ -50,7 +52,7 @@ void UdpTransport::drain()
     if (!m_socket.valid()) return;
     std::vector<u8> datagram;
     while (m_socket.recv_from(datagram)) {
-        if (m_rx.size() >= kBacklog) {
+        if (m_rx.size() >= m_backlog) {
             m_rx.pop_front();  // drop the stalest; a late frame is worthless
         }
         m_rx.push_back(std::move(datagram));

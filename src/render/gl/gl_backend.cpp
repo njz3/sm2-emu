@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -49,14 +51,12 @@ bool GlBackend::init(osd::Window& window, const BackendConfig& config)
         return false;
     }
 
-    // Set the version directive for all subsequent shader compilations.
-    set_version_directive(m_context.is_es() ? kEsVersionDirective
-                                            : kDesktopVersionDirective);
+    set_version_directive(m_context.is_es()         ? kEsVersionDirective
+                          : m_context.has_compute() ? kDesktopVersionDirective
+                                                    : kGl41VersionDirective);
 
-    // Clamp to what the driver can allocate. The composite target is a texture
-    // (GL_MAX_TEXTURE_SIZE) and its fill mask a renderbuffer
-    // (GL_MAX_RENDERBUFFER_SIZE); N*496 or N*384 beyond either would fail
-    // allocation, so bound N by the smaller of the two.
+    // The composite target is a texture and its fill mask a renderbuffer, so
+    // bound N by the smaller of the two size limits.
     s32 max_texture      = 0;
     s32 max_renderbuffer = 0;
     GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture);
@@ -81,10 +81,8 @@ bool GlBackend::init(osd::Window& window, const BackendConfig& config)
                  scaled_height(m_render_scale));
     }
 
-    // Anisotropy ceiling for the opt-in enhanced 3D texture filter, gated on the
-    // filter-anisotropic extension. GL_MAX_TEXTURE_MAX_ANISOTROPY (0x84FF) is a
-    // float limit; reading it as an integer truncates, which is fine for a tap
-    // ceiling. 1.0 (the default) means "unavailable" to the capability check.
+    // GL_MAX_TEXTURE_MAX_ANISOTROPY (0x84FF) is a float; truncating it is fine
+    // for a tap ceiling. 1.0 means unavailable.
     constexpr GLenum kMaxTextureMaxAnisotropy = 0x84FF;
     if (has_gl_extension("GL_ARB_texture_filter_anisotropic")
         || has_gl_extension("GL_EXT_texture_filter_anisotropic")) {
@@ -113,6 +111,7 @@ bool GlBackend::init(osd::Window& window, const BackendConfig& config)
 
 void GlBackend::set_widescreen(u32 columns, u32 wide_background)
 {
+    m_model3_wide = wide_background;
     m_tilemaps.set_wide_below(wide_background);
     if (columns == m_columns) {
         return;
@@ -133,6 +132,8 @@ void GlBackend::set_widescreen(u32 columns, u32 wide_background)
 
 void GlBackend::shutdown()
 {
+    m_model3.shutdown();
+    m_model3_width = 0;
     m_present.shutdown();
     m_polygons.shutdown();
     m_tilemaps.shutdown();
@@ -143,8 +144,8 @@ void GlBackend::shutdown()
 Capabilities GlBackend::capabilities() const
 {
     Capabilities caps;
-    caps.compute_shaders = true;
-    // No GPU timer queries wired up yet (GL_TIME_ELAPSED could be added later).
+    caps.compute_shaders = m_context.has_compute();
+    // No GPU timer queries on GL.
     caps.gpu_timing = false;
     caps.anisotropy      = m_max_anisotropy > 1.0F;
     caps.max_anisotropy  = m_max_anisotropy;
@@ -218,19 +219,15 @@ void GlBackend::submit_polygons(const hw::Model2MachineBase* machine,
 
 void GlBackend::render_polygons()
 {
-    // The 3D now draws inside the native framebuffer via composite_native_frame(),
-    // between the tilemap layers. Nothing to do here: GL clears the depth buffer
-    // inline in draw_polygons(), with no separate transition to record.
+    // The 3D draws in composite_native_frame(), between the tilemap layers.
 }
 
 void GlBackend::composite_native_frame(u32 background_rgba, bool skip_3d)
 {
     m_present.begin_frame();
     m_tilemaps.draw_below(background_rgba);
-    // Render test mode cuts the DSP out: the framebuffer bank the host has
-    // been drawing into is shown instead of the 3D pass, and has already
-    // been composed into the layers below by the caller -- matching
-    // VulkanBackend::composite_native_frame()'s own skip_3d handling.
+    // Render test mode shows the host's framebuffer bank instead of the 3D
+    // pass; the caller has already composed it into the layers below.
     if (!skip_3d) {
         m_polygons.draw_polygons();
     }
@@ -274,6 +271,8 @@ void GlBackend::set_present_options(const PresentOptions& options)
 void GlBackend::set_texture_replacements(TextureReplacements* replacements)
 {
     m_polygons.set_texture_replacements(replacements);
+    m_model3.set_texture_replacements(replacements);
+    m_model3_frame.set_texture_replacements(replacements);
 }
 
 void GlBackend::set_enhancement_options(const EnhancementOptions& options)
@@ -282,6 +281,15 @@ void GlBackend::set_enhancement_options(const EnhancementOptions& options)
     m_polygons.set_texture_quality(effective_texture_quality());
     m_polygons.set_blend_translucency(options.translucency == Translucency::Blended);
     m_tilemaps.set_upscale_2d(static_cast<u32>(options.upscale_2d));
+    m_model3.set_aniso_taps(model3_aniso_taps());
+}
+
+u32 GlBackend::model3_aniso_taps() const
+{
+    // The Model 3 shader takes its own taps, so the sampler limit does not apply.
+    return m_enhancement_options.texture_filter == TextureFilter::Anisotropic
+               ? std::clamp(m_enhancement_options.anisotropy, 1u, 16u)
+               : 1u;
 }
 
 u32 GlBackend::effective_texture_quality() const
@@ -324,14 +332,8 @@ bool GlBackend::end_frame()
 
 void GlBackend::wait_idle()
 {
-    // GL has no explicit device-idle wait; Finish() (glFinish) is the
-    // closest equivalent and is only ever needed before a capture is saved
-    // or before destroying a resource a submitted draw might still
-    // reference -- both of which, on this backend, already happen
-    // synchronously (no frames-in-flight ring exists to race against, see
-    // gl_context.h's own note on why). Called anyway for parity with the
-    // Vulkan path's call sites, which is cheap insurance against a future
-    // change here introducing asynchrony this comment did not anticipate.
+    // This backend is synchronous, so glFinish is only for parity with Vulkan.
+    m_model3_frame.release();
     Finish();
 }
 
@@ -341,7 +343,9 @@ void GlBackend::wait_idle()
 
 bool GlBackend::init_overlay(osd::Gui& /*gui*/)
 {
-    const char* imgui_version = m_context.is_es() ? "#version 300 es" : "#version 430 core";
+    const char* imgui_version = m_context.is_es()         ? "#version 300 es"
+                              : m_context.has_compute() ? "#version 430 core"
+                                                        : "#version 410 core";
     if (!ImGui_ImplOpenGL3_Init(imgui_version)) {
         SM2_ERROR("gl: ImGui_ImplOpenGL3_Init failed");
         return false;
@@ -357,6 +361,47 @@ void GlBackend::shutdown_overlay()
     }
     ImGui_ImplOpenGL3_Shutdown();
     m_overlay_ready = false;
+}
+
+// ---------------------------------------------------------------------------
+// Sega Model 3
+// ---------------------------------------------------------------------------
+
+bool GlBackend::ensure_model3()
+{
+    const u32 width = frame_width(m_columns);
+    if (!m_model3.ready() || m_model3_width != width) {
+        if (!m_model3.init(m_render_scale, width)) {
+            return false;
+        }
+        m_model3_width = width;
+    }
+    m_model3_frame.match_geometry(model3_geometry(), false);
+    m_model3.set_smooth_2d(m_enhancement_options.upscale_2d != Upscale2D::Faithful);
+    m_model3.set_aniso_taps(model3_aniso_taps());
+    return true;
+}
+
+void GlBackend::submit_model3_frame(const hw::model3::VideoFrame& frame)
+{
+    m_model3_frame.wait();
+    m_model3_frame.set_geometry(model3_geometry());
+    // DEPTH32F_STENCIL8 is a float depth buffer: no depth remap needed.
+    if (m_model3_async) {
+        m_model3_frame.submit_async(frame, false);
+    } else {
+        m_model3_frame.submit(frame, false);
+    }
+}
+
+void GlBackend::render_model3()
+{
+    if (!ensure_model3()) {
+        return;
+    }
+    m_present.begin_frame();
+    m_model3.render(m_model3_frame, m_present.fbo());
+    m_present.begin_frame();
 }
 
 }  // namespace sm2::render::gl

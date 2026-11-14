@@ -6,7 +6,7 @@
 //
 // The arithmetic below is deliberately MAME's, in MAME's order, including the
 // parts that look like rounding accidents: the point of this file is that any
-// difference from MAME is a difference in sm2-emu, not in the port.
+// difference from MAME is a difference in Keisho, not in the port.
 
 #include "hw/model2_softrender.h"
 
@@ -543,11 +543,9 @@ void SoftRenderer::render_triangle(const Rect& cliprect, const PolyVertex& in1,
 void SoftRenderer::render_convex(const Rect& cliprect, const PolyVertex* v, u32 count,
                                  u32 renderer, const SoftPolyExtra& extra, u32& pixels)
 {
-    // poly.h's render_polygon: two edge walks from the topmost vertex, one each
-    // way round, then per-scanline interpolation along whichever pair of edges the
-    // scanline crosses. Not a fan of triangles: the parameter interpolation is
-    // linear along the edges, which is what the hardware does and what gives the
-    // characteristic warp on a large quad.
+    // poly.h's render_polygon: two edge walks from the topmost vertex, then
+    // per-scanline interpolation between the edges crossed. Not a triangle fan:
+    // interpolating linearly along the edges gives the hardware's warp on a large quad.
     u32 minv = 0;
     u32 maxv = 0;
     for (u32 index = 1; index < count; ++index) {

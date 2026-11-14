@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -25,9 +27,8 @@
 namespace sm2::render::gl {
 namespace {
 
-/// GLES's mandatory minimums for these can be lower than the version number
-/// implies, so they are checked explicitly rather than assumed from the 3.1
-/// floor check alone.
+/// GLES's mandatory minimums for these can be lower than needed, so they are
+/// checked explicitly.
 struct GlesLimit {
     GLenum      query;
     s32         required;
@@ -71,8 +72,7 @@ bool Context::init(osd::Window& window, const ContextConfig& config)
     m_window = window.handle();
     m_is_es  = config.es_mode;
 
-    // Attributes must be set before context creation; SDL applies them to
-    // the context SDL_GL_CreateContext produces next, not retroactively.
+    // Attributes apply to the next context created, so set them first.
     if (config.es_mode) {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -83,15 +83,20 @@ bool Context::init(osd::Window& window, const ContextConfig& config)
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
     }
     // The default framebuffer needs neither depth nor stencil: the 3D pass's
-    // fill mask is a stencil renderbuffer on the composite FBO (PresentPass),
-    // and the only draw to the window is the final letterbox blit, a plain
-    // textured copy. Model 2's hardware has no depth buffer either -- see
-    // backend.h on why draw order, not depth, decides pixel ownership.
+    // stencil lives on the composite FBO, and the window only receives the
+    // final letterbox blit.
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
     m_context = SDL_GL_CreateContext(m_window);
+    if (m_context == nullptr && !config.es_mode) {
+        // macOS stops at 4.1 core: no compute, which the GPU tilemap and
+        // texture decode fall back from.
+        SM2_INFO("gl: no 4.3 core context (%s); trying 4.1 core", SDL_GetError());
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+        m_context = SDL_GL_CreateContext(m_window);
+    }
     if (m_context == nullptr) {
         SM2_ERROR("SDL_GL_CreateContext failed: %s", SDL_GetError());
         return false;
@@ -103,9 +108,7 @@ bool Context::init(osd::Window& window, const ContextConfig& config)
         return false;
     }
 
-    // Function pointers can only be resolved once a context is current --
-    // see load_gl_functions()'s own documentation of why this ordering
-    // matters, not just as a general precaution.
+    // Function pointers can only be resolved once a context is current.
     std::string load_error;
     if (!load_gl_functions(SDL_GL_GetProcAddress, &load_error)) {
         SM2_ERROR("gl: %s", load_error.c_str());
@@ -115,9 +118,7 @@ bool Context::init(osd::Window& window, const ContextConfig& config)
     }
     resolve_buffer_storage(SDL_GL_GetProcAddress, config.es_mode);
 
-    // The version actually granted, not the version requested: a driver can
-    // silently hand back a higher (never lower) context than asked for, and
-    // this is what this backend's declared floor actually depends on having.
+    // Check the version granted, which can be higher than the one requested.
     s32 major = 0;
     s32 minor = 0;
     GetIntegerv(GL_MAJOR_VERSION, &major);
@@ -149,22 +150,37 @@ bool Context::init(osd::Window& window, const ContextConfig& config)
         GetIntegerv(GL_CONTEXT_PROFILE_MASK, &profile_mask);
 
         const bool is_core = (profile_mask & GL_CONTEXT_CORE_PROFILE_BIT) != 0;
-        const bool meets_floor = (major > 4) || (major == 4 && minor >= 3);
+        const bool meets_floor = (major > 4) || (major == 4 && minor >= 1);
         if (!meets_floor || !is_core) {
-            SM2_ERROR("gl: context is %d.%d %s, but this backend requires 4.3 core "
-                      "or newer (compute shaders and storage buffers are not "
-                      "available below that line)",
+            SM2_ERROR("gl: context is %d.%d %s, but this backend requires 4.1 core "
+                      "or newer",
                       major, minor, is_core ? "core" : "not core");
             SDL_GL_DestroyContext(m_context);
             m_context = nullptr;
             return false;
         }
+        m_has_compute = (major > 4) || (major == 4 && minor >= 3);
         m_has_buffer_storage = has_gl_extension("GL_ARB_buffer_storage");
         m_device_name = "OpenGL " + std::to_string(major) + "." + std::to_string(minor)
                       + " core";
 
         SM2_INFO("gl: context %d.%d core, GL_ARB_buffer_storage %s", major, minor,
                  m_has_buffer_storage ? "present" : "absent (falling back to BufferSubData)");
+        if (!m_has_compute) {
+            SM2_INFO("gl: no compute shaders: CPU tilemap composite and texture decode, "
+                     "buffer textures for the 3D pass");
+        }
+    }
+
+    const bool texture_storage = config.es_mode || m_has_compute
+                              || has_gl_extension("GL_ARB_texture_storage");
+    std::string optional_error;
+    if (!resolve_optional_functions(SDL_GL_GetProcAddress, m_has_compute, texture_storage,
+                                    &optional_error)) {
+        SM2_ERROR("gl: %s", optional_error.c_str());
+        SDL_GL_DestroyContext(m_context);
+        m_context = nullptr;
+        return false;
     }
 
     SDL_GL_SetSwapInterval(config.vsync ? 1 : 0);

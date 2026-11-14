@@ -1,20 +1,21 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
-// Reads a rendered image back off the GPU and writes it as a PPM. GL
-// analogue of render::vk::FrameCapture -- see that class's own doc comment
-// for why this exists (an unattended, diffable "does it look right?").
+// Reads a rendered image back off the GPU and writes it as a PPM; the GL
+// counterpart of render::vk::FrameCapture.
 #pragma once
 
 #include "core/types.h"
@@ -31,13 +32,8 @@ public:
     FrameCapture(const FrameCapture&)            = delete;
     FrameCapture& operator=(const FrameCapture&) = delete;
 
-    /// Read `width` by `height` RGBA8 pixels from the currently bound
-    /// framebuffer's colour attachment. The caller binds the FBO to capture
-    /// (ordinarily PresentPass's native FBO, after that frame's drawing is
-    /// complete) before calling this -- mirroring
-    /// render::vk::FrameCapture::record()'s own "captures what was
-    /// rendered, not a re-render" contract, just via a bound framebuffer
-    /// instead of a named image.
+    /// Read `width` by `height` RGBA8 pixels from the bound framebuffer's colour
+    /// attachment, normally PresentPass's native FBO once the frame is drawn.
     [[nodiscard]] bool record(u32 width, u32 height);
 
     /// Write what record() captured.

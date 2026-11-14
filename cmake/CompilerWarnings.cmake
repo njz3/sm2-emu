@@ -1,29 +1,28 @@
-#  ____  __  __  ____         _____ __  __ _   _
-# / ___||  \/  ||___ \       | ____|  \/  | | | |
-# \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-#  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-# |____/|_|  |_||_____|      |_____|_|  |_|\___/
+# ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+# ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+# █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+# ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+# ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+# ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+#            継 承  ( k e i s h ō )
 #
-# sm2-emu — A Sega Model 1 & 2 arcade emulator.
+# A Sega Model 1, 2 & 3 arcade emulator.
 # Copyright (c) 2025+ Daniel Martin (dmanlfc)
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# This header must not be removed. sm2-emu is licensed under the GNU General
+# This header must not be removed. Keisho is licensed under the GNU General
 # Public License, version 3 or later, with additional terms under section 7 of
 # that licence. See LICENSE and NOTICE.
 #
 
 # Shared warning configuration.
 #
-# Two INTERFACE targets:
-#
 #   sm2_warnings         strict, for code written here
 #   sm2_warnings_ported  relaxed, for code derived from MAME
 #
-# Both are built from one flag list rather than by having the relaxed target link
-# the strict one. Linking would work, but CMake emits a target's own options
-# before its dependencies', which puts the -Wno- overrides first where they have
-# no effect: for GCC and Clang the last flag wins.
+# The relaxed target repeats the strict flags rather than linking the strict
+# target: CMake emits a target's own options before its dependencies', which
+# would put the -Wno- overrides first, and for GCC and Clang the last flag wins.
 
 set(SM2_WARNING_FLAGS "")
 set(SM2_WARNING_RELAXATIONS "")
@@ -57,9 +56,7 @@ else()
         -Wformat=2
         -Wimplicit-fallthrough
 
-        # Emulation code converts between integer widths constantly and by
-        # design. Enabling these produces thousands of diagnostics that say
-        # nothing about correctness.
+        # Emulation code converts between integer widths constantly and by design.
         -Wno-conversion
         -Wno-sign-conversion
     )
@@ -76,10 +73,8 @@ else()
         list(APPEND SM2_WARNING_FLAGS -Werror)
     endif()
 
-    # Ported cores are kept as textually close to their MAME originals as
-    # possible so that upstream fixes can be diffed across. These are the checks
-    # that fire on idioms pervasive in that code and cannot be silenced without
-    # rewriting it.
+    # Ported cores stay textually close to MAME so upstream fixes can be diffed
+    # across; these checks fire on idioms pervasive in that code.
     list(APPEND SM2_WARNING_RELAXATIONS
         -Wno-pedantic
         -Wno-shadow

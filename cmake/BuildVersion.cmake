@@ -1,4 +1,4 @@
-# sm2-emu — the build's version, as `git describe --tags --exclude dev` names it
+# Keisho — the build's version, as `git describe --tags --exclude dev` names it
 # (v0.9.54-59-g9c0c080, the release packages' name), for the window's title.
 #
 # Run as a script at every build (cmake -P), so that a new commit shows

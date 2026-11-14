@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -25,13 +27,8 @@
 namespace sm2::render::vk {
 namespace {
 
-/// True when the format stores blue in the first byte.
-///
-/// This is a straight byte-order adaptation for whatever image `record()` is
-/// handed, not a correction for a bug elsewhere. Today main.cpp captures the
-/// renderer's own native R8G8B8A8_UNORM attachment, so the swap below stays
-/// off; it fires only if a caller points the capture at a BGRA image (as it
-/// did when captures were still read out of the swapchain).
+/// True when the format stores blue in the first byte, so the capture swaps
+/// to RGBA.
 [[nodiscard]] bool is_bgr(VkFormat format)
 {
     switch (format) {
@@ -69,10 +66,8 @@ FrameCapture::~FrameCapture()
 
 bool FrameCapture::init(Context& context)
 {
-    // Nothing is checked here any more: what gets captured is a colour attachment
-    // this renderer created with TRANSFER_SRC usage, not the swapchain, so there is
-    // no surface capability to depend on. record() validates the format instead,
-    // where it knows what it was given.
+    // The captured image is the renderer's own attachment; record() validates
+    // its format.
     m_context = &context;
     return true;
 }

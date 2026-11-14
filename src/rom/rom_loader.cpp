@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -58,11 +60,8 @@ struct ZipEntry {
     return out;
 }
 
-/// Signature bytes identifying an archive's actual format, read from the
-/// file's own contents rather than trusted from its extension: a renamed
-/// file (7z content with a `.zip` name, or the reverse, both observed in
-/// real-world Model 2 dumps) still has to load correctly, matching the
-/// loader's existing CRC-first philosophy that identity comes from content.
+/// Signature bytes identifying an archive's format from its contents, not its
+/// extension, so a 7z named `.zip` (or the reverse) still loads.
 enum class ArchiveFormat {
     Unknown,
     Zip,
@@ -93,17 +92,15 @@ enum class ArchiveFormat {
     return ArchiveFormat::Unknown;
 }
 
-/// Owns one open 7z archive via the vendored LZMA SDK reader, plus the
-/// solid-block decompression cache `SzArEx_Extract` uses to avoid
-/// re-inflating a shared block for every file inside it.
+/// Owns one open 7z archive via the vendored LZMA SDK reader, plus
+/// `SzArEx_Extract`'s solid-block cache.
 struct SevenZipArchive {
     CFileInStream archive_stream{};
     CLookToRead2  look_stream{};
     CSzArEx       db{};
     bool          db_open = false;
 
-    // SzArEx_Extract's solid-block cache: must persist across calls for the
-    // same archive to get the reuse benefit, and must be zeroed before the
+    // Must persist across calls for the same archive and be zeroed before the
     // first call.
     UInt32 cached_block_index  = 0;
     Byte*  cached_out_buffer   = nullptr;
@@ -115,10 +112,8 @@ struct SevenZipArchive {
 
     SevenZipArchive(const SevenZipArchive&)            = delete;
     SevenZipArchive& operator=(const SevenZipArchive&) = delete;
-    // CFileInStream/CLookToRead2 hold self-pointers into `look_stream.vt`
-    // (installed by LookToRead2_CreateVTable to point back at this object's
-    // fields), so an instance must never be relocated once opened. As with
-    // mz_zip_archive above, callers keep these in a std::deque.
+    // CFileInStream/CLookToRead2 hold self-pointers, so an instance must never
+    // be relocated once opened.
     SevenZipArchive(SevenZipArchive&&)            = delete;
     SevenZipArchive& operator=(SevenZipArchive&&) = delete;
 
@@ -138,11 +133,8 @@ struct SevenZipArchive {
     }
 };
 
-/// File names inside a 7z are UTF-16LE; ROM chip names are always plain
-/// ASCII in practice, so a byte-at-a-time truncation (dropping the high byte
-/// of anything outside the ASCII range) is sufficient and matches what every
-/// chip name actually contains. Lowercasing happens separately in
-/// `index_entry`/`find`, same as the zip backend.
+/// File names inside a 7z are UTF-16LE; chip names are plain ASCII, so the
+/// high byte is simply dropped.
 [[nodiscard]] std::string utf16_to_utf8(const std::vector<u16>& utf16)
 {
     std::string out;
@@ -156,13 +148,9 @@ struct SevenZipArchive {
     return out;
 }
 
-/// A set of open zip *or* 7z archives, indexed for lookup by CRC and by
-/// name. Both backends feed the same `ZipEntry` records so the rest of
-/// `RomLoader` does not need to know which format a given archive is.
-///
-/// More than one archive is needed for split sets, where a clone's own
-/// archive holds only the chips that differ and the rest come from the
-/// parent's -- and a zip and a 7z can be mixed in the same set.
+/// A set of open zip and 7z archives, indexed by CRC and by name. Both
+/// backends feed the same `ZipEntry` records. Split sets need more than one
+/// archive, and formats can be mixed.
 class ArchiveSet {
 public:
     ~ArchiveSet()
@@ -192,8 +180,7 @@ public:
     }
 
     /// Find an entry, by CRC when the database declares one and by name
-    /// otherwise. Matching on CRC *is* the verification: a corrupted chip
-    /// simply is not found.
+    /// otherwise. Matching on CRC is the verification.
     [[nodiscard]] const ZipEntry* find(const FileSpec& file) const
     {
         if (file.has_crc) {
@@ -215,11 +202,8 @@ public:
     }
 
 private:
-    // Backend archive indices are disjoint: zip archives are indexed
-    // 0..N-1 directly into `m_zip_archives`, and 7z archives are indexed
-    // starting at this base into `m_seven_zip_archives`, so `ZipEntry::archive`
-    // alone says which backend and slot an entry came from without a
-    // separate tag field.
+    // `ZipEntry::archive` indexes `m_zip_archives` below this base and
+    // `m_seven_zip_archives` from it.
     static constexpr usize kSevenZipArchiveBase = 1u << 20;
 
     [[nodiscard]] bool open_zip(const std::string& path)
@@ -330,9 +314,8 @@ private:
 
     void index_entry(const ZipEntry& entry)
     {
-        // Several chips in a merged set can share a CRC when a revision
-        // respins only some of them, so keep the first and let name lookup
-        // disambiguate. Content is identical by definition.
+        // Chips in a merged set can share a CRC across revisions; keep the
+        // first, as the content is identical.
         m_by_crc.emplace(entry.crc32, entry);
         m_by_name.emplace(to_lower(entry.name), entry);
     }
@@ -371,10 +354,8 @@ private:
             &out_size_processed, &alloc, &alloc_temp);
 
         if (result != SZ_OK) {
-            // SzArEx_Extract verifies the folder's CRC while inflating (7z
-            // stores CRCs per solid block, same guarantee as miniz's per-file
-            // CRC check), so this also catches damaged data with a correct
-            // header.
+            // SzArEx_Extract verifies the solid block's CRC while inflating, so
+            // this also catches damaged data.
             SM2_ERROR("could not extract '%s': SzArEx_Extract returned %d", entry.name.c_str(),
                       result);
             return false;
@@ -385,10 +366,8 @@ private:
         return true;
     }
 
-    // Deques, not vectors: both mz_zip_archive and SevenZipArchive hold
-    // internal/self pointers once opened, so neither must ever be relocated,
-    // and entries reference their archive by index. A deque never moves an
-    // existing element.
+    // Deques, not vectors: both archive types hold self pointers once opened
+    // and must never be relocated.
     std::deque<mz_zip_archive>                m_zip_archives;
     std::deque<SevenZipArchive>                m_seven_zip_archives;
     std::unordered_map<u32, ZipEntry>         m_by_crc;
@@ -447,9 +426,7 @@ usize RomLoader::computed_region_size(const RegionSpec&         region,
                         + chunk;
         required = std::max(required, end);
     }
-    // A mirror can reach past the last chip, which is the whole point of it, so
-    // a region declaring no explicit size still has to be big enough to hold
-    // its own copies.
+    // A mirror can reach past the last chip, so the region must hold it too.
     for (const RegionCopy& copy : region.copies) {
         required = std::max<usize>(required, usize{copy.to} + copy.size);
     }
@@ -520,8 +497,7 @@ std::optional<std::vector<u8>> RomLoader::assemble_region(
         usize       destination = file.offset;
         usize       source      = 0;
 
-        // Bounds-check once rather than per chunk: the inner loop runs up to two
-        // million times per file.
+        // Bounds-check once rather than per chunk, outside the hot inner loop.
         const usize last_end = file.offset + stride * (chunks - 1) + chunk;
         if (last_end > data.size()) {
             SM2_ERROR("region '%s': file '%s' at 0x%x with stride %u overruns "
@@ -538,10 +514,8 @@ std::optional<std::vector<u8>> RomLoader::assemble_region(
         }
     }
 
-    // MAME's ROM_COPY, applied in declaration order once every chip is in
-    // place. Before the byte swap rather than after, which is equivalent
-    // (swapping a copy of a block gives the same bytes as copying the swapped
-    // block) but keeps the swap as the single last step over the whole region.
+    // MAME's ROM_COPY, in declaration order once every chip is in place. Doing
+    // it before the byte swap is equivalent and keeps the swap last.
     for (const RegionCopy& copy : region.copies) {
         const usize from = copy.from;
         const usize to   = copy.to;
@@ -552,34 +526,49 @@ std::optional<std::vector<u8>> RomLoader::assemble_region(
                       data.size());
             return std::nullopt;
         }
-        // memmove, not memcpy: nothing stops a set from declaring an
-        // overlapping mirror.
+        // memmove: a mirror may overlap.
         std::memmove(data.data() + to, data.data() + from, span);
     }
 
-    // MAME's driver init patches, applied after the mirrors so a patched word
-    // cannot be overwritten by one.
+    // Bounds-check every patch up front, whichever side of the swap it lands.
     for (const RegionPatch& patch : region.patches) {
-        if (usize{patch.offset} + 4 > data.size()) {
+        if (usize{patch.offset} + patch.bits / 8 > data.size()) {
             SM2_ERROR("region '%s': patch at 0x%x is outside the region's 0x%zx bytes",
                       region.name.c_str(), patch.offset, data.size());
             return std::nullopt;
         }
-        data[patch.offset + 0] = static_cast<u8>(patch.value);
-        data[patch.offset + 1] = static_cast<u8>(patch.value >> 8);
-        data[patch.offset + 2] = static_cast<u8>(patch.value >> 16);
-        data[patch.offset + 3] = static_cast<u8>(patch.value >> 24);
-        SM2_DEBUG("region '%s': patched 0x%x = %08x", region.name.c_str(),
-                  patch.offset, patch.value);
     }
+    const auto apply_patches = [&](bool big_endian) {
+        for (const RegionPatch& patch : region.patches) {
+            if (patch.big_endian != big_endian) {
+                continue;
+            }
+            const u32 bytes = patch.bits / 8u;
+            for (u32 i = 0; i < bytes; ++i) {
+                const u32 shift = 8u * (big_endian ? bytes - 1 - i : i);
+                data[patch.offset + i] = static_cast<u8>(patch.value >> shift);
+            }
+            SM2_DEBUG("region '%s': patched %u bits at 0x%x = 0x%llx (%s-endian)",
+                      region.name.c_str(), static_cast<unsigned>(patch.bits), patch.offset,
+                      static_cast<unsigned long long>(patch.value), big_endian ? "big" : "little");
+        }
+    };
+
+    // MAME's driver init patches, applied after the mirrors so a patched word
+    // cannot be overwritten by one.
+    apply_patches(false);
 
     if (region.byte_swap) {
         // Reproduces MAME's ROM_LOAD16_WORD_SWAP: the big-endian 68000 sound
         // program and its samples are stored with each 16-bit word reversed.
+        // Model 3's 16-bit-chip regions are swapped the same way.
         for (usize offset = 0; offset + 1 < data.size(); offset += 2) {
             std::swap(data[offset], data[offset + 1]);
         }
     }
+
+    // Big-endian (Model 3) patches, after the swap.
+    apply_patches(true);
 
     return data;
 }
@@ -627,12 +616,14 @@ bool RomLoader::holds_clone(const GameDatabase& database, const std::string& arc
 std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
                                           const std::string&  archive_path,
                                           const std::string&  preferred_game,
-                                          LoadError*          load_error)
+                                          LoadError*          load_error,
+                                          const LoadOptions&  options)
 {
     LoadError  unused;
     LoadError& failure = load_error != nullptr ? *load_error : unused;
     failure            = {};
     const std::string file_name = std::filesystem::path(archive_path).filename().string();
+    const std::string archive_stem = std::filesystem::path(archive_path).stem().string();
 
     std::error_code error;
     if (!std::filesystem::exists(archive_path, error)) {
@@ -654,7 +645,7 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
         chosen = database.find(preferred_game);
         if (chosen == nullptr) {
             SM2_ERROR("'%s' is not in the ROM database", preferred_game.c_str());
-            failure.message = "'" + preferred_game + "' is not a game sm2-emu knows.";
+            failure.message = "'" + preferred_game + "' is not a game Keisho knows.";
             return std::nullopt;
         }
     } else {
@@ -670,11 +661,17 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
                       score.found, score.missing);
 
             // A complete match always beats an incomplete one; between two of
-            // the same completeness, more matched chips wins.
+            // the same completeness, more matched chips wins. A tie goes to the
+            // set the archive is named after (srally2p / srally2pa).
+            const bool same  = score.complete() == best_score.complete()
+                            && score.found == best_score.found;
+            const bool named = candidate.name == archive_stem && best != nullptr
+                            && best->name != archive_stem;
             const bool better = best == nullptr
                              || (score.complete() && !best_score.complete())
                              || (score.complete() == best_score.complete()
-                                 && score.found > best_score.found);
+                                 && score.found > best_score.found)
+                             || (same && named);
             if (better) {
                 best       = &candidate;
                 best_score = score;
@@ -682,11 +679,11 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
         }
 
         if (best == nullptr) {
-            SM2_ERROR("'%s' does not contain any game sm2-emu recognises",
+            SM2_ERROR("'%s' does not contain any game Keisho recognises",
                       archive_path.c_str());
             SM2_ERROR("Identification is by CRC32, so this means none of the "
                       "expected chips were found, not that the name is wrong.");
-            failure.message = file_name + " does not hold any Model 2 game sm2-emu "
+            failure.message = file_name + " does not hold any game Keisho "
                               "recognises. Games are matched by their chips' CRC32, "
                               "not by the file name.";
             return std::nullopt;
@@ -700,8 +697,7 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
         chosen = best;
     }
 
-    // A sibling archive named `stem`, preferring zip but accepting 7z, because
-    // either format turns up in the wild for both parent sets and device sets.
+    // A sibling archive named `stem`, preferring zip but accepting 7z.
     const auto find_sibling_archive =
         [&archive_path](const std::string& stem) -> std::optional<std::filesystem::path> {
         const std::filesystem::path directory =
@@ -762,13 +758,54 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
         }
     }
 
-    if (!board_implemented(chosen->board)) {
-        SM2_ERROR("'%s' is a %s board, which is not implemented yet. The original "
-                  "Model 2 and the CRX boards (2A, 2B and 2C) are supported.",
+    // -- other sets that list the missing chips ----------------------------
+    // Romsets name parents differently (MAME's bassdx is a clone of bass;
+    // here bassdx is the parent), so a chip still missing is looked for in
+    // the archive of any other game that lists it.
+    if (!score_game(archives, *chosen).complete()) {
+        std::unordered_set<u32> missing;
+        for (const RegionSpec& region : chosen->regions) {
+            for (const FileSpec& file : region.files) {
+                if (region.required && file.has_crc && archives.find(file) == nullptr) {
+                    missing.insert(file.crc32);
+                }
+            }
+        }
+        std::unordered_set<std::string> opened;
+        for (const GameSpec& other : database.games()) {
+            if (missing.empty() || score_game(archives, *chosen).complete()) {
+                break;
+            }
+            if (other.name == chosen->name || opened.count(other.name) != 0) {
+                continue;
+            }
+            bool holds = false;
+            for (const RegionSpec& region : other.regions) {
+                for (const FileSpec& file : region.files) {
+                    holds = holds || (file.has_crc && missing.count(file.crc32) != 0);
+                }
+            }
+            if (!holds) {
+                continue;
+            }
+            if (const auto path = find_sibling_archive(other.name)) {
+                opened.insert(other.name);
+                SM2_INFO("'%s' is missing chips that '%s' also uses; also reading %s",
+                         chosen->name.c_str(), other.name.c_str(), path->string().c_str());
+                if (!archives.open(path->string())) {
+                    continue;
+                }
+            }
+        }
+    }
+
+    if (!board_implemented(chosen->board) && !options.allow_unimplemented_board) {
+        SM2_ERROR("'%s' is a %s board, which is not implemented yet. Model 1, the "
+                  "original Model 2, the CRX boards (2A, 2B and 2C) and Model 3 are supported.",
                   chosen->name.c_str(), board_name(chosen->board));
         failure.game    = chosen->name;
         failure.message = std::string("This is a ") + board_name(chosen->board)
-                        + " game, which sm2-emu does not run yet.";
+                        + " game, which Keisho does not run yet.";
         return std::nullopt;
     }
     if (chosen->preliminary) {
@@ -780,9 +817,8 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
     LoadResult result;
     result.game = *chosen;
 
-    // Collect every missing required chip across all regions before giving up,
-    // rather than failing on the first, so a single run tells the user exactly
-    // which files to find. Optional absences are reported too, but only warn.
+    // Collect every missing required chip before giving up, so one run lists
+    // them all. Optional absences only warn.
     u32 required_missing = 0;
 
     for (const RegionSpec& region : chosen->regions) {
@@ -819,13 +855,20 @@ std::optional<LoadResult> RomLoader::load(const GameDatabase& database,
             }
         }
 
+        // An optional region with no chips and no size is left out (many dumps
+        // lack the drive board program).
+        if (!region.required && region.size == 0 && optional_missing == region.files.size()) {
+            SM2_INFO("optional region '%s' absent: none of its %zu file(s) found",
+                     region.name.c_str(), region.files.size());
+            continue;
+        }
         if (optional_missing != 0) {
             SM2_WARN("region '%s': %u optional file(s) absent; filling with 0x%02x",
                      region.name.c_str(), optional_missing, region.fill);
         }
 
-        // A region short a required chip cannot be assembled correctly, so skip
-        // assembly for it; the run will fail below once every gap is listed.
+        // Skip a region short a required chip; the load fails below once every
+        // gap is listed.
         if (required_missing != 0) {
             continue;
         }

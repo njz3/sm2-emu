@@ -54,11 +54,18 @@ public:
     /// The player's music level, in percent.
     void set_music_volume(u32 percent) { m_music = static_cast<s32>(percent * 256 / 100); }
 
+    /// Linearly interpolate the 32 kHz decoder output (Model 3). Set before
+    /// reset(); the save-state layout depends on it.
+    void set_interpolate(bool enabled) { m_interpolate = enabled; }
+
     /// A serial byte from the host's i8251, the same one the SCSP receives.
     void write_txd(u8 value);
 
-    /// A byte the board sends back to the host (unused by the Model 2 titles,
-    /// kept for completeness).
+    /// The UART would latch a byte now. A host that can outrun the link (the
+    /// Model 3 sound board) queues and sends only when this is true.
+    [[nodiscard]] bool ready_for_byte() const { return present() && m_uart.can_receive(); }
+
+    /// A byte the board sends back to the host (unused by the Model 2 titles).
     void set_rxd_handler(std::function<void(u8)> handler) { m_rxd_handler = std::move(handler); }
 
     /// Advance the Z80 (and its UART) by the equivalent of `host_cycles` of the
@@ -100,8 +107,7 @@ private:
     void mpeg_stereo_w(u8 data);
     [[nodiscard]] u8 mpeg_pos_r(u32 offset) const;
 
-    /// Fill m_audio_buf with the next decoded MPEG frame, or stop. Returns the
-    /// number of stereo samples now available, 0 at end of stream.
+    /// Fill m_audio_buf with the next decoded MPEG frame, or stop at end of stream.
     void decode_next();
 
     cpu::z80::Z80 m_cpu;
@@ -125,6 +131,8 @@ private:
     u64 m_cycle_debt = 0;
 
     // Linear resampler state (decoder 32000 Hz -> output rate).
+    bool m_interpolate = false;
+    s16  m_prev[2]     = {};  ///< Previous decoded sample pair, for interpolation.
     u64 m_resample_frac = 0;
 
     std::function<void(u8)> m_rxd_handler;

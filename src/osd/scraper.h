@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -28,12 +30,10 @@ namespace sm2::osd {
 /// background thread, cached under an artwork directory and keyed by MAME short
 /// name. Inert when built without libcurl or disabled by the user.
 ///
-/// Thread-safety contract (the reason this class is shaped as it is): the
-/// worker touches only libcurl, the filesystem under the artwork dir, and JSON.
-/// It never calls the renderer/GUI/ImGui/audio/SDL. The one cross-thread
-/// channel is the mutex-guarded name queue drained by take_ready(); image
-/// decode and GPU upload are the main thread's job. The owner joins the thread
-/// (stop()/dtor) before tearing down anything the main thread owns.
+/// Threading: the worker touches only libcurl, the artwork directory and JSON,
+/// never the renderer, GUI, audio or SDL. The one cross-thread channel is the
+/// mutex-guarded name queue drained by take_ready(); image decode and upload
+/// stay on the main thread. stop() (or the destructor) joins the worker.
 class Scraper {
 public:
     struct Entry {

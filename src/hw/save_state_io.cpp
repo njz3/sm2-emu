@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -17,8 +19,11 @@
 #include "core/archive.h"
 #include "core/log.h"
 
+#include <miniz.h>
+
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <utility>
@@ -29,6 +34,17 @@ namespace {
 
 /// "HOST", the tag of the host's section after the machine's payload.
 constexpr u32 kHostTag = 0x54534f48u;
+
+// A state file is the raw state deflated behind this magic and the raw size.
+// Files without it are read as they are.
+constexpr char  kPackedMagic[8] = {'K', 'E', 'I', 'S', 'H', 'O', 'S', 'Z'};
+/// The packed magic of states saved by sm2-emu, still read.
+constexpr char  kLegacyPackedMagic[8] = {'S', 'M', '2', 'S', 'T', 'A', 'T', 'Z'};
+
+constexpr const char* kExtension       = ".kstate";
+constexpr const char* kLegacyExtension = ".sm2state";
+constexpr usize kPackedHeader   = sizeof(kPackedMagic) + sizeof(u64);
+constexpr u64   kMaxStateBytes  = u64{1} << 30;
 
 /// The host's serialize walk, when set.
 SerializeFn& host_state()
@@ -126,11 +142,8 @@ bool load_state_from_buffer(std::span<const u8> data, const std::string& game, u
         return false;
     }
 
-    // Reject-before-commit (design §5(4), requirement 3.2). A scratch machine is
-    // not viable (create_machine consumes the RomSet), so snapshot the current
-    // state to a rollback buffer, apply the file, and if the read ran past the
-    // end restore from the rollback. The Archive zero-fills rather than reading
-    // OOB, so the rollback is always applicable.
+    // Snapshot the current state first and restore it if the file reads short.
+    // The Archive zero-fills rather than reading out of bounds.
     std::vector<u8> rollback;
     {
         Archive save_ar(rollback);
@@ -147,7 +160,6 @@ bool load_state_from_buffer(std::span<const u8> data, const std::string& game, u
         return false;
     }
 
-    // The host's section, when the state has one.
     pending_host_section().clear();
     const usize payload_size = data.size() - payload_offset;
     if (payload_size - load_ar.position() >= sizeof(u32)) {
@@ -170,26 +182,39 @@ bool load_state_from_buffer(std::span<const u8> data, const std::string& game, u
 
 bool write_state_file(const std::string& path, std::span<const u8> data)
 {
-    // Create the parent directory (e.g. the states dir) on first use, the way
-    // the screenshot path does; fopen("wb") will not make it.
+    // fopen("wb") will not create the directory.
     const std::filesystem::path parent = std::filesystem::path(path).parent_path();
     if (!parent.empty()) {
         std::error_code ec;
         std::filesystem::create_directories(parent, ec);
     }
 
+    mz_ulong        packed_size = mz_compressBound(static_cast<mz_ulong>(data.size()));
+    std::vector<u8> packed(kPackedHeader + packed_size);
+    if (mz_compress2(packed.data() + kPackedHeader, &packed_size, data.data(),
+                     static_cast<mz_ulong>(data.size()), MZ_BEST_SPEED)
+        != MZ_OK) {
+        SM2_ERROR("save-state: could not compress the state");
+        return false;
+    }
+    const u64 raw_size = data.size();
+    std::memcpy(packed.data(), kPackedMagic, sizeof(kPackedMagic));
+    std::memcpy(packed.data() + sizeof(kPackedMagic), &raw_size, sizeof(raw_size));
+    packed.resize(kPackedHeader + packed_size);
+
     std::FILE* handle = std::fopen(path.c_str(), "wb");
     if (handle == nullptr) {
         SM2_ERROR("save-state: could not open '%s' for writing", path.c_str());
         return false;
     }
-    const usize written = std::fwrite(data.data(), 1, data.size(), handle);
+    const usize written = std::fwrite(packed.data(), 1, packed.size(), handle);
     std::fclose(handle);
-    if (written != data.size()) {
+    if (written != packed.size()) {
         SM2_ERROR("save-state: short write to '%s'", path.c_str());
         return false;
     }
-    SM2_INFO("save-state: wrote %zu bytes to '%s'", data.size(), path.c_str());
+    SM2_INFO("save-state: wrote %zu bytes (%zu raw) to '%s'", packed.size(), data.size(),
+             path.c_str());
     return true;
 }
 
@@ -215,6 +240,27 @@ bool read_state_file(const std::string& path, std::vector<u8>& out)
         SM2_ERROR("save-state: short read from '%s'", path.c_str());
         return false;
     }
+    if (out.size() < kPackedHeader
+        || (std::memcmp(out.data(), kPackedMagic, sizeof(kPackedMagic)) != 0
+            && std::memcmp(out.data(), kLegacyPackedMagic, sizeof(kLegacyPackedMagic)) != 0)) {
+        return true;
+    }
+    u64 raw_size = 0;
+    std::memcpy(&raw_size, out.data() + sizeof(kPackedMagic), sizeof(raw_size));
+    if (raw_size == 0 || raw_size > kMaxStateBytes) {
+        SM2_ERROR("save-state: '%s' is corrupt (bad size)", path.c_str());
+        return false;
+    }
+    std::vector<u8> raw(static_cast<usize>(raw_size));
+    mz_ulong        raw_len = static_cast<mz_ulong>(raw_size);
+    if (mz_uncompress(raw.data(), &raw_len, out.data() + kPackedHeader,
+                      static_cast<mz_ulong>(out.size() - kPackedHeader))
+            != MZ_OK
+        || raw_len != raw_size) {
+        SM2_ERROR("save-state: '%s' is corrupt or truncated", path.c_str());
+        return false;
+    }
+    out = std::move(raw);
     return true;
 }
 
@@ -223,12 +269,36 @@ bool read_state_file(const std::string& path, std::vector<u8>& out)
 // ---------------------------------------------------------------------------
 
 std::string state_slot_path(const std::string& dir, const std::string& game,
-                            const std::string& slot)
+                            const std::string& slot, bool convert)
 {
-    return (std::filesystem::path(dir) / (game + "." + slot + ".sm2state")).string();
+    const std::filesystem::path path   = std::filesystem::path(dir) / (game + "." + slot + kExtension);
+    const std::filesystem::path legacy = std::filesystem::path(dir) / (game + "." + slot + kLegacyExtension);
+    std::error_code             ec;
+    if (std::filesystem::exists(path, ec) || !std::filesystem::exists(legacy, ec)) {
+        return path.string();
+    }
+    if (!convert) {
+        return legacy.string();  // read as it is: the loader takes the old magic
+    }
+    // An sm2-emu state for this slot: rewrite it in the new format, then drop it.
+    std::vector<u8> data;
+    if (!read_state_file(legacy.string(), data)) {
+        return path.string();
+    }
+    if (data.size() >= sizeof(state::kLegacyMagic)
+        && std::memcmp(data.data(), state::kLegacyMagic, sizeof(state::kLegacyMagic)) == 0) {
+        std::memcpy(data.data(), state::kMagic, sizeof(state::kMagic));
+    }
+    if (write_state_file(path.string(), data)) {
+        std::filesystem::remove(legacy, ec);
+        SM2_INFO("save-state: converted '%s' to '%s'", legacy.filename().string().c_str(),
+                 path.filename().string().c_str());
+    }
+    return path.string();
 }
 
-std::vector<SlotInfo> list_state_slots(const std::string& dir, const std::string& game)
+std::vector<SlotInfo> list_state_slots(const std::string& dir, const std::string& game,
+                                       bool convert)
 {
     std::vector<SlotInfo> slots;
     slots.reserve(1 + kNumberedSlots);
@@ -237,13 +307,12 @@ std::vector<SlotInfo> list_state_slots(const std::string& dir, const std::string
         SlotInfo info;
         info.slot = name;
         std::error_code ec;
-        const std::filesystem::path p = state_slot_path(dir, game, name);
+        const std::filesystem::path p = state_slot_path(dir, game, name, convert);
         if (std::filesystem::exists(p, ec)) {
             info.occupied = true;
             const auto ftime = std::filesystem::last_write_time(p, ec);
             if (!ec) {
-                // file_clock -> system_clock -> time_t, portably enough for a
-                // display stamp (exact epoch alignment does not matter here).
+                // file_clock -> system_clock, approximately; it is only displayed.
                 const auto sctime = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
                     ftime - std::filesystem::file_time_type::clock::now()
                     + std::chrono::system_clock::now());

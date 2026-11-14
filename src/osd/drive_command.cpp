@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -34,8 +36,8 @@ DriveCommand make(Effect effect, int steps, int full_steps, bool held = false)
 //   0x6x  push right   0..7
 // All strengths share the board's scale (0..63), including its gain setting
 // of 2. A push or kick is 12 + 2n, so even step 0 is a firm push; only 0x1x
-// releases the wheel. A spring is 2n + 2, reached by a ramp of two a pot step
-// from just inside its deadzone. Steps 8..15 of the other families match
+// releases the wheel. A spring is 2n + 2, ramping up by two per pot step from
+// just inside its deadzone. Steps 8..15 of the other families match
 // nothing on the board and also stop the motor. 0x0x and 0x7x are the boot
 // handshake and the gain setting.
 DriveCommand decode_daytona(u8 value)

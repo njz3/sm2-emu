@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -84,24 +86,21 @@ void PresentPass::shutdown()
 
 bool PresentPass::create_target()
 {
-    // The composite target is N*native; the software upload and a capture stay
-    // native (subregions of this texture). At N=1 these are kWidth x kHeight.
+    // The composite target is N*native; the software upload and a capture are
+    // native-sized subregions of it.
     const auto w = static_cast<GLsizei>(width());
     const auto h = static_cast<GLsizei>(height());
 
     GenTextures(1, &m_native_texture);
     BindTexture(GL_TEXTURE_2D, m_native_texture);
     TexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, w, h);
-    // Linear, matching render::vk::PresentPass's kMagnifyFilter exactly: the
-    // raster is scaled by a non-integer factor at almost every window size,
-    // where nearest sampling makes glyph stems alternate between one and two
-    // pixels wide.
+    // Linear, as in the Vulkan present pass: at non-integer scales nearest
+    // sampling makes glyph stems alternate between one and two pixels wide.
     TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // The 3D pass draws its fill mask into this framebuffer now, so it carries a
-    // stencil sized to match the colour attachment, with depth for blended
-    // translucency to order its pass by. Both are mandatory at this floor.
+    // The 3D pass draws its fill mask into the stencil, and blended translucency
+    // orders its pass by depth.
     GenRenderbuffers(1, &m_stencil_renderbuffer);
     BindRenderbuffer(GL_RENDERBUFFER, m_stencil_renderbuffer);
     RenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);
@@ -137,10 +136,10 @@ bool PresentPass::create_program()
     GenBuffers(1, &m_push_ubo);
     BindBuffer(GL_UNIFORM_BUFFER, m_push_ubo);
     // std140 Present block: vec2 source_size (0), vec2 target_size (8),
-    // uint method (16), uint crt_enabled (20), then four floats (24..36) = 40
-    // bytes, rounded up to a 16-byte multiple. Sized to the struct present()
-    // writes (48 bytes with its trailing pad).
-    BufferData(GL_UNIFORM_BUFFER, 64, nullptr, GL_DYNAMIC_DRAW);
+    // uint method (16), uint crt_enabled (20), then four floats (24..36), the crop's
+    // six scalars (40..60) and the gain (64): sized to the struct present()
+    // writes (80 bytes with its trailing pad).
+    BufferData(GL_UNIFORM_BUFFER, 80, nullptr, GL_DYNAMIC_DRAW);
     return true;
 }
 
@@ -154,11 +153,8 @@ void PresentPass::begin_frame()
 
 void PresentPass::upload_from_host(std::span<const u32> pixels)
 {
-    // `pixels` must hold exactly kWidth * kHeight texels -- see this
-    // method's own header doc comment; unlike
-    // render::vk::PresentPass::upload_from_host()'s std::min-clamped memcpy,
-    // TexSubImage2D has no partial form to fall back to, so a short span
-    // here is the caller's bug to fix, not this method's to paper over.
+    // `pixels` must hold exactly kWidth * kHeight texels; unlike the Vulkan
+    // pass, there is no clamp.
     BindTexture(GL_TEXTURE_2D, m_native_texture);
     TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(kWidth),
                  static_cast<GLsizei>(kHeight), GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
@@ -168,8 +164,7 @@ void PresentPass::present(u32 window_width, u32 window_height)
 {
     BindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Clears the whole window so the letterbox bars are defined, matching
-    // render::vk::PresentPass::record()'s own VK_ATTACHMENT_LOAD_OP_CLEAR.
+    // Clear the whole window so the letterbox bars are defined.
     Viewport(0, 0, static_cast<GLsizei>(window_width), static_cast<GLsizei>(window_height));
     ClearColor(0.0F, 0.0F, 0.0F, 1.0F);
     Clear(GL_COLOR_BUFFER_BIT);
@@ -185,8 +180,8 @@ void PresentPass::present(u32 window_width, u32 window_height)
              static_cast<GLsizei>(box.width), static_cast<GLsizei>(box.height));
 
     // std140 layout of present.frag's Present block (see create_program()):
-    // two vec2s, method, crt_enabled, four floats, then the crop's six
-    // scalars: 64 bytes.
+    // two vec2s, method, crt_enabled, four floats, the crop's six scalars and
+    // the gain, padded to 80 bytes.
     struct PushBlock {
         float source_size[2];
         float target_size[2];
@@ -202,8 +197,10 @@ void PresentPass::present(u32 window_width, u32 window_height)
         u32   crop_barrel;
         float barrel_centre;
         float barrel_radius;
+        float gain;
+        u32   pad[3];
     } push{};
-    static_assert(sizeof(PushBlock) == 64);
+    static_assert(sizeof(PushBlock) == 80);
     push.source_size[0] = static_cast<float>(m_native_width);
     push.source_size[1] = static_cast<float>(kHeight);
     push.target_size[0] = box.width;
@@ -220,6 +217,7 @@ void PresentPass::present(u32 window_width, u32 window_height)
     push.crop_barrel    = map.barrel ? 1U : 0U;
     push.barrel_centre  = map.centre;
     push.barrel_radius  = map.radius;
+    push.gain           = m_options.gain;
 
     UseProgram(m_program);
     BindBuffer(GL_UNIFORM_BUFFER, m_push_ubo);

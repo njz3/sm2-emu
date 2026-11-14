@@ -1,14 +1,16 @@
-#  ____  __  __  ____         _____ __  __ _   _
-# / ___||  \/  ||___ \       | ____|  \/  | | | |
-# \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-#  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-# |____/|_|  |_||_____|      |_____|_|  |_|\___/
+# ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+# ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+# █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+# ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+# ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+# ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+#            継 承  ( k e i s h ō )
 #
-# A Sega Model 1 & 2 arcade emulator.
+# A Sega Model 1, 2 & 3 arcade emulator.
 # Copyright (c) 2025+ Daniel Martin (dmanlfc)
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# This header must not be removed. sm2-emu is licensed under the GNU General
+# This header must not be removed. Keisho is licensed under the GNU General
 # Public License, version 3 or later, with additional terms under section 7 of
 # that licence. See LICENSE and NOTICE.
 #
@@ -35,13 +37,23 @@ endif()
 # ---------------------------------------------------------------------------
 # sm2_render — backend-neutral render support
 # ---------------------------------------------------------------------------
-# render/geometry.cpp (render::triangulate() etc.) has no Vulkan or GL
-# dependency and every backend needs it, so it is always built here rather than
-# inside the Vulkan target -- otherwise a GL-only or Vulkan-less build loses it.
+# Every backend needs render/geometry.cpp, so it lives here rather than in a
+# GPU backend target.
 
 add_library(sm2_render STATIC
     render/geometry.cpp
     render/image_write.cpp
+    render/model3/frame_plan.cpp
+    render/model3/model3_frame.cpp
+    render/model3/r3d_math.cpp
+    render/model3/r3d_model.cpp
+    render/model3/scene.cpp
+    render/model3/soft_backend.cpp
+    render/model3/soft_render.cpp
+    render/model3/texture_dump.cpp
+    render/model3/texture_key.cpp
+    render/model3/textures.cpp
+    render/model3/tilegen.cpp
     render/panorama.cpp
     render/texture_dump.cpp
     render/texture_key.cpp
@@ -65,6 +77,7 @@ if(SM2_BUILD_VULKAN)
     add_library(sm2_render_vk STATIC
         render/vk/context.cpp
         render/vk/frame_capture.cpp
+        render/vk/model3_pass.cpp
         render/vk/poly3d_pass.cpp
         render/vk/present_pass.cpp
         render/vk/tilemap_pass.cpp
@@ -72,10 +85,8 @@ if(SM2_BUILD_VULKAN)
         render/vk/vma_impl.cpp
         render/vk/vulkan_backend.cpp
     )
-    # sm2_hw is a dependency of the 3D pass alone, which reads the geometry
-    # engine's output and asks the video stage to resolve each polygon's colour.
-    # It is private because nothing in this library's headers exposes those
-    # types by value. sm2_render carries render::triangulate().
+    # sm2_hw is needed only by the 3D pass, and no header here exposes its
+    # types by value, so it is private.
     target_link_libraries(sm2_render_vk
         PUBLIC
             sm2_core
@@ -90,20 +101,15 @@ if(SM2_BUILD_VULKAN)
             SDL3::SDL3
     )
     # GCC 12-14 emit a spurious -Wfree-nonheap-object inside std::vector when it
-    # over-inlines allocate/deallocate at -O2+ (seen in context.cpp's instance
-    # setup on the aarch64 toolchain); the code is correct, so silence it here.
+    # over-inlines allocate/deallocate at -O2+.
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         target_compile_options(sm2_render_vk PRIVATE -Wno-free-nonheap-object)
     endif()
 endif()
 
 # ---------------------------------------------------------------------------
-# sm2_render_gl — OpenGL 4.3 core desktop backend (phase 9)
+# sm2_render_gl — OpenGL 4.3 core desktop backend
 # ---------------------------------------------------------------------------
-# render/geometry.cpp is not listed here: it is sm2_render_vk's, and this
-# target links that library to reach it rather than compiling a second copy
-# -- see render/geometry.h's own doc comment for why that logic must not be
-# duplicated per backend.
 
 if(SM2_BUILD_OPENGL_DESKTOP OR SM2_BUILD_OPENGL_ES)
     if(SM2_BUILD_OPENGL_DESKTOP AND SM2_BUILD_OPENGL_ES)
@@ -120,11 +126,10 @@ if(SM2_BUILD_OPENGL_DESKTOP OR SM2_BUILD_OPENGL_ES)
         render/gl/gl_poly3d_pass.cpp
         render/gl/gl_present_pass.cpp
         render/gl/gl_tilemap_pass.cpp
+        render/gl/model3_pass.cpp
     )
-    # sm2_hw is used through headers only (types forward-declared), so it is
-    # not linked here -- sm2-emu's own link line supplies it. sm2_render (not
-    # sm2_render_vk) carries render::triangulate(), so the GL backend builds
-    # with Vulkan absent.
+    # sm2_hw is used through forward declarations only; keisho's own link line
+    # supplies it.
     target_link_libraries(sm2_render_gl
         PUBLIC
             sm2_core
@@ -144,9 +149,8 @@ endif()
 # ---------------------------------------------------------------------------
 # sm2_cpu — CPU cores ported from MAME
 # ---------------------------------------------------------------------------
-# Held to the relaxed warning profile: these files are kept textually close to
-# their MAME originals so upstream fixes stay diffable, and reformatting them to
-# satisfy our own warning set would destroy that.
+# Held to the relaxed warning profile: these files stay textually close to
+# their MAME originals so upstream fixes remain diffable.
 
 add_library(sm2_cpu STATIC
     cpu/i960/i960.cpp
@@ -166,9 +170,8 @@ target_link_libraries(sm2_cpu
 # ---------------------------------------------------------------------------
 # sm2_cpu_m68000 — the sound board's 68000
 # ---------------------------------------------------------------------------
-# Separate from sm2_cpu because its provenance is different: the core is Musashi
-# (MIT) rather than MAME, and the glue here is ours, so unlike sm2_cpu's contents
-# it is held to the strict warning profile.
+# Separate from sm2_cpu because the core is Musashi (MIT) rather than MAME and
+# the glue is ours, so it is held to the strict warning profile.
 
 add_library(sm2_cpu_m68000 STATIC
     cpu/m68000/m68000.cpp
@@ -178,6 +181,46 @@ target_link_libraries(sm2_cpu_m68000
         sm2_core
         sm2_musashi
     PRIVATE
+        sm2_warnings
+)
+
+# ---------------------------------------------------------------------------
+# sm2_cpu_jit — JIT infrastructure shared by the dynamically recompiled cores
+# ---------------------------------------------------------------------------
+# Both emitters are built on every host, whichever one it runs.
+
+add_library(sm2_cpu_jit STATIC
+    cpu/jit/arm64_emitter.cpp
+    cpu/jit/block_cache.cpp
+    cpu/jit/code_buffer.cpp
+    cpu/jit/dispatcher.cpp
+    cpu/jit/guest_memory.cpp
+    cpu/jit/x64_emitter.cpp
+)
+target_link_libraries(sm2_cpu_jit
+    PUBLIC
+        sm2_core
+    PRIVATE
+        sm2_warnings
+)
+
+# ---------------------------------------------------------------------------
+# sm2_cpu_ppc — the Model 3 PowerPC 603e / 603ev
+# ---------------------------------------------------------------------------
+
+add_library(sm2_cpu_ppc STATIC
+    cpu/ppc/ppc.cpp
+    cpu/ppc/ppc_decode.cpp
+    cpu/ppc/ppc_helper.cpp
+    cpu/ppc/ppc_interp.cpp
+    cpu/ppc/ppc_jit_arm64.cpp
+    cpu/ppc/ppc_jit_x64.cpp
+)
+target_link_libraries(sm2_cpu_ppc
+    PUBLIC
+        sm2_core
+    PRIVATE
+        sm2_cpu_jit
         sm2_warnings
 )
 
@@ -204,9 +247,7 @@ target_link_libraries(sm2_rom
 # ---------------------------------------------------------------------------
 # sm2_hw_ported — hardware emulation kept textually close to its MAME original
 # ---------------------------------------------------------------------------
-# Same reasoning as sm2_cpu: these files are deliberately not reformatted to
-# satisfy our own warning set, because doing so would destroy the ability to diff
-# them against upstream when MAME fixes something.
+# Relaxed warning profile, for the same reason as sm2_cpu.
 
 add_library(sm2_hw_ported STATIC
     hw/geometrizer.cpp
@@ -239,7 +280,6 @@ add_library(sm2_hw STATIC
     hw/m1audio.cpp
     hw/m1comm.cpp
     hw/m2comm.cpp
-    hw/machine_factory.cpp
     hw/mb8421.cpp
     hw/model1io.cpp
     hw/model1io2.cpp
@@ -278,12 +318,68 @@ target_link_libraries(sm2_hw
         sm2_ymfm
     PRIVATE
         sm2_warnings
+        sm2_miniz
 )
 # The second SCSP core (see SCSP.md). Held to the strict warning profile: it
 # is our own code, not a port kept diffable against an upstream.
 if(SM2_SCSP_MEDNAFEN)
     target_sources(sm2_hw PRIVATE hw/scsp_mdfn.cpp)
     target_compile_definitions(sm2_hw PRIVATE SM2_HAVE_SCSP_MEDNAFEN=1)
+endif()
+
+# ---------------------------------------------------------------------------
+# sm2_hw_model3 — the Sega Model 3 machine, its chips and its sound board
+# ---------------------------------------------------------------------------
+# Builds on sm2_hw (EEPROM, 315-5881, link board). create_machine lives in
+# sm2_machines below so the two do not depend on each other.
+
+add_library(sm2_hw_model3 STATIC
+    hw/model3/drive_board.cpp
+    hw/model3/jtag.cpp
+    hw/model3/model3.cpp
+    hw/model3/model3_cpu_ppc.cpp
+    hw/model3/model3_sound.cpp
+    hw/model3/mpc10x.cpp
+    hw/model3/net_board.cpp
+    hw/model3/real3d.cpp
+    hw/model3/rtc72421.cpp
+    hw/model3/scheduler.cpp
+    hw/model3/scsi_53c810.cpp
+    hw/model3/tilegen.cpp
+)
+target_link_libraries(sm2_hw_model3
+    PUBLIC
+        sm2_core
+        sm2_hw
+        sm2_rom
+    PRIVATE
+        sm2_warnings
+        sm2_miniz
+)
+
+# sm2_machines — create_machine(), which constructs every board
+add_library(sm2_machines STATIC hw/machine_factory.cpp)
+target_link_libraries(sm2_machines
+    PUBLIC
+        sm2_hw
+        sm2_hw_model3
+    PRIVATE
+        sm2_warnings
+)
+
+# Deferred so it does not depend on where sm2_cpu_ppc is defined in this file.
+function(sm2_model3_link_ppc)
+    if(TARGET sm2_cpu_ppc)
+        target_compile_definitions(sm2_hw_model3 PRIVATE SM2_MODEL3_HAVE_PPC=1)
+        target_link_libraries(sm2_hw_model3 PUBLIC sm2_cpu_ppc)
+    endif()
+endfunction()
+cmake_language(DEFER CALL sm2_model3_link_ppc)
+
+# Without the SoundPort adapter the machine runs silent.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/hw/model3/model3_sound_port.cpp")
+    target_sources(sm2_hw_model3 PRIVATE hw/model3/model3_sound_port.cpp)
+    target_compile_definitions(sm2_hw_model3 PRIVATE SM2_MODEL3_HAVE_SOUND=1)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -362,10 +458,10 @@ if(SM2_HAVE_CURL)
 endif()
 
 # ---------------------------------------------------------------------------
-# sm2-emu — the executable
+# Keisho — the executable
 # ---------------------------------------------------------------------------
 
-add_executable(sm2-emu
+add_executable(keisho
     main.cpp
     agent.cpp
     telemetry/telemetry.cpp
@@ -381,22 +477,21 @@ add_executable(sm2-emu
     telemetry/manxtt.cpp
 )
 
-# On macOS build a proper .app bundle so the Finder/Dock show the icon and the
-# app is double-clickable. The .icns is carried inside the bundle as a resource
-# and named in Info.plist; games.xml is staged into Contents/Resources below.
+# On macOS build a .app bundle so Finder and the Dock show the icon.
 if(SM2_PLATFORM_MACOS)
-    set(SM2_MACOS_ICNS "${CMAKE_SOURCE_DIR}/data/icons/sm2-emu.icns")
-    set_target_properties(sm2-emu PROPERTIES
+    set(SM2_MACOS_ICNS "${CMAKE_SOURCE_DIR}/data/icons/keisho.icns")
+    set_target_properties(keisho PROPERTIES
+        OUTPUT_NAME   "Keisho"
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_INFO_PLIST      "${CMAKE_SOURCE_DIR}/cmake/Info.plist.in"
-        MACOSX_BUNDLE_BUNDLE_NAME     "SM2 Emulator"
-        MACOSX_BUNDLE_GUI_IDENTIFIER  "dev.dmanlfc.sm2-emu"
+        MACOSX_BUNDLE_BUNDLE_NAME     "Keisho"
+        MACOSX_BUNDLE_GUI_IDENTIFIER  "io.github.keisho-emu.keisho"
         MACOSX_BUNDLE_BUNDLE_VERSION        "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING  "${PROJECT_VERSION}"
-        MACOSX_BUNDLE_ICON_FILE       "sm2-emu.icns")
+        MACOSX_BUNDLE_ICON_FILE       "keisho.icns")
     # Package the icns and the ROM database into Contents/Resources so the
-    # bundle is self-contained (and stays so when installed/copied).
-    target_sources(sm2-emu PRIVATE
+    # bundle is self-contained.
+    target_sources(keisho PRIVATE
         "${SM2_MACOS_ICNS}"
         "${CMAKE_SOURCE_DIR}/data/games.xml")
     set_source_files_properties(
@@ -405,70 +500,70 @@ if(SM2_PLATFORM_MACOS)
         PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
     # The overlay's translations, in Contents/Resources/lang.
     file(GLOB SM2_LANG_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/lang/*.po")
-    target_sources(sm2-emu PRIVATE ${SM2_LANG_FILES})
+    target_sources(keisho PRIVATE ${SM2_LANG_FILES})
     set_source_files_properties(${SM2_LANG_FILES}
         PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/lang")
+    # Fonts for scripts a system may lack, in Contents/Resources/lang/fonts.
+    file(GLOB SM2_LANG_FONTS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/lang/fonts/*")
+    target_sources(keisho PRIVATE ${SM2_LANG_FONTS})
+    set_source_files_properties(${SM2_LANG_FONTS}
+        PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/lang/fonts")
 elseif(SM2_PLATFORM_WINDOWS)
-    # Compile the .ico into the .exe so Explorer/taskbar show it. MSVC builds
-    # any .rc listed as a source automatically. The window icon while running is
-    # set separately in osd/window.cpp.
-    set(SM2_WIN_ICON "${CMAKE_SOURCE_DIR}/data/icons/sm2-emu.ico")
+    # Compile the .ico into the .exe so Explorer and the taskbar show it. The
+    # running window's icon is set in osd/window.cpp.
+    set(SM2_WIN_ICON "${CMAKE_SOURCE_DIR}/data/icons/keisho.ico")
     configure_file(
-        "${CMAKE_SOURCE_DIR}/cmake/sm2-emu.rc.in"
-        "${CMAKE_BINARY_DIR}/sm2-emu.rc"
+        "${CMAKE_SOURCE_DIR}/cmake/keisho.rc.in"
+        "${CMAKE_BINARY_DIR}/keisho.rc"
         @ONLY)
-    target_sources(sm2-emu PRIVATE "${CMAKE_BINARY_DIR}/sm2-emu.rc")
+    target_sources(keisho PRIVATE "${CMAKE_BINARY_DIR}/keisho.rc")
     # Delay-load the Vulkan loader: an old or missing vulkan-1.dll lacks the
     # 1.3 exports and would stop the exe starting, even for OpenGL/software.
     if(MSVC AND SM2_BUILD_VULKAN)
-        target_link_options(sm2-emu PRIVATE "/DELAYLOAD:vulkan-1.dll")
-        target_link_libraries(sm2-emu PRIVATE delayimp)
+        target_link_options(keisho PRIVATE "/DELAYLOAD:vulkan-1.dll")
+        target_link_libraries(keisho PRIVATE delayimp)
     endif()
 endif()
-# sm2_core is not listed: sm2_osd and sm2_hw expose it PUBLIC, and naming it
-# again makes the linker warn about a duplicate archive. sm2_hw brings in
-# sm2_cpu and sm2_rom the same way. sm2_render (backend-neutral geometry) is
-# linked directly so it is present whichever GPU backends are, or are not,
-# built.
-target_link_libraries(sm2-emu
+# sm2_core, sm2_cpu and sm2_rom come in PUBLIC through sm2_osd and sm2_hw;
+# naming them again makes the linker warn about duplicate archives.
+target_link_libraries(keisho
     PRIVATE
         sm2_osd
         sm2_render
         sm2_hw
+        sm2_hw_model3
+        sm2_machines
         sm2_warnings
 )
 if(SM2_BUILD_VULKAN)
-    target_link_libraries(sm2-emu PRIVATE sm2_render_vk)
+    target_link_libraries(keisho PRIVATE sm2_render_vk)
 endif()
 if(SM2_BUILD_OPENGL_DESKTOP OR SM2_BUILD_OPENGL_ES)
-    target_link_libraries(sm2-emu PRIVATE sm2_render_gl)
+    target_link_libraries(keisho PRIVATE sm2_render_gl)
 endif()
 
-target_compile_definitions(sm2-emu PRIVATE
+target_compile_definitions(keisho PRIVATE
     $<$<BOOL:${SM2_BUILD_VULKAN}>:SM2_HAVE_VULKAN=1>
     $<$<BOOL:${SM2_BUILD_OPENGL_DESKTOP}>:SM2_HAVE_OPENGL_DESKTOP=1>
     $<$<BOOL:${SM2_BUILD_OPENGL_ES}>:SM2_HAVE_OPENGL_ES=1>
 )
 
-# Keep games.xml beside the binary so a freshly built tree runs without any
-# environment set up. GameDatabase::locate also looks in ../share/sm2-emu for
-# installed builds. On macOS games.xml is packaged into the bundle's
-# Contents/Resources instead (see the bundle setup above), so this staging is
-# only for the non-bundle layouts.
+# Keep games.xml beside the binary so a freshly built tree runs as is. The
+# macOS bundle carries it in Contents/Resources instead.
 if(NOT SM2_PLATFORM_MACOS)
-    add_custom_command(TARGET sm2-emu POST_BUILD
+    add_custom_command(TARGET keisho POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${CMAKE_SOURCE_DIR}/data/games.xml"
-                "$<TARGET_FILE_DIR:sm2-emu>/games.xml"
+                "$<TARGET_FILE_DIR:keisho>/games.xml"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_SOURCE_DIR}/data/lang"
-                "$<TARGET_FILE_DIR:sm2-emu>/lang"
+                "$<TARGET_FILE_DIR:keisho>/lang"
         COMMENT "Staging games.xml and translations"
         VERBATIM
     )
 endif()
 
-target_compile_definitions(sm2-emu PRIVATE
+target_compile_definitions(keisho PRIVATE
     SM2_VERSION="${PROJECT_VERSION}"
     $<$<BOOL:${SM2_ENABLE_VALIDATION}>:SM2_ENABLE_VALIDATION=1>
 )
@@ -485,8 +580,8 @@ add_custom_target(sm2_build_version
     BYPRODUCTS "${sm2_build_version_header}"
     COMMENT "Build version from git describe"
     VERBATIM)
-add_dependencies(sm2-emu sm2_build_version)
-target_include_directories(sm2-emu PRIVATE "${SM2_GENERATED_DIR}")
+add_dependencies(keisho sm2_build_version)
+target_include_directories(keisho PRIVATE "${SM2_GENERATED_DIR}")
 
 # On macOS the Vulkan loader is not in a default search path, so record where
 # it was found. Without this the binary only runs from a shell that has sourced
@@ -495,7 +590,7 @@ if(SM2_PLATFORM_MACOS AND SM2_BUILD_VULKAN)
     get_target_property(sm2_vulkan_library Vulkan::Vulkan IMPORTED_LOCATION)
     if(sm2_vulkan_library)
         get_filename_component(sm2_vulkan_dir "${sm2_vulkan_library}" DIRECTORY)
-        set_target_properties(sm2-emu PROPERTIES
+        set_target_properties(keisho PROPERTIES
             BUILD_RPATH   "${sm2_vulkan_dir}"
             INSTALL_RPATH "${sm2_vulkan_dir}")
     endif()
@@ -505,62 +600,59 @@ endif()
 # Installation
 # ---------------------------------------------------------------------------
 # `cmake --install` lays the emulator out in a standard prefix:
-#   bin/sm2-emu                          the executable
-#   share/sm2-emu/games.xml              the ROM database (GameDatabase::locate
-#                                        searches ../share/sm2-emu for it)
-#   share/sm2-emu/lang/*.po              the overlay's translations
-# plus the desktop-integration icons per platform (below). The in-window icon 
-# is compiled in separately (src/osd/app_icon.h) and does not depend on any of 
-# this being installed.
+#   bin/keisho                          the executable
+#   share/keisho/games.xml              the ROM database (GameDatabase::locate
+#                                        searches ../share/keisho for it)
+#   share/keisho/lang/*.po              the overlay's translations
+#   share/keisho/lang/fonts/*.ttf       fonts for scripts the system may lack
+# plus the desktop-integration icons per platform (below). The in-window icon
+# is compiled in (src/osd/app_icon.h).
 
 include(GNUInstallDirs)
 
 set(SM2_ICON_DIR "${CMAKE_SOURCE_DIR}/data/icons")
 
 if(SM2_PLATFORM_MACOS)
-    # The .app is self-contained (executable + icns + games.xml inside it), so
-    # it installs to a Applications-style bundle directory and needs nothing
-    # alongside it.
-    install(TARGETS sm2-emu BUNDLE DESTINATION ".")
+    # The .app is self-contained and needs nothing alongside it.
+    install(TARGETS keisho BUNDLE DESTINATION ".")
 elseif(SM2_PLATFORM_WINDOWS)
     # Keep games.xml beside the .exe (GameDatabase::locate checks the exe dir)
     # so the install prefix is one self-contained folder to zip and run.
-    install(TARGETS sm2-emu RUNTIME DESTINATION ".")
+    install(TARGETS keisho RUNTIME DESTINATION ".")
     install(FILES "${CMAKE_SOURCE_DIR}/data/games.xml" DESTINATION ".")
     install(DIRECTORY "${CMAKE_SOURCE_DIR}/data/lang" DESTINATION "."
-            FILES_MATCHING PATTERN "*.po")
-    install(FILES "${SM2_ICON_DIR}/sm2-emu.ico" DESTINATION ".")
+            FILES_MATCHING PATTERN "*.po" PATTERN "*.ttf" PATTERN "OFL.txt")
+    install(FILES "${SM2_ICON_DIR}/keisho.ico" DESTINATION ".")
 else()
-    install(TARGETS sm2-emu RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(TARGETS keisho RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     install(FILES "${CMAKE_SOURCE_DIR}/data/games.xml"
-            DESTINATION "${CMAKE_INSTALL_DATADIR}/sm2-emu")
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/keisho")
     install(DIRECTORY "${CMAKE_SOURCE_DIR}/data/lang"
-            DESTINATION "${CMAKE_INSTALL_DATADIR}/sm2-emu"
-            FILES_MATCHING PATTERN "*.po")
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/keisho"
+            FILES_MATCHING PATTERN "*.po" PATTERN "*.ttf" PATTERN "OFL.txt")
 endif()
 
 if(SM2_PLATFORM_LINUX)
-    # Freedesktop hicolor icon theme: one PNG per size under
-    # share/icons/hicolor/<size>x<size>/apps/, named after the .desktop's Icon
-    # key (sm2-emu). The desktop environment picks the best size automatically.
+    # Freedesktop hicolor icon theme: one PNG per size, named after the
+    # .desktop file's Icon key.
     foreach(sz 48 128 256 512)
-        install(FILES "${SM2_ICON_DIR}/sm2-emu-${sz}.png"
+        install(FILES "${SM2_ICON_DIR}/keisho-${sz}.png"
                 DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/${sz}x${sz}/apps"
-                RENAME "sm2-emu.png")
+                RENAME "keisho.png")
     endforeach()
     # Scalable slot: our SVG carries the exact artwork, so hand it to themes
     # that prefer scalable icons.
-    install(FILES "${SM2_ICON_DIR}/sm2-emu.svg"
+    install(FILES "${SM2_ICON_DIR}/keisho.svg"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps")
 
     # A .desktop launcher so the icon and app show up in the applications menu.
     configure_file(
-        "${CMAKE_SOURCE_DIR}/cmake/sm2-emu.desktop.in"
-        "${CMAKE_BINARY_DIR}/sm2-emu.desktop"
+        "${CMAKE_SOURCE_DIR}/cmake/keisho.desktop.in"
+        "${CMAKE_BINARY_DIR}/keisho.desktop"
         @ONLY)
-    install(FILES "${CMAKE_BINARY_DIR}/sm2-emu.desktop"
+    install(FILES "${CMAKE_BINARY_DIR}/keisho.desktop"
             DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
 endif()
 
-# macOS needs nothing extra here: the icon (sm2-emu.icns) and games.xml are
+# macOS needs nothing extra here: the icon (keisho.icns) and games.xml are
 # packaged inside the .app bundle above.

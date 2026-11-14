@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -21,7 +23,7 @@
 
 namespace sm2::hw {
 
-class Model2MachineBase;
+class Machine;
 
 /// Recent machine states, for stepping back through play.
 ///
@@ -37,12 +39,12 @@ public:
     void clear();
 
     /// Call after every frame the machine runs forward.
-    void capture(const Model2MachineBase& machine);
+    void capture(const Machine& machine);
 
     /// Restore the newest snapshot and make the one before it the newest. The
     /// oldest is kept, so holding rewind stops there. False when there is
     /// nothing to restore.
-    bool step_back(Model2MachineBase& machine);
+    bool step_back(Machine& machine);
 
     [[nodiscard]] usize snapshots() const { return m_current.empty() ? 0 : m_deltas.size() + 1; }
     [[nodiscard]] usize bytes_used() const { return m_current.size() + m_delta_bytes; }

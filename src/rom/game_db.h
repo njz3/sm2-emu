@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -44,13 +46,17 @@ public:
     [[nodiscard]] static std::optional<std::string> locate();
 
 private:
+    /// What each set declared itself, where the parsed value cannot tell.
+    struct Declarations {
+        std::set<std::string> board_inherited;  ///< Clones with no board attribute.
+        std::set<std::string> protection;       ///< Sets with a protection attribute,
+                                                ///< "none" included.
+        std::set<std::string> model3;           ///< Sets with a <model3> element.
+    };
+
     /// Fold each clone's parent into it, so a child set need only list the
     /// chips that differ.
-    ///
-    /// `board_inherited` names the clones that declared no board of their own, so
-    /// the merge can take the parent's. Passed in rather than stored on GameSpec
-    /// because it is a fact about the file, not about the hardware.
-    [[nodiscard]] bool merge_clones(const std::set<std::string>& board_inherited);
+    [[nodiscard]] bool merge_clones(const Declarations& declared);
 
     std::vector<GameSpec> m_games;
 };

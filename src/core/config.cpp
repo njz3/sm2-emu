@@ -1,18 +1,22 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
 #include "core/config.h"
+
+#include "core/log.h"
 
 #include <algorithm>
 #include <array>
@@ -27,7 +31,12 @@
 namespace sm2 {
 namespace {
 
-constexpr const char* kFileName = "sm2-emu.ini";
+constexpr const char* kFileName = "keisho.ini";
+#if defined(_WIN32) || defined(__APPLE__)
+constexpr const char* kDirName = "Keisho";
+#else
+constexpr const char* kDirName = "keisho";
+#endif
 
 /// Mirrors render::kMaxRenderScale; kept local to avoid pulling in the render
 /// backend header just for a clamp bound.
@@ -242,6 +251,7 @@ constexpr std::array<const char*, Config::kWheelRoleCount> kWheelRoleNames = {
     "start", "coin", "1", "2", "3", "4", "gear_up", "gear_down",
     "test", "service", "menu", "gear_1", "gear_2", "gear_3", "gear_4", "gear_neutral",
 };
+constexpr std::array<const char*, 3> kLightgunModeNames = {"auto", "on", "off"};
 
 /// Shortcut names in the ini, after "key_", in Config::Hotkey order.
 constexpr std::array<const char*, Config::kHotkeyCount> kHotkeyNames = {
@@ -277,25 +287,29 @@ constexpr std::array<const char*, Config::kPadAxisCount> kPadAxisNames = {
     return (value != nullptr && value[0] != '\0') ? value : nullptr;
 }
 
+[[nodiscard]] std::filesystem::path app_directory(const std::filesystem::path& parent)
+{
+    return parent / kDirName;
+}
+
 /// The platform's config directory. Not SDL's preferences path, which on Linux
 /// is the XDG *data* directory; config belongs in the config directory.
 [[nodiscard]] std::filesystem::path config_directory()
 {
 #if defined(_WIN32)
     if (const char* appdata = environment("APPDATA")) {
-        return std::filesystem::path(appdata) / "sm2-emu";
+        return app_directory(appdata);
     }
 #elif defined(__APPLE__)
     if (const char* home = environment("HOME")) {
-        return std::filesystem::path(home) / "Library" / "Application Support"
-             / "sm2-emu";
+        return app_directory(std::filesystem::path(home) / "Library" / "Application Support");
     }
 #else
     if (const char* xdg = environment("XDG_CONFIG_HOME")) {
-        return std::filesystem::path(xdg) / "sm2-emu";
+        return app_directory(xdg);
     }
     if (const char* home = environment("HOME")) {
-        return std::filesystem::path(home) / ".config" / "sm2-emu";
+        return app_directory(std::filesystem::path(home) / ".config");
     }
 #endif
     return std::filesystem::path();  // no home directory; caller falls back to cwd
@@ -322,6 +336,108 @@ bool parse_log_level(const std::string& name, log::Level* out_level)
     return true;
 }
 
+std::string config_file_in(const std::string& directory)
+{
+    return (std::filesystem::path(directory) / kFileName).string();
+}
+
+namespace {
+
+constexpr const char* kLegacyFileName = "sm2-emu.ini";
+constexpr const char* kLegacyDirName  = "sm2-emu";
+
+/// Copy `from` into `to`, what `to` already has kept, and in each copied ini
+/// the old folder's path changed into the new one's.
+void copy_legacy_tree(const std::filesystem::path& from, const std::filesystem::path& to)
+{
+    namespace fs = std::filesystem;
+    std::error_code error;
+    fs::create_directories(to, error);
+    fs::copy(from, to, fs::copy_options::recursive | fs::copy_options::skip_existing, error);
+    if (error) {
+        SM2_WARN("settings: could not copy %s to %s: %s", from.string().c_str(),
+                 to.string().c_str(), error.message().c_str());
+    }
+    const std::string old_path = from.string();
+    const std::string new_path = to.string();
+    for (const fs::directory_entry& entry : fs::directory_iterator(to, error)) {
+        if (entry.path().extension() != ".ini") {
+            continue;
+        }
+        std::ifstream in(entry.path(), std::ios::binary);
+        std::string   text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        in.close();
+        bool changed = false;
+        for (usize at = text.find(old_path); at != std::string::npos;
+             at = text.find(old_path, at + new_path.size())) {
+            text.replace(at, old_path.size(), new_path);
+            changed = true;
+        }
+        if (changed) {
+            std::ofstream(entry.path(), std::ios::binary | std::ios::trunc) << text;
+        }
+    }
+}
+
+}  // namespace
+
+std::string migrate_legacy_settings(const std::string& config_path, bool default_location)
+{
+    namespace fs = std::filesystem;
+    std::error_code error;
+    const fs::path  path(config_path);
+    if (fs::exists(path, error)) {
+        return config_path;
+    }
+    // An ini naming a write folder: nothing is written beside it, the write
+    // folder takes the settings over (main.cpp's --write-dir).
+    const auto writes_elsewhere = [](const fs::path& ini) {
+        Config                   probe;
+        std::vector<std::string> ignored;
+        return load_config(ini.string(), &probe, &ignored) && !probe.write_dir.empty();
+    };
+    const fs::path dir    = path.parent_path();
+    const fs::path legacy = dir / kLegacyFileName;
+    if (!default_location || dir.empty()) {
+        // Beside the new name, in the same folder: sm2-emu.ini becomes it.
+        if (fs::exists(legacy, error)) {
+            if (writes_elsewhere(legacy)) {
+                return legacy.string();
+            }
+            fs::copy_file(legacy, path, error);
+            if (!error) {
+                SM2_INFO("settings: %s copied from %s", path.string().c_str(),
+                         legacy.string().c_str());
+            }
+        }
+        return config_path;
+    }
+    // The platform folders, sm2-emu's to Keisho's: the settings, each game's
+    // own, the saves, states and screenshots.
+    const auto legacy_of = [](const fs::path& folder) { return folder.parent_path() / kLegacyDirName; };
+    const fs::path old_config = legacy_of(dir);
+    if (!fs::exists(old_config / kLegacyFileName, error)) {
+        return config_path;
+    }
+    if (writes_elsewhere(old_config / kLegacyFileName)) {
+        return (old_config / kLegacyFileName).string();
+    }
+    copy_legacy_tree(old_config, dir);
+    const fs::path data = data_directory(false);
+    if (data != dir) {
+        const fs::path old_data = legacy_of(data);
+        if (fs::exists(old_data, error)) {
+            copy_legacy_tree(old_data, data);
+        }
+    }
+    if (fs::exists(dir / kLegacyFileName, error) && !fs::exists(path, error)) {
+        fs::rename(dir / kLegacyFileName, path, error);
+    }
+    SM2_INFO("settings: sm2-emu's copied from %s to %s", old_config.string().c_str(),
+             dir.string().c_str());
+    return config_path;
+}
+
 std::string default_config_path()
 {
     // A file in the working directory wins, keeping a checked-out copy self-contained.
@@ -329,12 +445,16 @@ std::string default_config_path()
     if (std::filesystem::exists(kFileName, error) && !error) {
         return kFileName;
     }
+    // An sm2-emu checkout's: the same file under the new name.
+    if (std::filesystem::exists(kLegacyFileName, error)) {
+        return migrate_legacy_settings(kFileName, false);
+    }
 
     const std::filesystem::path directory = config_directory();
     if (directory.empty()) {
         return kFileName;
     }
-    return (directory / kFileName).string();
+    return config_file_in(directory.string());
 }
 
 std::string data_directory(bool config_in_cwd)
@@ -346,20 +466,19 @@ std::string data_directory(bool config_in_cwd)
 
 #if defined(_WIN32)
     if (const char* appdata = environment("APPDATA")) {
-        return (std::filesystem::path(appdata) / "sm2-emu").string();
+        return app_directory(appdata).string();
     }
 #elif defined(__APPLE__)
     if (const char* home = environment("HOME")) {
-        return (std::filesystem::path(home) / "Library" / "Application Support"
-                / "sm2-emu").string();
+        return app_directory(std::filesystem::path(home) / "Library" / "Application Support").string();
     }
 #else
     // XDG_DATA_HOME, not the config dir's XDG_CONFIG_HOME.
     if (const char* xdg = environment("XDG_DATA_HOME")) {
-        return (std::filesystem::path(xdg) / "sm2-emu").string();
+        return app_directory(xdg).string();
     }
     if (const char* home = environment("HOME")) {
-        return (std::filesystem::path(home) / ".local" / "share" / "sm2-emu").string();
+        return app_directory(std::filesystem::path(home) / ".local" / "share").string();
     }
 #endif
     // No home directory: fall back to the working directory.
@@ -376,13 +495,10 @@ void resolve_default_paths(Config* config, bool config_in_cwd,
     if (config->screenshot_dir.empty()) {
         config->screenshot_dir = (base / "screenshots").string();
     }
-    // Save states live in a `states` subdirectory of the saves directory, so a
-    // user who relocates their saves (--nvram / nvram_dir) takes their states
-    // with them. Derived from the now-final nvram_dir; a runtime field only,
-    // not read from or written to the ini.
+    // Save states live under the saves directory, so relocating saves
+    // (--nvram / nvram_dir) takes the states too. Runtime only, not in the ini.
     config->states_dir = (std::filesystem::path(config->nvram_dir) / "states").string();
-    // Artwork always sits beside the config file; not user-adjustable, so set
-    // unconditionally (never read from the ini).
+    // Artwork always sits beside the config file; not user-adjustable.
     {
         const std::filesystem::path dir =
             config_dir.empty() ? std::filesystem::path(".") : std::filesystem::path(config_dir);
@@ -665,6 +781,8 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             if (!parse_bool(value, &out->borderless_fullscreen)) {
                 bad_value();
             }
+        } else if (key == "fullscreen_resolution") {
+            out->fullscreen_resolution = value;
         } else if (key == "fullscreen") {
             if (!parse_bool(value, &out->fullscreen)) {
                 bad_value();
@@ -675,6 +793,10 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             }
         } else if (key == "software_async") {
             if (!parse_bool(value, &out->software_async)) {
+                bad_value();
+            }
+        } else if (key == "model3_async") {
+            if (!parse_bool(value, &out->model3_async)) {
                 bad_value();
             }
         } else if (key == "software_slow_cores") {
@@ -696,8 +818,22 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
                 bad_value();
             }
         } else if (key == "lightgun") {
-            if (!parse_bool(value, &out->lightgun)) {
-                bad_value();
+            // An older file's true is On, and its false the default.
+            bool flag = false;
+            const std::string v = lowered(value);
+            bool known = false;
+            for (u32 m = 0; m < kLightgunModeNames.size(); ++m) {
+                if (v == kLightgunModeNames[m]) {
+                    out->lightgun = static_cast<Config::LightgunMode>(m);
+                    known         = true;
+                }
+            }
+            if (!known) {
+                if (parse_bool(value, &flag)) {
+                    out->lightgun = flag ? Config::LightgunMode::On : Config::LightgunMode::Auto;
+                } else {
+                    bad_value();
+                }
             }
         } else if (key == "lightgun_crosshair") {
             if (!parse_bool(value, &out->lightgun_crosshair)) {
@@ -916,6 +1052,10 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             if (mode == "original" || mode == "buffered") {
                 out->link_mode = mode;
             } else {
+                bad_value();
+            }
+        } else if (key == "link_delay") {
+            if (!parse_u32(value, &out->link_delay)) {
                 bad_value();
             }
         } else if (key == "wheel_ffb") {
@@ -1191,6 +1331,8 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
             out->rom_dir = value;
         } else if (key == "model1_rom_dir") {
             out->model1_rom_dir = value;
+        } else if (key == "model3_rom_dir") {
+            out->model3_rom_dir = value;
         } else if (key == "nvram_dir") {
             out->nvram_dir = value;
         } else if (key == "screenshot_dir") {
@@ -1289,12 +1431,12 @@ bool load_config_stream(std::istream& file, const std::string& path, Config* out
     out->crt_mask_strength     = std::min(out->crt_mask_strength, 100u);
     out->crt_glow_strength     = std::min(out->crt_glow_strength, 100u);
     out->crt_curvature         = std::min(out->crt_curvature, 100u);
-    // Anisotropy is a tap ceiling; clamp to a sane 1..16 here, and the backend
-    // further clamps to the device's maxSamplerAnisotropy at use time.
+    // The backend further clamps to the device's maxSamplerAnisotropy.
     out->anisotropy            = std::clamp(out->anisotropy, 1u, 16u);
     // A UDP port is 16-bit; floor at 1 since 0 binds an ephemeral port.
     out->link_port      = std::clamp(out->link_port, 1u, 65535u);
     out->link_next_port = std::clamp(out->link_next_port, 1u, 65535u);
+    out->link_delay     = std::clamp(out->link_delay, 1u, 30u);
     return true;
 }
 
@@ -1405,7 +1547,7 @@ void write_config(std::ostream& out, const Config& config)
         return config.wheel_buttons[cfg_role(role)];
     };
 
-    out << "# sm2-emu settings\n"
+    out << "# Keisho settings\n"
         << "\n[video]\n"
         << "graphics_backend = " << config.graphics_backend << "\n"
         << "gpu = " << config.gpu << "\n"
@@ -1413,6 +1555,7 @@ void write_config(std::ostream& out, const Config& config)
         << "throttle = " << bool_text(config.throttle) << "\n"
         << "fullscreen = " << bool_text(config.fullscreen) << "\n"
         << "borderless_fullscreen = " << bool_text(config.borderless_fullscreen) << "\n"
+        << "fullscreen_resolution = " << config.fullscreen_resolution << "\n"
         << "window_width = " << config.window_width << "\n"
         << "window_height = " << config.window_height << "\n"
         << "show_fps = " << bool_text(config.show_fps) << "\n"
@@ -1442,6 +1585,7 @@ void write_config(std::ostream& out, const Config& config)
         << "dump_textures = " << bool_text(config.dump_textures) << "\n"
         << "software_async = " << bool_text(config.software_async) << "\n"
         << "software_slow_cores = " << bool_text(config.software_slow_cores) << "\n"
+        << "model3_async = " << bool_text(config.model3_async) << "\n"
         << "\n[audio]\n"
         << "scsp_core = " << config.scsp_core << "\n"
         << "music_volume = " << config.music_volume << "\n"
@@ -1454,6 +1598,7 @@ void write_config(std::ostream& out, const Config& config)
     out << "\n[paths]\n"
         << "rom_dir = " << config.rom_dir << "\n"
         << "model1_rom_dir = " << config.model1_rom_dir << "\n"
+        << "model3_rom_dir = " << config.model3_rom_dir << "\n"
         << "nvram_dir = " << config.nvram_dir << "\n"
         << "screenshot_dir = " << config.screenshot_dir << "\n"
         << "write_dir = " << config.write_dir << "\n"
@@ -1513,7 +1658,7 @@ void write_config(std::ostream& out, const Config& config)
         }
     }
     out << "\n[lightgun]\n"
-        << "lightgun = " << bool_text(config.lightgun) << "\n"
+        << "lightgun = " << kLightgunModeNames[static_cast<usize>(config.lightgun)] << "\n"
         << "lightgun_crosshair = " << bool_text(config.lightgun_crosshair) << "\n"
         << "lightgun_hide_flash = " << bool_text(config.lightgun_hide_flash) << "\n"
         << "lightgun_pad_centred = " << bool_text(config.lightgun_pad_centred) << "\n"
@@ -1541,6 +1686,7 @@ void write_config(std::ostream& out, const Config& config)
         << "link_next_port = " << config.link_next_port << "\n"
         << "link_cabinet_index = " << config.link_cabinet_index << "\n"
         << "link_mode = " << config.link_mode << "\n"
+        << "link_delay = " << config.link_delay << "\n"
         << "outputs_network = " << bool_text(config.outputs_network) << "\n"
         << "outputs_network_port = " << config.outputs_network_port << "\n"
         << "outputs_network_udp_port = " << config.outputs_network_udp_port << "\n"

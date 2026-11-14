@@ -1,30 +1,24 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
 //
 // Audio output.
 //
-// The SCSP produces 44100 Hz stereo, and the machine hands over roughly 767
-// frames of it per video frame. This pushes those into an SDL_AudioStream, which
-// resamples to whatever the device wants and buffers on our behalf.
-//
-// SDL3's audio streams are pull-driven underneath but can be fed by pushing, with
-// no callback and no locking, which is what this does: the emulation thread is the
-// only thread involved. That is worth having because the alternative -- a callback
-// on SDL's audio thread reading a ring buffer the emulator writes -- needs either
-// a lock in the emulator's inner loop or a lock-free queue, and neither buys
-// anything when the producer already runs in real time.
+// Samples are pushed from the emulation thread into an SDL_AudioStream, which
+// resamples and buffers, so no callback or locking is needed.
 
 #pragma once
 
@@ -48,9 +42,8 @@ public:
     /// Open the default output device for `sample_rate` Hz interleaved stereo
     /// 16-bit.
     ///
-    /// Returns false if there is no usable device. That is not fatal: a machine
-    /// with no audio device still has to run, so the caller is expected to carry
-    /// on and let submit() do nothing.
+    /// Returns false if there is no usable device. Not fatal: the caller carries
+    /// on and submit() does nothing.
     [[nodiscard]] bool init(u32 sample_rate);
     void shutdown();
 
@@ -59,9 +52,7 @@ public:
     /// Queue interleaved stereo samples for playback.
     ///
     /// Drops the oldest audio if the queue has grown past kMaxQueuedMilliseconds,
-    /// which happens when the emulator runs unthrottled: a capture producing
-    /// frames five times faster than real time would otherwise build an
-    /// ever-growing delay and eventually exhaust memory.
+    /// as it does when the emulator runs unthrottled.
     void submit(std::span<const s16> samples);
 
     /// Stop and start playback, for the pause key. Queued audio is discarded on
@@ -73,8 +64,7 @@ public:
     [[nodiscard]] u32 queued_milliseconds() const;
 
     /// Queue trimmed to the target once it passes the ceiling. The ceiling is
-    /// several frames deep so a heavy graphics frame that briefly starves the
-    /// once-per-frame submit does not underrun the device (an audible pop).
+    /// several frames deep so a slow frame does not underrun the device.
     static constexpr u32 kTargetQueuedMilliseconds = 80;
     static constexpr u32 kMaxQueuedMilliseconds    = 200;
 

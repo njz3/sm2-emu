@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -16,15 +18,16 @@
 
 #include "core/log.h"
 
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
 namespace sm2::render::gl {
 
-// One X-macro list drives both the declarations in gl_common.h and the
-// definitions + loader here, so the two cannot drift out of sync with each
-// other. See gl_common.h's own top comment for why every entry is named
-// without its "gl" prefix.
+// One X-macro list drives the declarations in gl_common.h and the definitions
+// and loader here.
 // clang-format off
 #define SM2_GL_FUNCTION_LIST(F) \
     F(GenBuffers, PFNGLGENBUFFERSPROC) \
@@ -45,13 +48,10 @@ namespace sm2::render::gl {
     F(DeleteTextures, SM2_PFNGLDELETETEXTURESPROC) \
     F(BindTexture, SM2_PFNGLBINDTEXTUREPROC) \
     F(ActiveTexture, PFNGLACTIVETEXTUREPROC) \
-    F(TexStorage2D, PFNGLTEXSTORAGE2DPROC) \
-    F(TexStorage3D, PFNGLTEXSTORAGE3DPROC) \
     F(TexSubImage3D, PFNGLTEXSUBIMAGE3DPROC) \
     F(GenerateMipmap, PFNGLGENERATEMIPMAPPROC) \
     F(TexSubImage2D, SM2_PFNGLTEXSUBIMAGE2DPROC) \
     F(TexParameteri, SM2_PFNGLTEXPARAMETERIPROC) \
-    F(BindImageTexture, PFNGLBINDIMAGETEXTUREPROC) \
     F(GenSamplers, PFNGLGENSAMPLERSPROC) \
     F(DeleteSamplers, PFNGLDELETESAMPLERSPROC) \
     F(BindSampler, PFNGLBINDSAMPLERPROC) \
@@ -82,8 +82,6 @@ namespace sm2::render::gl {
     F(UseProgram, PFNGLUSEPROGRAMPROC) \
     F(UniformBlockBinding, PFNGLUNIFORMBLOCKBINDINGPROC) \
     F(GetUniformBlockIndex, PFNGLGETUNIFORMBLOCKINDEXPROC) \
-    F(DispatchCompute, PFNGLDISPATCHCOMPUTEPROC) \
-    F(MemoryBarrier, PFNGLMEMORYBARRIERPROC) \
     F(DrawArrays, SM2_PFNGLDRAWARRAYSPROC) \
     F(Enable, SM2_PFNGLENABLEPROC) \
     F(Disable, SM2_PFNGLDISABLEPROC) \
@@ -104,7 +102,17 @@ namespace sm2::render::gl {
     F(GetIntegerv, SM2_PFNGLGETINTEGERVPROC) \
     F(GetStringi, PFNGLGETSTRINGIPROC) \
     F(GetError, SM2_PFNGLGETERRORPROC) \
-    F(Finish, SM2_PFNGLFINISHPROC)
+    F(Finish, SM2_PFNGLFINISHPROC) \
+    F(BindBufferRange, PFNGLBINDBUFFERRANGEPROC) \
+    F(BlitFramebuffer, PFNGLBLITFRAMEBUFFERPROC) \
+    F(ClearBufferfv, PFNGLCLEARBUFFERFVPROC) \
+    F(ClearBufferuiv, PFNGLCLEARBUFFERUIVPROC) \
+    F(ClearBufferfi, PFNGLCLEARBUFFERFIPROC) \
+    F(PixelStorei, SM2_PFNGLPIXELSTOREIPROC) \
+    F(TexImage2D, SM2_PFNGLTEXIMAGE2DPROC) \
+    F(TexImage3D, PFNGLTEXIMAGE3DPROC) \
+    F(GetUniformLocation, PFNGLGETUNIFORMLOCATIONPROC) \
+    F(Uniform1i, PFNGLUNIFORM1IPROC)
 // clang-format on
 
 #define SM2_GL_DEFINE(name, type) type name = nullptr;
@@ -112,6 +120,12 @@ SM2_GL_FUNCTION_LIST(SM2_GL_DEFINE)
 #undef SM2_GL_DEFINE
 
 PFNGLBUFFERSTORAGEPROC BufferStorage = nullptr;
+PFNGLTEXBUFFERPROC     TexBuffer     = nullptr;
+PFNGLTEXSTORAGE2DPROC     TexStorage2D     = nullptr;
+PFNGLTEXSTORAGE3DPROC     TexStorage3D     = nullptr;
+PFNGLBINDIMAGETEXTUREPROC BindImageTexture = nullptr;
+PFNGLDISPATCHCOMPUTEPROC  DispatchCompute  = nullptr;
+PFNGLMEMORYBARRIERPROC    MemoryBarrier    = nullptr;
 
 namespace {
 bool g_loaded = false;
@@ -142,11 +156,104 @@ bool gl_functions_loaded()
 
 void resolve_buffer_storage(SDL_FunctionPointer (*get_proc)(const char*), bool is_es)
 {
-    // GLES exposes this only as glBufferStorageEXT, never under the
-    // unsuffixed desktop name. A null result is not an error here --
-    // create_persistent_buffer() falls back to BufferSubData.
+    // GLES has only glBufferStorageEXT. Null is fine: create_persistent_buffer()
+    // falls back to BufferSubData.
     BufferStorage = reinterpret_cast<PFNGLBUFFERSTORAGEPROC>(
         get_proc(is_es ? "glBufferStorageEXT" : "glBufferStorage"));
+}
+
+namespace {
+
+void storage_format(GLenum internal_format, GLenum* format, GLenum* type)
+{
+    switch (internal_format) {
+        case GL_RGBA8UI: *format = GL_RGBA_INTEGER; *type = GL_UNSIGNED_BYTE; return;
+        case GL_R16UI:   *format = GL_RED_INTEGER;  *type = GL_UNSIGNED_SHORT; return;
+        case GL_R32UI:   *format = GL_RED_INTEGER;  *type = GL_UNSIGNED_INT; return;
+        default:         *format = GL_RGBA;         *type = GL_UNSIGNED_BYTE; return;
+    }
+}
+
+// TexStorage emulated with mutable TexImage levels, capped by MAX_LEVEL so the
+// texture is complete exactly as an immutable one would be.
+void APIENTRY tex_storage_2d_fallback(GLenum target, GLsizei levels, GLenum internal_format,
+                                      GLsizei width, GLsizei height)
+{
+    GLenum format = 0;
+    GLenum type   = 0;
+    storage_format(internal_format, &format, &type);
+    for (GLsizei level = 0; level < levels; ++level) {
+        TexImage2D(target, level, static_cast<GLint>(internal_format), width, height, 0, format,
+                   type, nullptr);
+        width  = std::max(1, width / 2);
+        height = std::max(1, height / 2);
+    }
+    TexParameteri(target, GL_TEXTURE_MAX_LEVEL, levels - 1);
+}
+
+void APIENTRY tex_storage_3d_fallback(GLenum target, GLsizei levels, GLenum internal_format,
+                                      GLsizei width, GLsizei height, GLsizei depth)
+{
+    GLenum format = 0;
+    GLenum type   = 0;
+    storage_format(internal_format, &format, &type);
+    for (GLsizei level = 0; level < levels; ++level) {
+        TexImage3D(target, level, static_cast<GLint>(internal_format), width, height, depth, 0,
+                   format, type, nullptr);
+        width  = std::max(1, width / 2);
+        height = std::max(1, height / 2);
+        if (target == GL_TEXTURE_3D) {
+            depth = std::max(1, depth / 2);
+        }
+    }
+    TexParameteri(target, GL_TEXTURE_MAX_LEVEL, levels - 1);
+}
+
+}  // namespace
+
+bool resolve_optional_functions(SDL_FunctionPointer (*get_proc)(const char*), bool compute,
+                                bool texture_storage, std::string* out_error)
+{
+    TexStorage2D     = nullptr;
+    TexStorage3D     = nullptr;
+    BindImageTexture = nullptr;
+    DispatchCompute  = nullptr;
+    MemoryBarrier    = nullptr;
+    TexBuffer        = nullptr;
+    if (texture_storage) {
+        TexStorage2D = reinterpret_cast<PFNGLTEXSTORAGE2DPROC>(get_proc("glTexStorage2D"));
+        TexStorage3D = reinterpret_cast<PFNGLTEXSTORAGE3DPROC>(get_proc("glTexStorage3D"));
+    }
+    if (TexStorage2D == nullptr || TexStorage3D == nullptr) {
+        TexStorage2D = tex_storage_2d_fallback;
+        TexStorage3D = tex_storage_3d_fallback;
+    }
+    if (compute) {
+        BindImageTexture =
+            reinterpret_cast<PFNGLBINDIMAGETEXTUREPROC>(get_proc("glBindImageTexture"));
+        DispatchCompute = reinterpret_cast<PFNGLDISPATCHCOMPUTEPROC>(get_proc("glDispatchCompute"));
+        MemoryBarrier   = reinterpret_cast<PFNGLMEMORYBARRIERPROC>(get_proc("glMemoryBarrier"));
+        if (BindImageTexture == nullptr || DispatchCompute == nullptr || MemoryBarrier == nullptr) {
+            if (out_error != nullptr) {
+                *out_error = "could not resolve the compute entry points";
+            }
+            return false;
+        }
+    } else {
+        TexBuffer = reinterpret_cast<PFNGLTEXBUFFERPROC>(get_proc("glTexBuffer"));
+        if (TexBuffer == nullptr) {
+            if (out_error != nullptr) {
+                *out_error = "could not resolve glTexBuffer";
+            }
+            return false;
+        }
+    }
+    return true;
+}
+
+bool is_gl41()
+{
+    return std::strcmp(g_version_directive, kGl41VersionDirective) == 0;
 }
 
 const char* active_version_directive()
@@ -171,20 +278,13 @@ std::string prepare_gl_source(const char* embedded_source, const char* version_d
                                                     : line_end - version_pos + 1);
     }
 
-    // Strip Vulkan-only "set = N, " from layout qualifiers. OpenGL has no
-    // descriptor sets -- it uses a flat binding-point namespace -- so the
-    // set qualifier is illegal in desktop GLSL and must be removed. The
-    // shaders are authored for Vulkan (where set is required) and shared
-    // with the GL backend via this mechanical rewrite.
-    //
-    // The match requires that "set" is not preceded by an alphanumeric or
-    // underscore character, to avoid false positives like "offset = ...".
+    // Strip Vulkan-only "set = N, " from layout qualifiers; GL has no
+    // descriptor sets. "set" must not follow an identifier character, so
+    // "offset = ..." is left alone.
     {
         const std::string pattern = "set = ";
         usize pos = 0;
         while ((pos = source.find(pattern, pos)) != std::string::npos) {
-            // Only match if "set" is at the start or preceded by a non-identifier
-            // character (comma, open-paren, space, etc.).
             if (pos > 0) {
                 const char prev = source[pos - 1];
                 if ((prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z')
@@ -194,13 +294,10 @@ std::string prepare_gl_source(const char* embedded_source, const char* version_d
                 }
             }
 
-            // Find the end of "set = N, " -- skip digits after "set = ", then
-            // consume the trailing ", " (comma + optional space).
             usize end = pos + pattern.size();
             while (end < source.size() && source[end] >= '0' && source[end] <= '9') {
                 ++end;
             }
-            // Consume ", " that follows the digit(s).
             if (end < source.size() && source[end] == ',') {
                 ++end;
                 if (end < source.size() && source[end] == ' ') {
@@ -215,32 +312,39 @@ std::string prepare_gl_source(const char* embedded_source, const char* version_d
     if (extra_define != nullptr) {
         header += "#define " + std::string(extra_define) + " 1\n";
     }
-    // GLES requires explicit precision qualifiers. Inject default precision
-    // declarations immediately after the version/define lines so every shader
-    // compiles without adding per-variable qualifiers throughout. highp float
-    // matches desktop GL's implicit precision and avoids visible artefacts in
-    // the tone-curve and filtering arithmetic.
-    if (std::string(version_directive).find(" es") != std::string::npos) {
+    const bool es   = std::string(version_directive).find(" es") != std::string::npos;
+    const bool gl41 = std::strcmp(version_directive, kGl41VersionDirective) == 0;
+    if (gl41) {
+        header += "#define SM2_GL41 1\n";
+        // GLSL 4.10 wants the interpolation qualifier before in/out.
+        for (const char* qualifier : {"in", "out"}) {
+            const std::string from = std::string(qualifier) + " flat ";
+            const std::string to   = std::string("flat ") + qualifier + " ";
+            for (usize pos = 0; (pos = source.find(from, pos)) != std::string::npos;) {
+                source.replace(pos, from.size(), to);
+                pos += to.size();
+            }
+        }
+    }
+    if (es) {
+        // GLES requires explicit precision qualifiers; highp matches desktop GL.
         header += "precision highp float;\n"
                   "precision highp int;\n"
                   "precision highp sampler2D;\n"
                   "precision highp sampler2DArray;\n"
+                  "precision highp usampler2D;\n"
                   "precision highp usampler2DArray;\n"
                   "precision highp image2DArray;\n"
                   "precision highp uimage2DArray;\n";
-
-        // ESSL treats `const` on a local variable as "compile-time constant
-        // expression required" rather than the desktop-GL meaning of "immutable
-        // after initialisation". Strip `const ` from lines inside function
-        // bodies (identified by leading whitespace) so runtime-initialised
-        // locals compile. Global-scope const (no leading whitespace) is left
-        // alone -- those are literal constants the ESSL compiler accepts.
+    }
+    if (es || gl41) {
+        // ESSL and GLSL before 4.20 require a local `const` to be a constant
+        // expression. Strip `const ` from indented lines so runtime-initialised
+        // locals compile; unindented global constants are left alone.
         {
             const std::string pat = "const ";
             usize pos = 0;
             while ((pos = source.find(pat, pos)) != std::string::npos) {
-                // Check if this is inside a function body: preceded by a
-                // newline then at least one space/tab (indented line).
                 bool indented = false;
                 if (pos > 0) {
                     usize line_start = source.rfind('\n', pos - 1);
@@ -281,12 +385,160 @@ bool has_gl_extension(const char* name)
 
 namespace {
 
-/// Compile one shader stage, logging its info log on failure. Returns 0 on
-/// failure, matching compile_program()'s own convention.
+/// A layout(binding = N) qualifier removed for GLSL 4.10, reapplied after link.
+struct BindingFixup {
+    std::string name;
+    s32         binding = 0;
+    bool        block   = false;
+};
+
+[[nodiscard]] std::string trim(const std::string& text)
+{
+    const usize first = text.find_first_not_of(" \t\r");
+    if (first == std::string::npos) {
+        return {};
+    }
+    const usize last = text.find_last_not_of(" \t\r");
+    return text.substr(first, last - first + 1);
+}
+
+[[nodiscard]] std::string next_word(const std::string& text, usize* pos)
+{
+    while (*pos < text.size() && (text[*pos] == ' ' || text[*pos] == '\t')) {
+        ++*pos;
+    }
+    const usize start = *pos;
+    while (*pos < text.size()
+           && (std::isalnum(static_cast<unsigned char>(text[*pos])) != 0 || text[*pos] == '_')) {
+        ++*pos;
+    }
+    return text.substr(start, *pos - start);
+}
+
+/// Strip layout binding qualifiers (GLSL 4.20) from `source`, recording the
+/// uniform blocks and samplers they named. Follows #ifdef/#ifndef/#else so a
+/// Vulkan-only branch's bindings are ignored.
+[[nodiscard]] std::string strip_bindings(const std::string& source,
+                                         std::vector<BindingFixup>* fixups)
+{
+    std::vector<std::string> defined;
+    std::vector<std::pair<bool, bool>> stack;  // (parent active, condition)
+    bool active = true;
+    std::string out;
+    out.reserve(source.size());
+
+    usize line_start = 0;
+    while (line_start < source.size()) {
+        usize line_end = source.find('\n', line_start);
+        if (line_end == std::string::npos) {
+            line_end = source.size();
+        }
+        std::string line = source.substr(line_start, line_end - line_start);
+        const std::string text = trim(line);
+
+        if (!text.empty() && text[0] == '#') {
+            usize pos = 1;
+            const std::string directive = next_word(text, &pos);
+            const std::string name      = next_word(text, &pos);
+            const bool is_defined =
+                std::find(defined.begin(), defined.end(), name) != defined.end();
+            if (directive == "define" && active) {
+                defined.push_back(name);
+            } else if (directive == "ifdef" || directive == "ifndef") {
+                const bool condition = (directive == "ifdef") == is_defined;
+                stack.emplace_back(active, condition);
+                active = active && condition;
+            } else if (directive == "if") {
+                stack.emplace_back(active, true);  // not evaluated
+            } else if ((directive == "else" || directive == "elif") && !stack.empty()) {
+                stack.back().second = !stack.back().second;
+                active = stack.back().first && stack.back().second;
+            } else if (directive == "endif" && !stack.empty()) {
+                active = stack.back().first;
+                stack.pop_back();
+            }
+        } else if (active && text.rfind("layout(", 0) == 0) {
+            const usize open  = line.find("layout(");
+            const usize close = line.find(')', open);
+            const usize key   = line.find("binding", open);
+            if (close != std::string::npos && key != std::string::npos && key < close) {
+                const usize eq = line.find('=', key);
+                const s32 binding = std::atoi(line.c_str() + eq + 1);
+
+                // Rebuild the qualifier list without the binding entry.
+                std::string kept;
+                usize item_start = open + 7;
+                while (item_start <= close) {
+                    usize item_end = line.find(',', item_start);
+                    if (item_end == std::string::npos || item_end > close) {
+                        item_end = close;
+                    }
+                    const std::string item = trim(line.substr(item_start, item_end - item_start));
+                    if (!item.empty() && item.rfind("binding", 0) != 0) {
+                        kept += (kept.empty() ? "" : ", ") + item;
+                    }
+                    item_start = item_end + 1;
+                }
+                const std::string rest = line.substr(close + 1);
+                line = line.substr(0, open) + (kept.empty() ? "" : "layout(" + kept + ")") + rest;
+
+                usize pos = 0;
+                std::string word;
+                while (!(word = next_word(rest, &pos)).empty() && word != "uniform") {
+                }
+                if (word == "uniform") {
+                    BindingFixup fixup;
+                    fixup.binding = binding;
+                    const std::string type = next_word(rest, &pos);
+                    const std::string name = next_word(rest, &pos);
+                    fixup.block = name.empty();
+                    fixup.name  = fixup.block ? type : name;
+                    fixups->push_back(fixup);
+                }
+            }
+        }
+        out += line;
+        if (line_end < source.size()) {
+            out += '\n';
+        }
+        line_start = line_end + 1;
+    }
+    return out;
+}
+
+void apply_bindings(u32 program, const std::vector<BindingFixup>& fixups)
+{
+    s32 previous = 0;
+    GetIntegerv(GL_CURRENT_PROGRAM, &previous);
+    UseProgram(program);
+    for (const BindingFixup& fixup : fixups) {
+        if (fixup.block) {
+            const u32 index = GetUniformBlockIndex(program, fixup.name.c_str());
+            if (index != GL_INVALID_INDEX) {
+                UniformBlockBinding(program, index, static_cast<u32>(fixup.binding));
+            }
+        } else {
+            const s32 location = GetUniformLocation(program, fixup.name.c_str());
+            if (location >= 0) {
+                Uniform1i(location, fixup.binding);
+            }
+        }
+    }
+    UseProgram(static_cast<u32>(previous));
+}
+
+/// Compile one shader stage, logging its info log on failure. 0 on failure.
 [[nodiscard]] u32 compile_stage(u32 stage_type, const char* source)
 {
-    const u32 shader = CreateShader(stage_type);
-    ShaderSource(shader, 1, &source, nullptr);
+    // Non-ASCII only appears in comments (the file banner); not every GLSL
+    // compiler accepts it there.
+    std::string ascii(source);
+    for (char& c : ascii) {
+        if (static_cast<unsigned char>(c) >= 0x80) c = ' ';
+    }
+    const char* text   = ascii.c_str();
+    const u32   shader = CreateShader(stage_type);
+    ShaderSource(shader, 1, &text, nullptr);
     CompileShader(shader);
 
     s32 ok = 0;
@@ -332,6 +584,16 @@ namespace {
 
 u32 compile_program(const char* vertex_source, const char* fragment_source)
 {
+    std::vector<BindingFixup> fixups;
+    std::string               vertex_text;
+    std::string               fragment_text;
+    if (is_gl41()) {
+        vertex_text     = strip_bindings(vertex_source, &fixups);
+        fragment_text   = strip_bindings(fragment_source, &fixups);
+        vertex_source   = vertex_text.c_str();
+        fragment_source = fragment_text.c_str();
+    }
+
     const u32 vertex = compile_stage(GL_VERTEX_SHADER, vertex_source);
     if (vertex == 0) {
         return 0;
@@ -341,7 +603,11 @@ u32 compile_program(const char* vertex_source, const char* fragment_source)
         DeleteShader(vertex);
         return 0;
     }
-    return link_program({vertex, fragment});
+    const u32 program = link_program({vertex, fragment});
+    if (program != 0 && !fixups.empty()) {
+        apply_bindings(program, fixups);
+    }
+    return program;
 }
 
 u32 compile_compute_program(const char* compute_source)
@@ -372,12 +638,8 @@ PersistentBuffer create_persistent_buffer(usize bytes, u32 target)
     GenBuffers(1, &buffer.handle);
     BindBuffer(target, buffer.handle);
 
-    // GL_ARB_buffer_storage (core since 4.4) gives a persistently-mapped
-    // buffer, matching the Vulkan path's own host-coherent, always-mapped
-    // resources. Below that -- a 4.3-only driver -- BufferData plus
-    // BufferSubData per write is the correct fallback, not a gap: this
-    // project's floor is 4.3, and 4.3-only hardware without this extension
-    // is expected to exist even if none was available to test against.
+    // GL_ARB_buffer_storage gives a persistently mapped buffer like the Vulkan
+    // path's; without it, BufferSubData per write.
     if (has_gl_extension("GL_ARB_buffer_storage")) {
         constexpr GLbitfield kStorageFlags =
             GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;

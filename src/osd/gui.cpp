@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -227,6 +229,96 @@ std::string language_label(const i18n::Language& language)
     return shown + " (" + language.english_name + ")";
 }
 
+// What a Gamepad tab slot does in a game, named after the cabinet control:
+// the slot's own name when it keeps its generic one, nullptr when the game
+// does not read it.
+[[nodiscard]] const char* typed_slot_name(const Gui::GameFamily& family, const char* slot)
+{
+    const auto is = [&](rom::InputFlags flag) {
+        return rom::has_input(static_cast<rom::InputFlags>(family.inputs), flag);
+    };
+    const auto at = [&](const char* name) { return std::strcmp(slot, name) == 0; };
+    using F = rom::InputFlags;
+    const bool model3 = is(F::Fighting) || is(F::SpikeOut) || is(F::Soccer) || is(F::Vr4)
+                     || is(F::ViewChange) || is(F::Handbrake) || is(F::Harley) || is(F::AnalogJoystick)
+                     || is(F::Fishing) || is(F::TwinJoysticks) || is(F::MagTruck) || is(F::Ski)
+                     || is(F::Shift4) || is(F::ShiftUpDown) || is(F::AnalogGun1);
+
+    // Virtual On's twin sticks, both on one pad.
+    if (is(F::TwinJoysticks) || family.key == "von") {
+        struct Named { const char* slot; const char* name; };
+        static const Named kVon[] = {
+            {"Move Up", N_("Left Lever Up")},       {"Move Down", N_("Left Lever Down")},
+            {"Move Left", N_("Left Lever Left")},   {"Move Right", N_("Left Lever Right")},
+            {"Button 4", N_("Right Lever Up")},     {"Button 1", N_("Right Lever Down")},
+            {"Button 3", N_("Right Lever Left")},   {"Button 2", N_("Right Lever Right")},
+            {"Brake", N_("Left Shot")},             {"Accelerator", N_("Right Shot")},
+            {"Gear Down", N_("Left Dash")},         {"Gear Up", N_("Right Dash")},
+            {"Steer / Aim", N_("Left Lever")},      {"Right Lever", N_("Right Lever")},
+        };
+        for (const Named& named : kVon) {
+            if (at(named.slot)) return named.name;
+        }
+        return slot;
+    }
+    if (is(F::Ski)) {
+        if (at("Gear Down")) return N_("Left Pole");
+        if (at("Gear Up")) return N_("Right Pole");
+    }
+
+    if (at("Brake")) {
+        if (family.brake && is(F::Fishing)) return N_("Line Tension");
+        return family.gun || family.brake ? slot : nullptr;
+    }
+    if (at("Accelerator")) return family.gun || family.accel ? slot : nullptr;
+    if (at("Gear Up") || at("Gear Down")) return family.gears ? slot : nullptr;
+    if (at("Right Lever")) return family.lever ? (is(F::Fishing) ? N_("Joystick") : slot) : nullptr;
+    if (at("Steer / Aim")) {
+        if (family.gun) return N_("Aim");
+        if (!family.aim) return nullptr;
+        return is(F::Vehicle) ? N_("Steer") : is(F::Fishing) ? N_("Rod") : slot;
+    }
+    if (at("Start") || at("Coin")) return slot;
+
+    const int button = at("Button 1") ? 1 : at("Button 2") ? 2 : at("Button 3") ? 3 : at("Button 4") ? 4 : 0;
+    if (button != 0) {
+        if (family.gun) {
+            if (button == 1) return N_("Trigger");
+            if (button == 2) return family.missile ? N_("Missile") : N_("Gun Reload");
+        }
+        if (!model3) return slot;
+        static const char* const kFighting[] = {N_("Punch"), N_("Kick"), N_("Guard"), N_("Escape")};
+        static const char* const kSpikeOut[] = {N_("Beat"), N_("Charge"), N_("Shift"), N_("Jump")};
+        static const char* const kSoccer[]   = {N_("Long Pass"), N_("Shoot"), N_("Short Pass"), nullptr};
+        static const char* const kVr[]       = {N_("VR1 (red)"), N_("VR2 (blue)"), N_("VR3 (yellow)"), N_("VR4 (green)")};
+        static const char* const kSkyStick[] = {N_("Event 1"), N_("Event 2"), nullptr, nullptr};
+        static const char* const kFishing[]  = {N_("Cast"), N_("Select"), nullptr, nullptr};
+        const usize i = static_cast<usize>(button - 1);
+        if (is(F::Fighting)) return kFighting[i];
+        if (is(F::SpikeOut)) return kSpikeOut[i];
+        if (is(F::Soccer)) return kSoccer[i];
+        if (is(F::Vr4)) return kVr[i];
+        if (is(F::AnalogJoystick)) return kSkyStick[i];
+        if (is(F::Fishing)) return kFishing[i];
+        if (is(F::Harley)) return button == 1 ? N_("Music Select") : button == 2 ? N_("View") : nullptr;
+        if (button == 1 && is(F::ViewChange)) return N_("View");
+        if (button == 2 && is(F::Handbrake)) return N_("Handbrake");
+        if (button == 1 && is(F::MagTruck)) return N_("Pedal");
+        if (is(F::Ski)) return button == 3 ? N_("Select 1") : button == 4 ? N_("Select 2")
+                             : button == 2 ? N_("Select 3") : nullptr;
+        return nullptr;
+    }
+
+    // The directions.
+    if (!model3 || is(F::Fighting) || is(F::SpikeOut) || is(F::Soccer)) {
+        return slot;
+    }
+    if (is(F::AnalogJoystick)) {
+        return at("Move Up") ? N_("Trigger 1") : at("Move Down") ? N_("Trigger 2") : nullptr;
+    }
+    return nullptr;
+}
+
 // Name an evdev key code for the gun-button UI; hex fallback for anything odd.
 [[nodiscard]] std::string evdev_button_name(u32 code)
 {
@@ -266,9 +358,8 @@ bool Gui::init(SDL_Window* window, const std::string& language)
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-    io.IniFilename = nullptr;  // No imgui.ini — settings live in sm2-emu.ini.
+    io.IniFilename = nullptr;  // No imgui.ini — settings live in keisho.ini.
 
-    // Dark style with some tweaks.
     ImGui::StyleColorsDark();
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding   = 4.0f;
@@ -276,9 +367,8 @@ bool Gui::init(SDL_Window* window, const std::string& language)
     style.GrabRounding     = 2.0f;
     style.WindowBorderSize = 0.0f;
 
-    // The platform backend only, chosen for input/clipboard/cursor handling.
-    // Which GPU API actually draws the result is a render backend's own
-    // ImGui renderer backend, initialised separately.
+    // The platform backend only; each render backend initialises its own ImGui
+    // renderer.
     if (!ImGui_ImplSDL3_InitForOther(window)) {
         SM2_ERROR("gui: ImGui_ImplSDL3_InitForOther failed");
         ImGui::DestroyContext();
@@ -332,11 +422,9 @@ void Gui::new_frame()
         apply_language();
     }
     ImGui_ImplSDL3_NewFrame();
-    // DisplaySize stays the SDL logical size (mouse arrives in that space, so
-    // layout must too); correct DisplayFramebufferScale to the backend's real
-    // pixel extent instead. imgui_impl_vulkan renders at DisplaySize*scale, so
-    // this fills the presented image even where SDL under-reports the surface
-    // pixel size on Wayland.
+    // DisplaySize stays the SDL logical size, which mouse input uses; correct
+    // DisplayFramebufferScale to the backend's real pixel extent instead, since
+    // SDL can under-report it on Wayland.
     if (m_framebuffer_width != 0 && m_framebuffer_height != 0) {
         ImGuiIO& io = ImGui::GetIO();
         if (io.DisplaySize.x > 0.0f && io.DisplaySize.y > 0.0f) {
@@ -350,14 +438,9 @@ void Gui::new_frame()
 
 void Gui::apply_scale()
 {
-    // Scale content with the window. Measured against the base 992x768 on both
-    // axes with the smaller ratio winning, so a wide-but-short window does not
-    // get oversized text; clamped so it stays legible small and sane huge.
-    //
-    // The floor is the font's native size in output pixels: the default font
-    // is drawn for 13 px and turns to mush below that, and on short modes such
-    // as a 640x240 15 kHz CRT the height ratio alone would shrink it to 6.5 px.
-    // A short window gets a scrolling overlay instead of unreadable text.
+    // Scale content against a base of 992x768, the smaller axis ratio winning.
+    // The floor is the font's native size in output pixels, since the default
+    // font is unreadable below 13 px; a short window scrolls instead.
     const ImGuiIO& io = ImGui::GetIO();
     const float    sx = io.DisplaySize.x > 0.0f ? io.DisplaySize.x / 992.0f : 1.0f;
     const float    sy = io.DisplaySize.y > 0.0f ? io.DisplaySize.y / 768.0f : 1.0f;
@@ -365,9 +448,7 @@ void Gui::apply_scale()
     float          scale = std::min(sx, sy);
     scale                = std::clamp(scale, std::clamp(1.0f / fb, 0.5f, 1.0f), 4.0f);
 
-    // Widget metrics are rescaled from a one-time base-style snapshot
-    // (ScaleAllSizes is cumulative), and FontScaleMain drives ImGui 1.92's
-    // dynamic font sizing so text re-rasterises crisply rather than stretching.
+    // Rescale from a base-style snapshot, since ScaleAllSizes is cumulative.
     static const ImGuiStyle base_style = ImGui::GetStyle();
     if (scale != m_ui_scale) {
         m_ui_scale          = scale;
@@ -390,13 +471,12 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
     // Cache this frame's present placement so the crosshair and Sinden-border
     // helpers frame the same rectangle the backend presents into.
 
-    // Shown regardless of F10 when enabled, so the counter is visible whether or
-    // not the settings overlay is open.
+    // Shown whether or not the settings overlay is open.
     if (config.show_fps) {
         draw_fps_overlay(measured_hz, renderer_label);
     }
 
-    // A notification (state saved/loaded), top-centered, over gameplay.
+    // A notification (state saved/loaded), top-centred, over gameplay.
     if (m_notify_seconds_left > 0.0f) {
         m_notify_seconds_left -= ImGui::GetIO().DeltaTime;
         if (config.show_notifications || m_notify_always) {
@@ -404,21 +484,19 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
         }
     }
 
-    // In light-gun mode draw the aiming crosshair(s) and hide the OS cursor, so
-    // only the crosshair is visible. gun_aims() is inactive for non-gun titles,
-    // so a non-gun game shows nothing even with the mode on.
-    //
-    // The cursor is only hidden while the settings overlay is CLOSED: with the
-    // overlay open the real pointer is needed to click its buttons and the close
-    // box, and the crosshair is clamped to the game area so it cannot reach them.
-    //
-    // Toggle only on a state change. ImGui's SDL3 backend drives the OS cursor
-    // itself every frame, so a bare SDL_HideCursor() is fought back the next
-    // frame (which is what flickered). NoMouseCursorChange makes ImGui stop
-    // touching the cursor, and then SDL_HideCursor() sticks.
-    // Not while the picker is up: grabbing the pointer there would confine it to
-    // the window, making the title bar and resize edges unreachable.
-    const bool hide_cursor = config.lightgun && !m_visible && !m_picker_enabled
+    // A gun game hides the OS cursor so only the crosshair shows, but not while
+    // the overlay or picker is open, where the real pointer is needed.
+    // NoMouseCursorChange stops ImGui's SDL3 backend re-showing the cursor every
+    // frame.
+    const GameFamily* playing = nullptr;
+    for (const GameFamily& f : m_families) {
+        if (f.key == m_current_family && !m_current_game.empty()) {
+            playing = &f;
+        }
+    }
+    using Mode          = Config::LightgunMode;
+    const bool gun_game = playing != nullptr && playing->gun && config.lightgun != Mode::Off;
+    const bool hide_cursor = (gun_game || config.lightgun == Mode::On) && !m_visible && !m_picker_enabled
                           && !m_load_error.has_value();
     if (hide_cursor != m_cursor_hidden) {
         ImGuiIO& io = ImGui::GetIO();
@@ -431,9 +509,8 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
         }
         m_cursor_hidden = hide_cursor;
     }
-    // Confine the pointer while playing fullscreen, so a light gun that presents
-    // as a mouse cannot drag the cursor onto another monitor. In a window it is
-    // left free, so the desktop pointer comes back once it leaves the window.
+    // Confine the pointer in fullscreen, so a light gun that presents as a mouse
+    // cannot drag it onto another monitor.
     const bool grab = hide_cursor && m_window != nullptr
                    && (SDL_GetWindowFlags(m_window) & SDL_WINDOW_FULLSCREEN) != 0;
     if (grab != m_mouse_grabbed) {
@@ -450,7 +527,7 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
         draw_bezel(config);
     }
 
-    if (config.lightgun && !m_picker_enabled) {
+    if ((gun_game || config.lightgun == Mode::On) && !m_picker_enabled) {
         draw_sinden_border(config);
         if (config.lightgun_crosshair) {
             draw_crosshairs(config, input);
@@ -480,9 +557,8 @@ bool Gui::draw(Config& config, const std::vector<std::string>& gpu_names,
 void Gui::end_frame()
 {
     if (!m_initialised) return;
-    // Must be called every frame after new_frame(), regardless of whether
-    // anything was drawn -- a render backend reads ImGui::GetDrawData() after
-    // this to submit it through whatever GPU API it owns.
+    // Every frame, even if nothing was drawn: the render backend reads
+    // ImGui::GetDrawData() afterwards.
     ImGui::Render();
 }
 
@@ -512,7 +588,6 @@ void Gui::draw_menu_bar(Config& config)
             ImGui::MenuItem(tr_id("FPS counter"), hotkey_name(config, Config::Hotkey::Fps),
                             &config.show_fps);
             ImGui::MenuItem(tr_id("On-screen notifications"), nullptr, &config.show_notifications);
-            ImGui::MenuItem(tr_id("Light-gun mode"), nullptr, &config.lightgun);
             ImGui::EndMenu();
         }
         ImGui::EndMainMenuBar();
@@ -526,9 +601,12 @@ void Gui::draw_menu_bar(Config& config)
 void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_names,
                         Input* input)
 {
-    // 88% of the space between the menu bar and the status bar, centred,
-    // re-applied every frame so it tracks a resize. On a short display the
-    // bars are a large share of the height, so the window must not cover them.
+    const auto model12_only = [&] {
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", tr("(Model 1 & 2 only)"));
+    };
+    // 88% of the space between the menu and status bars, centred, re-applied
+    // every frame so it tracks a resize.
     const ImGuiViewport* viewport   = ImGui::GetMainViewport();
     const float          status_bar = ImGui::GetFrameHeight() + 4.0f;
     const ImVec2 area(viewport->WorkSize.x, std::max(viewport->WorkSize.y - status_bar, 0.0f));
@@ -676,8 +754,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                 config.window_height = static_cast<u32>(std::max(384, h));
             }
 
-            // 3D render scale. Live runtime reallocation is out of scope for
-            // v1, so this only edits the config; it applies on the next launch.
+            // 3D render scale; applies on the next launch.
             ImGui::Separator();
             {
                 static constexpr std::array<const char*, 8> kScaleLabels = {
@@ -700,9 +777,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                 }
             }
 
-            // Present-stage scaling: how the finished frame is put on screen.
-            // Unlike the 3D render scale these are present-only, so they apply
-            // live (main.cpp pushes them to the backend every frame).
+            // Present-stage scaling, applied live.
             ImGui::Separator();
             {
                 static constexpr std::array<const char*, 4> kMethodLabels = {
@@ -835,8 +910,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                            "transparent window."));
             }
 
-            // Enhancement: opt-in quality beyond the original hardware, GPU-gated
-            // and off by default. Applies live (main.cpp pushes it each frame).
+            // Enhancements beyond the original hardware, off by default, applied live.
             ImGui::Separator();
             ImGui::TextDisabled("%s", tr("Enhancement (cosmetic, beyond the original hardware)"));
             {
@@ -893,8 +967,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                     }
                 }
 
-                // 2D upscale. xBR/ScaleFX need the GPU compute path the tilemap
-                // composite already relies on, so they are always available here.
+                // 2D upscale, always available: it uses the tilemap compute path.
                 static constexpr std::array<const char*, 3> kUpscaleLabels = {
                     N_("Faithful"), "xBR", "ScaleFX"};
                 int up_index = std::clamp(static_cast<int>(config.upscale_2d), 0, 2);
@@ -921,10 +994,15 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                     translucency        = 0;
                     ImGui::BeginDisabled();
                 }
+                if (m_model3_running) ImGui::BeginDisabled();
                 ImGui::SetNextItemWidth(160);
                 if (ImGui::Combo(tr_id("Translucency"), &translucency, tr_all(kTranslucencyLabels).data(),
                                  static_cast<int>(kTranslucencyLabels.size()))) {
                     config.translucency = static_cast<Translucency>(translucency);
+                }
+                if (m_model3_running) {
+                    ImGui::EndDisabled();
+                    model12_only();
                 }
                 if (!m_caps_blended) {
                     ImGui::EndDisabled();
@@ -937,7 +1015,12 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                                "see-through surface it's trying to achieve. Applies live."));
                 }
 
+                if (m_model3_running) ImGui::BeginDisabled();
                 ImGui::Checkbox(tr_id("Extended draw distance"), &config.extended_draw_distance);
+                if (m_model3_running) {
+                    ImGui::EndDisabled();
+                    model12_only();
+                }
                 ImGui::SameLine();
                 ImGui::TextDisabled("(?)");
                 if (ImGui::IsItemHovered()) {
@@ -1016,7 +1099,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                 ImGui::SameLine();
                 ImGui::TextDisabled("(?)");
                 if (ImGui::IsItemHovered()) {
-                    tooltip(tr("Where sm2-emu.ini is read from and saved to.\n"
+                    tooltip(tr("Where keisho.ini is read from and saved to.\n"
                                "Set with --config <dir>; cannot be changed here."));
                 }
                 ImGui::Spacing();
@@ -1032,6 +1115,11 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                       N_("Where the Model 1 ROM archives live.\n"
                          "Empty means the ROM directory."));
             ImGui::Spacing();
+            dir_field(N_("Model 3 ROM directory"), "##model3romdir", config.model3_rom_dir,
+                      DirPickerTarget::Model3RomDir,
+                      N_("Where the Model 3 ROM archives live.\n"
+                         "Empty means the ROM directory."));
+            ImGui::Spacing();
             dir_field(N_("Saves directory"), "##saves", config.nvram_dir,
                       DirPickerTarget::NvramDir,
                       N_("Battery-backed saves: per-game NVRAM (.nv) and EEPROM\n"
@@ -1044,7 +1132,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
             dir_field(N_("Bezels directory"), "##bezels", config.bezel_dir,
                       DirPickerTarget::BezelDir,
                       N_("Bezel images: <game>.png, the parent set's, or default.png.\n"
-                         "Empty means a bezels folder beside sm2-emu.ini."));
+                         "Empty means a bezels folder beside keisho.ini."));
             ImGui::Spacing();
             dir_field(N_("Crosshairs directory"), "##crosshairs", config.crosshair_dir,
                       DirPickerTarget::CrosshairDir,
@@ -1052,7 +1140,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
                          "<game>.png for both, then the parent set's, then default.\n"
                          "Drawn at their own size on a 1080-line picture. Without\n"
                          "one the built-in crosshair is drawn.\n"
-                         "Empty means a crosshairs folder beside sm2-emu.ini."));
+                         "Empty means a crosshairs folder beside keisho.ini."));
 
             ImGui::Spacing();
             ImGui::Separator();
@@ -1062,7 +1150,7 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
             ImGui::TextDisabled("(?)");
             if (ImGui::IsItemHovered()) {
                 tooltip(tr("Let the game picker fetch box art and descriptions from\n"
-                           "ArcadeDB over the network. Off keeps sm2-emu offline: the\n"
+                           "ArcadeDB over the network. Off keeps Keisho offline: the\n"
                            "picker still lists and launches every game, with placeholder\n"
                            "tiles and no descriptions."));
             }
@@ -1110,20 +1198,20 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
         bool on_about_tab = false;
         if (ImGui::BeginTabItem(tr_id("About"))) {
             on_about_tab = true;
-            ImGui::Text(" ____  __  __  ____         _____ __  __ _   _");
-            ImGui::Text("/ ___||  \\/  ||___ \\       | ____|  \\/  | | | |");
-            ImGui::Text("\\___ \\| |\\/| |  __) |_____ |  _| | |\\/| | | | |");
-            ImGui::Text(" ___) | |  | | / __/|_____|| |___| |  | | |_| |");
-            ImGui::Text("|____/|_|  |_||_____|      |_____|_|  |_|\\___/");
+            ImGui::TextUnformatted(" _  _______ ___ ____  _   _  ___");
+            ImGui::TextUnformatted("| |/ / ____|_ _/ ___|| | | |/ _ \\");
+            ImGui::TextUnformatted("| ' /|  _|  | |\\___ \\| |_| | | | |");
+            ImGui::TextUnformatted("| . \\| |___ | | ___) |  _  | |_| |");
+            ImGui::TextUnformatted("|_|\\_\\_____|___|____/|_| |_|\\___/");
             ImGui::Spacing();
-            ImGui::TextUnformatted(tr("A Sega Model 1 & 2 arcade emulator"));
+            ImGui::TextUnformatted(tr("A Sega Model 1, 2 & 3 arcade emulator"));
             ImGui::Spacing();
             ImGui::Text("Copyright (c) 2025+ Daniel Martin (dmanlfc)");
             ImGui::TextUnformatted(tr("GPL-3.0-or-later licence. See LICENSE."));
             ImGui::Spacing();
             ImGui::Separator();
             ImGui::Spacing();
-            ImGui::TextUnformatted(tr("sm2-emu exists because of open source shared with the community."));
+            ImGui::TextUnformatted(tr("Keisho exists because of open source shared with the community."));
             ImGui::TextUnformatted(tr("With thanks to the projects whose code makes it possible:"));
             ImGui::Spacing();
             ImGui::BulletText("%s", tr("The MAME project - Sega Model 2 emulation guidance"));
@@ -1175,7 +1263,8 @@ void Gui::draw_settings(Config& config, const std::vector<std::string>& gpu_name
             const std::string path =
                 m_config_path.empty() ? default_config_path() : m_config_path;
             const auto save = [&](const std::string& to) {
-                const bool saved = m_save ? m_save(to, config) : save_config(to, config);
+                const bool saved = m_save ? m_save(to, m_save_filter ? m_save_filter(config) : config)
+                                   : save_config(to, m_save_filter ? m_save_filter(config) : config);
                 if (saved) {
                     SM2_INFO("gui: settings saved to %s", to.c_str());
                 } else {
@@ -2031,7 +2120,20 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
         ImGui::EndCombo();
     }
 
-    // A game without its own layout is edited as a copy of the default, kept once changed.
+    const GameFamily* family = nullptr;
+    for (const GameFamily& f : m_families) {
+        if (f.key == m_pad_family) {
+            family = &f;
+        }
+    }
+    // A game without its own layout is edited as a copy of its default (the
+    // default layout with the game's logical changes), kept once changed.
+    Config::PadLayout game_default = config.pad;
+    if (!m_pad_family.empty()) {
+        Config without = config;
+        without.pad_layouts.erase(m_pad_family);
+        game_default = Input::game_layout(without, m_pad_family, family != nullptr ? family->inputs : 0);
+    }
     Config::PadLayout  scratch;
     Config::PadLayout* binds = &config.pad;
     if (!m_pad_family.empty()) {
@@ -2039,7 +2141,7 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
         if (found != config.pad_layouts.end()) {
             binds = &found->second;
         } else {
-            scratch = config.pad;
+            scratch = game_default;
             binds   = &scratch;
         }
     }
@@ -2072,7 +2174,7 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
         ImGui::BeginDisabled(binds == &scratch);
         if (ImGui::Button(tr_id("Use Default Layout"))) {
             config.pad_layouts.erase(m_pad_family);
-            scratch                   = config.pad;
+            scratch                   = game_default;
             binds                     = &scratch;
             m_pad_capture_player      = -1;
             m_pad_axis_capture_player = -1;
@@ -2158,12 +2260,7 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
     int          rows[4]   = {0, 0, 0, 0};
     const std::span<const Slot> slots =
         m_pad_shortcuts_view ? std::span<const Slot>{} : std::span<const Slot>(kSlots);
-    const GameFamily* gun_family = nullptr;
-    for (const GameFamily& family : m_families) {
-        if (family.key == m_pad_family && family.gun) {
-            gun_family = &family;
-        }
-    }
+    const GameFamily* gun_family = family != nullptr && family->gun ? family : nullptr;
     for (const Slot& slot : slots) {
         const int row = rows[slot.column]++;
         ImVec2    pos;
@@ -2316,8 +2413,19 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
             {"wingwar", "Brake", N_("Throttle back")}, {"wingwar", "Accelerator", N_("Throttle forward")},
             {"wingwar", "Gear Up", nullptr},        {"wingwar", "Gear Down", nullptr},
             {"wingwar", "Steer / Aim", N_("Stick")}, {"wingwar", "Right Lever", N_("Throttle")},
+            {"desert", "Gear Down", N_("Machine Gun")}, {"desert", "Gear Up", N_("Cannon")},
+            {"segawski", "Gear Down", N_("Pitch Left")}, {"segawski", "Gear Up", N_("Pitch Right")},
+            {"powsled", "Gear Down", N_("Cancel Error")}, {"powsled", "Gear Up", N_("Cancel Network")},
         };
         bool unused = false;
+        if (family != nullptr) {
+            const char* typed = typed_slot_name(*family, slot.name);
+            if (typed == nullptr) {
+                unused = true;
+            } else if (typed != slot.name) {
+                name = typed;
+            }
+        }
         for (const Named& named : kNamed) {
             if (m_pad_family == named.family && std::strcmp(slot.name, named.slot) == 0) {
                 name   = named.name != nullptr ? named.name : slot.name;
@@ -2399,7 +2507,7 @@ void Gui::draw_gamepad_tab(Config& config, Input* input)
         }
         ImGui::PopID();
     }
-    if (binds == &scratch && scratch != config.pad) {
+    if (binds == &scratch && scratch != game_default) {
         config.pad_layouts[m_pad_family] = scratch;
     }
 
@@ -2705,25 +2813,36 @@ void Gui::draw_audio_tab(Config& config)
 
 void Gui::draw_lightgun_tab(Config& config, Input* input)
 {
-    ImGui::Checkbox(tr_id("Light-gun mode"), &config.lightgun);
-    ImGui::SameLine();
-    ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered()) {
-        tooltip(tr("Show the aiming crosshair and hide the mouse cursor,\n"
-                   "for the light-gun titles (Virtua Cop 2, House of the\n"
-                   "Dead, Gunblade NY, Rail Chase 2, Behind Enemy Lines)."));
+    {
+        static const char* const kModes[] = {N_("Auto"), N_("On"), N_("Off")};
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(tr("Gun mode"));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120.0f * (m_ui_scale > 0.0f ? m_ui_scale : 1.0f));
+        if (ImGui::BeginCombo("##gun_mode", tr(kModes[static_cast<usize>(config.lightgun)]))) {
+            for (u32 m = 0; m < 3; ++m) {
+                if (ImGui::Selectable(tr(kModes[m]), static_cast<u32>(config.lightgun) == m)) {
+                    config.lightgun = static_cast<Config::LightgunMode>(m);
+                }
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            tooltip(tr("The aiming crosshair, with the mouse pointer hidden.\n"
+                       "Auto turns it on in a gun game; On hides the pointer in\n"
+                       "every game; Off never shows a crosshair."));
+        }
     }
-
-    ImGui::BeginDisabled(!config.lightgun);
     ImGui::Checkbox(tr_id("Show crosshair"), &config.lightgun_crosshair);
     ImGui::SameLine();
     ImGui::TextDisabled("(?)");
     if (ImGui::IsItemHovered()) {
-        tooltip(tr("Draw sm2-emu's own crosshair. Turn off if the gun\n"
+        tooltip(tr("Draw Keisho's own crosshair. Turn off if the gun\n"
                    "has its own sight (e.g. a Sinden). Positional-gun\n"
                    "titles always draw their own regardless."));
     }
-    ImGui::EndDisabled();
 
     ImGui::Checkbox(tr_id("Centred stick aim"), &config.lightgun_pad_centred);
     ImGui::SameLine();
@@ -2747,8 +2866,8 @@ void Gui::draw_lightgun_tab(Config& config, Input* input)
 #ifndef SM2_HAVE_LIGHTGUNS
     (void)input;
     ImGui::Separator();
-    text_wrapped("Player 1 aims with the mouse; the left button fires and the right "
-                 "button reloads (shoot off screen).");
+    text_wrapped("By default player 1 aims with the mouse (the left button fires and the "
+                 "right reloads by shooting off screen) and player 2 with a gamepad.");
 #else
     ImGui::Separator();
     ImGui::TextUnformatted(tr("Recoil"));
@@ -2969,6 +3088,22 @@ void Gui::draw_network_tab(Config& config)
                        "cabinet's data exchanged at the end of each frame (TCP),\n"
                        "the cabinets numbered in the ring's order. Every cabinet\n"
                        "of a ring needs the same. Applies to the next game."));
+        }
+    }
+
+    {
+        int delay = static_cast<int>(config.link_delay);
+        ImGui::SetNextItemWidth(120.0f);
+        if (ImGui::InputInt(tr_id("Link delay (frames)"), &delay)) {
+            config.link_delay = static_cast<u32>(std::clamp(delay, 1, 30));
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            tooltip(tr("Model 3 only. How many frames late the other cabinets'\n"
+                       "data is read. Raise it if a race over Wi-Fi stutters;\n"
+                       "lower it on a wired LAN. Each frame shows the other\n"
+                       "cars 1/60 s later."));
         }
     }
 
@@ -3318,8 +3453,7 @@ void Gui::draw_states_tab(const Config& config)
                      hotkey_label(config, Config::Hotkey::QuickLoad)).c_str());
     ImGui::Spacing();
 
-    // A table so the three buttons always fit regardless of the overlay width,
-    // rather than fixed SameLine() offsets that push them off the right edge.
+    // A table so the three buttons always fit the overlay width.
     constexpr ImGuiTableFlags kFlags = ImGuiTableFlags_SizingStretchProp;
     // Fixed columns sized to the translated text, which can run longer.
     const ImGuiStyle& style  = ImGui::GetStyle();
@@ -3413,7 +3547,7 @@ void Gui::draw_fps_overlay(float measured_hz, const char* renderer_label)
 }
 
 // ---------------------------------------------------------------------------
-// On-screen notification (transient toast, top-centered)
+// On-screen notification (transient toast, top-centred)
 // ---------------------------------------------------------------------------
 
 void Gui::notify(std::string message, float seconds, bool always)
@@ -3494,8 +3628,7 @@ void Gui::draw_notification()
 {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
 
-    // Same font and size as the FPS overlay (the default font, no scaling),
-    // top-centered rather than top-right.
+    // Same font and size as the FPS overlay, centred at the top.
     const ImVec2 text_size = ImGui::CalcTextSize(m_notify_text.c_str());
     const ImVec2 padding{8.0F, 4.0F};
     const ImVec2 window_size{text_size.x + padding.x * 2.0F, text_size.y + padding.y * 2.0F};
@@ -3537,9 +3670,8 @@ void Gui::draw_crosshairs(const Config& config, const Input* input)
     }
     update_crosshair_images(config);
 
-    // Each aim is a 0..1 fraction of the game image. Map it back onto the same
-    // letterboxed 4:3 rectangle the frame is presented into, so the crosshair
-    // sits exactly where a shot lands. io.DisplaySize is that window.
+    // Each aim is a 0..1 fraction of the game image, mapped onto the letterboxed
+    // rectangle the frame is presented into.
     const ImGuiIO& io = ImGui::GetIO();
     if (io.DisplaySize.x < 1.0f || io.DisplaySize.y < 1.0f) {
         return;
@@ -3557,12 +3689,8 @@ void Gui::draw_crosshairs(const Config& config, const Input* input)
     const float radius = std::max(8.0f, box.height * 0.02f);
     const auto& aims = input->gun_aims();
 
-    // The aim positions come from the input poll, which does not run while the
-    // game is paused (settings overlay open). So player 1's crosshair would
-    // freeze there. When player 1 is on the mouse fallback (no dedicated gun),
-    // track the live ImGui pointer instead so the crosshair still follows the
-    // mouse in the overlay. A player on a gun or the pad cursor still freezes,
-    // which is correct -- its position only exists when polled.
+    // The input poll stops while paused, so a player 1 on the mouse fallback
+    // tracks the live pointer instead; guns and pad cursors freeze.
 
     for (usize player = 0; player < aims.size(); ++player) {
         const Input::GunAim& aim = aims[player];
@@ -3572,12 +3700,8 @@ void Gui::draw_crosshairs(const Config& config, const Input* input)
         float fx = aim.x;
         float fy = aim.y;
         if (player == 0 && aim.mouse && box.width > 0.0f && box.height > 0.0f) {
-            // Read the pointer straight from SDL rather than io.MousePos: while
-            // the settings window is focused ImGui reports a position relative to
-            // that window, which would confine the crosshair to its width. SDL's
-            // window-relative position spans the whole window. The overlay draws
-            // in io.DisplaySize space, which the SDL3 backend keeps equal to the
-            // window size, so this shares the letterbox already computed above.
+            // From SDL rather than io.MousePos, which is relative to the focused
+            // settings window.
             float mx = 0.0f;
             float my = 0.0f;
             SDL_GetMouseState(&mx, &my);
@@ -3605,11 +3729,8 @@ void Gui::draw_crosshairs(const Config& config, const Input* input)
     }
 }
 
-// A host calibration tool (Batocera's) steps the gun's reported position through
-// its targets and expects the screen to show where each one is, so the player
-// can shoot it. The marker is drawn on the window rather than the game image,
-// because the tool works in screen space, and regardless of the crosshair
-// setting, because these guns usually run without one.
+// Targets for a host gun calibration tool (Batocera's), drawn in window space
+// and regardless of the crosshair setting.
 void Gui::draw_calibration_markers(const Input* input)
 {
     if (input == nullptr) {
@@ -3819,6 +3940,7 @@ void Gui::draw_dir_picker_popup(Config& config)
         switch (m_dir_picker_target) {
             case DirPickerTarget::RomDir:        config.rom_dir        = m_dir_picker_path; break;
             case DirPickerTarget::Model1RomDir:  config.model1_rom_dir = m_dir_picker_path; break;
+            case DirPickerTarget::Model3RomDir:  config.model3_rom_dir = m_dir_picker_path; break;
             case DirPickerTarget::NvramDir:      config.nvram_dir      = m_dir_picker_path; break;
             case DirPickerTarget::ScreenshotDir: config.screenshot_dir = m_dir_picker_path; break;
             case DirPickerTarget::BezelDir: config.bezel_dir = m_dir_picker_path; break;
@@ -3907,9 +4029,8 @@ void Gui::enable_picker(std::vector<PickerEntry> entries, render::Backend* backe
         }
     }
 
-    // Load anything already cached up front: the scraper skips a set whose cache
-    // file exists and never pushes a Ready for it, so without this a cached set
-    // would show "Fetching..." forever. Uncached sets fill in from Ready later.
+    // Load anything already cached: the scraper never sends Ready for a set it
+    // has cached.
     if (m_picker_scraper != nullptr) {
         for (PickerEntry& entry : m_picker_entries) {
             const Scraper::Metadata meta =
@@ -4038,7 +4159,7 @@ void Gui::draw_picker(Config& config)
 
     if (m_picker_entries.empty()) {
         ImGui::Spacing();
-        text_wrapped("No Model 2 ROM archives were found in the ROM directory. Set it in "
+        text_wrapped("No ROM archives were found in the ROM directories. Set them in "
                      "Settings (F1) > Paths, then relaunch.");
         ImGui::End();
         ImGui::PopStyleColor();
@@ -4202,8 +4323,7 @@ void Gui::draw_picker(Config& config)
     ImGui::Separator();
 
     // Auto-scroll: hold at the top, creep up until fully past, hold, loop.
-    // m_picker_scroll is seconds since the pick (0 on selection change), so a
-    // new pick always starts at the top. Text that fits never scrolls.
+    // m_picker_scroll is seconds since the pick. Text that fits never scrolls.
     ImGui::BeginChild("##desc", ImVec2(0.0f, 0.0f), false,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     if (cur.description.empty()) {

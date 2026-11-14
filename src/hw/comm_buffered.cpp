@@ -373,7 +373,7 @@ bool BufferedLink::handshake(Role role)
         }
         if (guid != kGuid) {
             SM2_ERROR("m2comm: buffered link: another cabinet runs a different link; "
-                      "every cabinet needs the same sm2-emu");
+                      "every cabinet needs the same Keisho");
             m_state  = State::Broken;
             m_rejoin = false;
             return false;
@@ -435,7 +435,7 @@ bool BufferedLink::handshake(Role role)
     }
     if (guid != kGuid) {
         SM2_ERROR("m2comm: buffered link: another cabinet runs a different link; "
-                  "every cabinet needs the same sm2-emu");
+                  "every cabinet needs the same Keisho");
         m_state  = State::Broken;
         m_rejoin = false;
         return false;

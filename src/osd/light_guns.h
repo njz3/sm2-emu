@@ -1,32 +1,28 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
 // Per-device light guns, one host device per player.
 //
-// SDL merges every physical mouse into one system pointer, so it cannot tell
-// two light guns apart. This class reads each gun as its own device and sits
-// beside the SDL input path, which still handles the keyboard, the pads and
-// the single-mouse fallback.
+// SDL merges every mouse into one pointer, so each gun is read here as its own
+// device, beside the SDL path that still handles the single-mouse fallback.
 //
-// There are two backends. On Linux (evdev_gun.cpp) guns are evdev nodes found
-// through libudev, by the ID_INPUT_GUN property or a light-gun model name. On
-// Windows (rawinput_gun.cpp) guns are Raw Input mice with a light-gun product
-// name. Both report buttons as Linux evdev key codes, so the bindings in the
-// config work on either platform.
-//
-// The evdev technique follows Supermodel's evdev input system, but no code is
-// taken from it.
+// Linux (evdev_gun.cpp) finds evdev nodes through libudev by ID_INPUT_GUN or a
+// light-gun model name; Windows (rawinput_gun.cpp) uses Raw Input mice with a
+// light-gun product name. Both report buttons as evdev key codes, so bindings
+// work on either platform.
 #pragma once
 
 #include "core/types.h"
@@ -42,13 +38,10 @@ namespace sm2::osd {
 /// A set of absolute-positioning light guns.
 class LightGuns {
 public:
-    /// The hardware never has more than two; the headroom just avoids surprises
-    /// with hubs presenting extra nodes.
+    /// Headroom over two players for hubs presenting extra nodes.
     static constexpr usize kMaxGuns = 8;
 
-    /// One gun's current state: normalised position and the evdev key codes
-    /// currently held. Buttons are tracked by their raw evdev code so any
-    /// binding (set in the config) resolves without a fixed slot table.
+    /// One gun's state: normalised position and the evdev key codes held.
     struct Gun {
         float x = 0.5f;  ///< 0..1 across the screen, centred until moved.
         float y = 0.5f;

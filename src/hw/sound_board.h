@@ -1,29 +1,25 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
 //
 // What the rest of the program needs from a sound board, whichever one a set has.
 //
-// Two entirely different boards turn up on Model 2 hardware: the CRX family
-// carries a 68000 with an SCSP, and the original board carries the Model 1 audio
-// board -- a 68000 with a YM3438 and two MultiPCMs. They share no registers, no
-// clock and no sample rate. What they do share is the shape of their connection
-// to everything else: the host hands them serial bytes, they hand back interleaved
-// stereo samples, and something has to know how fast those samples are.
-//
-// Keeping that in one interface is what stops main.cpp from growing a second copy
-// of the audio path per board.
+// The CRX family carries a 68000 with an SCSP; the original board carries the
+// Model 1 audio board (a 68000, a YM3438 and two MultiPCMs). They share nothing
+// but the shape of the connection: serial bytes in, interleaved stereo out.
 
 #pragma once
 
@@ -42,18 +38,15 @@ public:
 
     virtual void clear_pending_samples() = 0;
 
-    /// Output rate in Hz. The two boards do not agree on one: the SCSP runs at
-    /// 44100 and the Model 1 board's MultiPCMs at 44643, so the audio device is
-    /// opened at whatever the board reports rather than at a constant.
+    /// Output rate in Hz: 44100 for the SCSP, 44643 for the Model 1 board.
     [[nodiscard]] virtual u32 sample_rate() const = 0;
 
     /// False when the set shipped no sound program, which keeps a synthetic
     /// machine in the tests usable.
     [[nodiscard]] virtual bool present() const = 0;
 
-    /// Voices currently sounding, for the status line and the headless report.
-    /// Boards count different things -- SCSP slots, MultiPCM channels -- so this
-    /// is only ever a rough indication that audio is happening.
+    /// Voices currently sounding; only a rough indication, as boards count
+    /// different things.
     [[nodiscard]] virtual u32 active_voices() const = 0;
 };
 

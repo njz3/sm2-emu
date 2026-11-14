@@ -1,19 +1,22 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -44,7 +47,7 @@ struct Language {
 };
 
 /// Find the catalogs: one <code>.po per language in a lang/ directory beside
-/// games.xml (the source tree's data/, ../share/sm2-emu, the app bundle's
+/// games.xml (the source tree's data/, ../share/keisho, the app bundle's
 /// Resources, or the executable's own directory).
 void init();
 
@@ -55,6 +58,9 @@ void init();
 /// system's preferred languages that has a catalog. Returns the code in effect,
 /// "en" when nothing matched.
 std::string set_language(const std::string& code);
+
+/// Fonts shipped for scripts a system may lack, beside the catalogs.
+[[nodiscard]] std::filesystem::path fonts_dir();
 
 /// The language in effect, "en" when untranslated.
 [[nodiscard]] const std::string& current();

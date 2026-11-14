@@ -1,23 +1,25 @@
 cmake_minimum_required(VERSION 3.24)
 
-#  ____  __  __  ____         _____ __  __ _   _
-# / ___||  \/  ||___ \       | ____|  \/  | | | |
-# \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-#  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-# |____/|_|  |_||_____|      |_____|_|  |_|\___/
+# ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+# ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+# █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+# ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+# ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+# ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+#            継 承  ( k e i s h ō )
 #
-# sm2-emu — A Sega Model 1 & 2 arcade emulator.
+# A Sega Model 1, 2 & 3 arcade emulator.
 # Copyright (c) 2025+ Daniel Martin (dmanlfc)
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# This header must not be removed. sm2-emu is licensed under the GNU General
+# This header must not be removed. Keisho is licensed under the GNU General
 # Public License, version 3 or later, with additional terms under section 7 of
 # that licence. See LICENSE and NOTICE.
 #
 
-project(sm2-emu
-    VERSION     0.9.59
-    DESCRIPTION "Sega Model 1 & 2 arcade emulator"
+project(keisho
+    VERSION     0.9.60
+    DESCRIPTION "Sega Model 1, 2 & 3 arcade emulator"
     LANGUAGES   C CXX
 )
 
@@ -32,6 +34,15 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Apple's ld warns on every static library CMake repeats for link order.
+if(APPLE)
+    include(CheckLinkerFlag)
+    check_linker_flag(CXX "LINKER:-no_warn_duplicate_libraries" SM2_LD_NO_DUP_WARN)
+    if(SM2_LD_NO_DUP_WARN)
+        add_link_options(LINKER:-no_warn_duplicate_libraries)
+    endif()
+endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Keep binaries in one predictable place; the emulator resolves data files
@@ -65,14 +76,12 @@ option(SM2_WERROR       "Treat compiler warnings as errors"        OFF)
 option(SM2_SHADER_WERROR "Treat shader compiler warnings as errors" ON)
 option(SM2_BUILD_TESTS  "Build unit tests"                          OFF)
 
-# Dependencies come from the system where available (find_package). Anything
-# not found falls back to the copy under 3rdparty/ (git submodules, plus the
-# vendored LZMA SDK), so a recursive checkout builds unattended with no network
-# access at configure time. See cmake/Dependencies.cmake.
+# Dependencies come from the system where available, falling back to the copies
+# under 3rdparty/, so a recursive checkout builds offline. See
+# cmake/Dependencies.cmake.
 
-# Render backends. Software is always built; the GPU backends are opt-in.
-# Vulkan defaults off so a bare build needs no Vulkan driver (for ARM boards
-# without one). SM2_BUILD_OPENGL_DESKTOP and SM2_BUILD_OPENGL_ES are mutually
+# Software rendering is always built. Vulkan defaults off so a bare build needs
+# no Vulkan driver. SM2_BUILD_OPENGL_DESKTOP and SM2_BUILD_OPENGL_ES are mutually
 # exclusive; GLES is for ARM targets.
 option(SM2_BUILD_VULKAN         "Build the Vulkan backend"                 OFF)
 option(SM2_BUILD_OPENGL_DESKTOP "Build the OpenGL 4.3 core desktop backend" ON)
@@ -104,15 +113,18 @@ elseif(APPLE)
     set(SM2_PLATFORM_MACOS TRUE)
 elseif(WIN32)
     set(SM2_PLATFORM_WINDOWS TRUE)
-    # <windows.h> (pulled in transitively by some vendored deps) defines min/max
-    # macros that break std::min/std::max, and is huge by default. Suppress both
-    # globally so any translation unit that ends up including it is unaffected.
+    # <windows.h>, pulled in by some vendored deps, defines min/max macros that
+    # break std::min/std::max.
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+    # Source files are UTF-8 (the file banner); MSVC otherwise reads them in
+    # the system code page.
+    if(MSVC)
+        add_compile_options(/utf-8)
+    endif()
 else()
-    message(WARNING "sm2-emu has not been tested on ${CMAKE_SYSTEM_NAME}")
+    message(WARNING "Keisho has not been tested on ${CMAKE_SYSTEM_NAME}")
 endif()
 
-# evdev light guns need libudev, which only exists on Linux.
 set(SM2_HAVE_EVDEV FALSE)
 if(NOT SM2_EVDEV STREQUAL "OFF" AND SM2_PLATFORM_LINUX)
     find_package(PkgConfig QUIET)
@@ -149,7 +161,7 @@ endif()
 # ---------------------------------------------------------------------------
 
 message(STATUS "")
-message(STATUS "sm2-emu ${PROJECT_VERSION}")
+message(STATUS "Keisho ${PROJECT_VERSION}")
 message(STATUS "  system          : ${CMAKE_SYSTEM_NAME} / ${CMAKE_SYSTEM_PROCESSOR}")
 message(STATUS "  build type      : ${CMAKE_BUILD_TYPE}")
 message(STATUS "  compiler        : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")

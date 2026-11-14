@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -18,13 +20,9 @@
 
 #include <utility>
 
-// The interface a CPU core uses to reach the rest of the machine.
-//
-// This replaces MAME's address_space. The ported cores were written against an
-// object offering read_byte/read_word/read_dword plus flag-returning variants,
-// so the shape here deliberately mirrors that: it keeps the ported instruction
-// implementations textually close to upstream, which is what makes future MAME
-// fixes diffable.
+// The interface a CPU core uses to reach the rest of the machine. It stands in
+// for MAME's address_space and mirrors its shape, so ported instruction code
+// stays textually close to upstream.
 
 namespace sm2::cpu {
 
@@ -40,11 +38,6 @@ enum : u16 {
 };
 
 /// Abstract memory bus.
-///
-/// Virtual dispatch costs a few nanoseconds per access. At the 25 MHz the real
-/// i960KB runs, and with the machine's own dispatch being a table lookup
-/// underneath, that is not close to being the limiting factor; measured before
-/// choosing anything more intrusive.
 class Bus {
 public:
     virtual ~Bus() = default;
@@ -57,10 +50,8 @@ public:
     virtual void write16(u32 address, u16 value) = 0;
     virtual void write32(u32 address, u32 value) = 0;
 
-    /// Reads that also report the accessed region's flags.
-    ///
-    /// Default implementations ignore flags, so a bus that has no burst regions
-    /// need not implement them.
+    /// Accesses that also report the region's flags. The defaults report none,
+    /// so a bus without burst regions need not override them.
     virtual std::pair<u8, u16> read8_flags(u32 address)
     {
         return {read8(address), kBusFlagNone};

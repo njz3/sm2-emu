@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -30,9 +32,8 @@
 namespace sm2::osd {
 namespace {
 
-// A hand-rolled reader for the handful of named fields we need, not a general
-// JSON parser: ArcadeDB's reply and our own cache file are both flat objects of
-// string values, so this is simpler to audit than vendoring a parser.
+// Not a general JSON parser: ArcadeDB's reply and the cache file are both flat
+// objects of string values.
 
 /// Decode a JSON string body, resolving \" \\ \/ \n \r \t \b \f and \uXXXX
 /// (BMP only, to UTF-8).
@@ -171,7 +172,7 @@ namespace {
 namespace {
 
 constexpr const char* kUserAgent =
-    "sm2-emu/1.0 (Sega Model 2 emulator; game picker artwork)";
+    "Keisho/1.0 (Sega Model 1, 2 & 3 emulator; game picker artwork)";
 constexpr long kConnectTimeoutSeconds = 8;
 constexpr long kTotalTimeoutSeconds   = 15;
 

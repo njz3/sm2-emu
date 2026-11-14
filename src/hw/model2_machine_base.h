@@ -1,64 +1,31 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
 //
-// The board-agnostic call surface every Model 2 machine variant presents to
-// main.cpp, the debug dump functions (hw/model2_debug.cpp) and the renderer
-// (render/vk/poly3d_pass.cpp).
-//
-// This interface is deliberately narrower than any one board's own class: it
-// covers exactly what those three consumers call on a machine instance today,
-// which is init/reset/run_frame, the input latch, the produced render list,
-// NVRAM persistence, and the handful of video and diagnostic accessors the
-// debug dumps and the 3D pass read. It does not cover the geometry coprocessor,
-// the sound board or the sound link (Model2::copro()/sound()/uart()): those
-// return board-specific hardware types (CoproTgp, Model2Sound, I8251) that do
-// not generalise across boards -- Model 2B's coprocessor is a SHARC wrapped in
-// a CoproSharc, Model 2C's is an MB86235 wrapped in a CoproTgpx4, and the
-// original Model 2's sound board is YM3438 + MultiPCM, not 68000/SCSP. Code
-// that needs those stays against the concrete board class.
-//
-// -- CPU state reporting across differing core types ------------------------
-//
-// main.cpp's boot-test report reads the main CPU's state through
-// Model2::cpu(): faulted(), fault_message(), state_string(), halted() and
-// instructions(). Every board this project will add runs a different core
-// there (i960 on Model 2 and 2A, SHARC on Model 2B, MB86235 on Model 2C), so
-// this interface needs some way to ask for that without knowing which.
-//
-// Two shapes were considered:
-//
-//   1. A type-erased CpuStatus snapshot struct (below), built by each board's
-//      main_cpu_status() from whichever concrete core it owns.
-//   2. A virtual base class every CPU core implements, so the interface could
-//      just return a reference to it.
-//
-// (1) was chosen. cpu::i960::I960 and cpu::mb86233::MB86233 -- and every core
-// this project ports the same way in later waves (SHARC, MB86235) -- are kept
-// textually close to their MAME originals on purpose, so that upstream fixes
-// stay diffable (see sm2_warnings_ported's rationale in src/CMakeLists.txt).
-// Retrofitting a virtual interface onto them would touch code whose entire
-// value is reading like upstream, for a feature (polymorphic status reporting)
-// that only the boot-test's summary print actually needs. A type-erased struct
-// costs one small allocation-bearing copy per report, which happens at most
-// once a frame, and touches none of the ported cores.
+// The board-agnostic call surface every Model 2 variant presents to main.cpp,
+// the debug dumps and the renderer. It leaves out the coprocessor and sound
+// hardware, whose types differ per board; code needing those uses the concrete
+// class. CPU state is reported through the type-erased CpuStatus (machine.h)
+// so the MAME-derived cores need no common virtual base.
 #pragma once
 
 #include "core/log.h"
 #include "core/types.h"
 #include "hw/geometrizer.h"
-#include "hw/save_state_io.h"
+#include "hw/machine.h"
 #include "rom/game.h"
 #include "rom/rom_set.h"
 
@@ -76,126 +43,14 @@ class Model2Video;
 class CommBoard;
 class M2Comm;
 
-/// Copy a set's shipped power-on image over battery-backed storage.
-///
-/// MAME's nvram_device and eeprom_base_device take their contents from a ROM
-/// region named after the device when the set provides one, and the comment in
-/// nvram_default says the region "always wins" over the all-ones default. Three
-/// Model 2 sets depend on it. Manx TT ships an EEPROM image that selects DX or
-/// Twin mode -- revision D picks DX and revision C picks Twin -- and Hanguk Pro
-/// Yagu 98 ships both an EEPROM and a 16 KB backup-RAM image.
-///
-/// Ignoring it is not cosmetic: with a blank EEPROM, revision C comes up in DX
-/// mode and sits on the motion-base self-test screen forever, which is exactly
-/// where it was stuck while MAME went straight into a race.
-///
-/// A saved image from a previous run takes precedence over both, matching the
-/// order MAME reads them in: nvram_default first, then the .nv file on top.
-inline bool apply_default_image(std::span<const u8> shipped, std::span<u8> storage)
-{
-    if (shipped.size() != storage.size()) return false;
-    std::copy(shipped.begin(), shipped.end(), storage.begin());
-    return true;
-}
-
-/// State of every operator and player control, in hardware polarity.
-///
-/// All Model 2 digital inputs are active low, so an idle panel is all ones.
-/// Until the input layer fills this from SDL it stays idle and the game sees a
-/// machine nobody is touching.
-struct Inputs {
-    /// Coins, service, test and start. Bit 0 coin 1, bit 1 coin 2, bit 2 test,
-    /// bit 3 service, bit 4 start 1, bit 5 start 2.
-    u8 in0 = 0xff;
-
-    /// Player 1: bits 0-3 buttons, bit 4 down, bit 5 up, bit 6 right, bit 7 left.
-    u8 in1 = 0xff;
-
-    /// Player 2, same layout.
-    u8 in2 = 0xff;
-
-    /// An extra port some cabinets add on the I/O controller's port E. Only
-    /// Power Sled uses it: bit 1 is its "Cancel Network Check" button.
-    u8 in3 = 0xff;
-
-    /// The CPU board's eight-position SW3.
-    u8 dipswitches = 0xff;
-
-    /// Eight analogue channels behind the I/O controller's mux. Unused by games
-    /// with digital controls only.
-    ///
-    /// These are filled from the per-title channel assignment in
-    /// rom::GameSpec::analog rather than by a fixed convention, because the
-    /// channel a control sits on differs between titles. A machine with no
-    /// analogue controls leaves them at their rest values.
-    std::array<u8, 8> analog{};
-
-    /// Gear selector, one bit per shifter position, active high. Only read by a
-    /// title whose GameSpec sets `gearbox`.
-    u8 gears = 0;
-
-    /// Lightgun position, 10-bit, in the coordinate space the title calibrates
-    /// for in rom::GameSpec::lightgun. These do not go through the analogue mux:
-    /// the gun interface board is a serial device.
-    u16 gun_p1x = 0;
-    u16 gun_p1y = 0;
-    u16 gun_p2x = 0;
-    u16 gun_p2y = 0;
-};
-
-/// A type-erased snapshot of the machine's main CPU state.
-///
-/// See the file comment above for why this is a plain struct rather than a
-/// shared virtual CPU base class.
-struct CpuStatus {
-    /// One-line register dump, as the concrete core's own state_string().
-    std::string state_string;
-
-    /// What went wrong, if faulted is true. Empty otherwise.
-    std::string fault_message;
-
-    /// Total instructions retired since reset.
-    u64 instructions = 0;
-
-    bool halted  = false;
-    bool faulted = false;
-};
-
 /// The call surface a Model 2 board variant presents to the rest of the
 /// program.
-///
-/// Every method here already exists on hw::Model2 (the Model 2A
-/// implementation); this interface exists so that a machine factory keyed on
-/// rom::Board can return one of several board variants and have main.cpp, the
-/// debug dumps and the renderer work against all of them unchanged.
-class Model2MachineBase {
+class Model2MachineBase : public Machine {
 public:
-    virtual ~Model2MachineBase() = default;
+    [[nodiscard]] MachineFamily family() const final { return MachineFamily::Model2; }
 
-    Model2MachineBase()                                     = default;
-    Model2MachineBase(const Model2MachineBase&)            = delete;
-    Model2MachineBase& operator=(const Model2MachineBase&) = delete;
-
-    // -- lifecycle -----------------------------------------------------------
-
-    /// Wire up the ROMs and bring the machine to its reset state.
-    [[nodiscard]] virtual bool init(const rom::GameSpec& game, rom::RomSet roms) = 0;
-
-    virtual void reset() = 0;
-
-    /// Advance one video frame, including the vertical blank interrupt.
-    virtual void run_frame() = 0;
-
-    // -- input and output -----------------------------------------------------
-
-    [[nodiscard]] virtual Inputs&       inputs()       = 0;
-    [[nodiscard]] virtual const Inputs& inputs() const = 0;
-
-    /// The communication (link) board, the same M2Comm type on every variant.
-    /// main.cpp injects a LAN transport here when linking is on; the OSD reads
-    /// its link state.
-    [[nodiscard]] virtual CommBoard&       comm()       = 0;
-    [[nodiscard]] virtual const CommBoard& comm() const = 0;
+    [[nodiscard]] Model2MachineBase*       as_model2() final { return this; }
+    [[nodiscard]] const Model2MachineBase* as_model2() const final { return this; }
 
     /// This frame's screen-space polygons, in drawing order.
     [[nodiscard]] virtual const RenderList& render_list() const = 0;
@@ -242,66 +97,6 @@ public:
     /// The colour ramp's black level (Model2Video::set_black_level).
     virtual void set_black_level(u32 /*bias*/) {}
 
-    // -- per-core timing, for --profile --------------------------------------
-    //
-    // run_frame() interleaves the i960, coprocessor and sound board, so main.cpp
-    // sees one call and cannot time them apart. Each board accumulates its own
-    // nanoseconds below, gated on profiling being armed (these run thousands of
-    // times a frame).
-
-    /// Arm or disarm the per-core accumulators. main.cpp turns it on under
-    /// --profile only.
-    void set_core_profiling(bool enable) { m_core_profile.enabled = enable; }
-
-    /// Nanoseconds the last run_frame() spent in each core. Zero when profiling
-    /// was not armed for that frame.
-    [[nodiscard]] u64 i960_stage_nanoseconds() const { return m_core_profile.i960_ns; }
-    [[nodiscard]] u64 copro_stage_nanoseconds() const { return m_core_profile.copro_ns; }
-    [[nodiscard]] u64 sound_stage_nanoseconds() const { return m_core_profile.sound_ns; }
-
-    // -- persistence -----------------------------------------------------------
-
-    /// Directory for the NVRAM and EEPROM images. Loaded now, saved on request.
-    virtual void set_nvram_directory(const std::string& directory) = 0;
-    virtual void load_nvram()                                      = 0;
-    virtual void save_nvram() const                                = 0;
-
-    /// Snapshot the whole machine into `out` / restore it from `data`. Both
-    /// must be called only between frames (see run_frame). Default:
-    /// unsupported, so a board that has not implemented save-states yet returns
-    /// false rather than failing to compile. Return false on any error, leaving
-    /// a running machine untouched on a failed load.
-    [[nodiscard]] virtual bool save_state_data(std::vector<u8>& out) const
-    {
-        (void)out;
-        return false;
-    }
-    [[nodiscard]] virtual bool load_state_data(std::span<const u8> data)
-    {
-        (void)data;
-        return false;
-    }
-
-    /// The same through a state file at `path`.
-    [[nodiscard]] bool save_state(const std::string& path) const
-    {
-        std::vector<u8> data;
-        return save_state_data(data) && write_state_file(path, data);
-    }
-    [[nodiscard]] bool load_state(const std::string& path)
-    {
-        std::vector<u8> data;
-        if (!read_state_file(path, data) || !load_state_data(data)) {
-            return false;
-        }
-        SM2_INFO("save-state: loaded '%s'", path.c_str());
-        return true;
-    }
-
-    // -- main CPU status, for the boot-test report ------------------------
-
-    [[nodiscard]] virtual CpuStatus main_cpu_status() const = 0;
-
     // -- video, for the renderer and the debug dumps ------------------------
 
     [[nodiscard]] virtual std::span<const u8>  tile_ram() const  = 0;
@@ -326,11 +121,8 @@ public:
     /// frame. Needed to walk the buffer the way the engine does.
     [[nodiscard]] virtual u32 geometry_read_start_address() const = 0;
 
-    /// Render test mode, bit 0 of the render mode register at 0x10000000.
-    ///
-    /// The manual describes it as letting the host reach memories that are
-    /// otherwise always being reloaded. In practice it stops the DSP drawing and
-    /// clearing the framebuffer and shows one of the two framebuffer banks
+    /// Render test mode, bit 0 of the render mode register at 0x10000000. It
+    /// stops the DSP drawing and clearing and shows a framebuffer bank
     /// directly, which is how Last Bronx draws its title screen.
     [[nodiscard]] virtual bool render_test_mode() const = 0;
 
@@ -342,29 +134,20 @@ public:
     [[nodiscard]] virtual bool palette_dirty() const = 0;
     virtual void               clear_palette_dirty() = 0;
 
-    /// Counters that advance whenever the 3D renderer's source data changes; see
-    /// hw::Model2's own documentation of these for why they are counters rather
-    /// than flags.
+    /// Counters that advance whenever the 3D renderer's source data changes.
     [[nodiscard]] virtual u64 texture_generation() const = 0;
     [[nodiscard]] virtual u64 table_generation() const   = 0;
 
-    /// Counters that advance on any write to tile RAM or character RAM
-    /// respectively, for a GPU tilemap pass deciding whether its own copies need
-    /// refreshing. Coarser than Segaic24Tile's internal per-cell/per-character
-    /// dirty bitmaps -- those exist to skip re-decoding unchanged cells on the
-    /// CPU path and stay exactly as they are; these two exist only so a consumer
-    /// outside Segaic24Tile can ask "did anything change" as cheaply as
-    /// texture_generation()/table_generation() already let it ask that of
-    /// texture and palette memory.
+    /// Counters that advance on any write to tile RAM or character RAM, so a GPU
+    /// tilemap pass can tell whether its copies need refreshing.
     [[nodiscard]] virtual u64 tile_generation() const = 0;
     [[nodiscard]] virtual u64 char_generation() const = 0;
 
     [[nodiscard]] virtual Model2Video&       video()       = 0;
     [[nodiscard]] virtual const Model2Video& video() const = 0;
 
-    /// Wall-clock time compose_video()'s call into Model2Video::compose() took,
-    /// in nanoseconds. Named separately from video() itself so a caller wanting
-    /// only the benchmark figure need not also declare Model2Video complete.
+    /// Wall-clock time of Model2Video::compose() in compose_video(), in
+    /// nanoseconds, without needing Model2Video complete.
     [[nodiscard]] virtual u64 tilemap_compose_nanoseconds() const = 0;
 
     /// Produce this frame's 2D output, refreshing the palette first if the
@@ -373,129 +156,12 @@ public:
 
     // -- diagnostics -----------------------------------------------------------
 
-    [[nodiscard]] virtual u64 cycles() const = 0;
-    [[nodiscard]] virtual u64 frames() const = 0;
-
     /// The interrupt latch, for reporting which sources the program has armed.
     [[nodiscard]] virtual u32 intreq() const = 0;
     [[nodiscard]] virtual u32 intena() const = 0;
 
-    /// Bytes the game wrote to its force-feedback drive board, oldest first.
-    struct DriveBoardWrites {
-        std::array<u8, 16> bytes{};
-        usize              count = 0;
-
-        [[nodiscard]] std::span<const u8> view() const { return {bytes.data(), count}; }
-    };
-
-    /// The drive-board writes since the last call, which empties the list. A
-    /// frame can hold several (Indy 500 sends an effect then two parameters), so
-    /// sampling only the last byte would miss the effect.
-    [[nodiscard]] DriveBoardWrites take_drive_board_writes()
-    {
-        const DriveBoardWrites writes = m_drive_board_writes;
-        m_drive_board_writes.count    = 0;
-        return writes;
-    }
-
-    /// The last value the game wrote to its lamp/coin-counter latch.
-    [[nodiscard]] u8 lamp_latch() const { return m_lamp_latch; }
-
-    /// A real drive board's answer (BackForceFeeder's m2ffb_rx, over the
-    /// network outputs), read by the game in place of the emulated board's on
-    /// every board that answers; none: the emulated answer. Not saved in
-    /// states: it comes from outside the machine.
-    void set_drive_reply(std::optional<u8> reply) { m_drive_reply = reply; }
-
-    /// Log every access that lands outside a mapped region. Off by default.
-    virtual void set_log_unmapped(bool enable) = 0;
-
     virtual void log_unmapped_summary() const = 0;
     virtual void log_burst_summary() const    = 0;
-
-protected:
-    /// Per-core wall-clock accumulators, filled by each board's run_frame().
-    /// See set_core_profiling() above for why this is gated rather than always
-    /// measured.
-    struct CoreProfile {
-        bool enabled  = false;
-        u64  i960_ns  = 0;
-        u64  copro_ns = 0;
-        u64  sound_ns = 0;
-    };
-    CoreProfile m_core_profile;
-
-    /// Called by each board's drive_board_write. When full, the newest byte
-    /// replaces the last slot.
-    void record_drive_board_write(u8 value)
-    {
-        auto& writes = m_drive_board_writes;
-        if (writes.count < writes.bytes.size()) {
-            writes.bytes[writes.count++] = value;
-        } else {
-            writes.bytes.back() = value;
-        }
-    }
-
-    DriveBoardWrites m_drive_board_writes;
-
-    /// What the game reads from its drive board: the real board's answer when
-    /// there is one (set_drive_reply), else `emulated`.
-    [[nodiscard]] u8 drive_reply_or(u8 emulated) const { return m_drive_reply.value_or(emulated); }
-
-    std::optional<u8> m_drive_reply;
-
-    /// The steering pot as the game reads it, for a drive board's answer.
-    [[nodiscard]] u8 steering_value(const rom::GameSpec& game) const
-    {
-        for (usize channel = 0; channel < game.analog.size(); ++channel) {
-            if (game.analog[channel].control == rom::AnalogControl::Steer) {
-                return inputs().analog[channel];
-            }
-        }
-        return 0x80;
-    }
-
-    /// Called by each board's lamp_output_w.
-    void record_lamp_latch(u8 value) { m_lamp_latch = value; }
-
-    u8 m_lamp_latch = 0;
-
-    /// Zero the per-frame accumulators. Called at the top of run_frame().
-    void reset_core_profile()
-    {
-        m_core_profile.i960_ns  = 0;
-        m_core_profile.copro_ns = 0;
-        m_core_profile.sound_ns = 0;
-    }
-
-    /// RAII accumulator: adds its lifetime in nanoseconds to `into` on exit,
-    /// but only when profiling is armed -- otherwise the clock is never read.
-    class CoreScope {
-    public:
-        CoreScope(const CoreProfile& profile, u64& into)
-            : m_into(profile.enabled ? &into : nullptr)
-        {
-            if (m_into != nullptr) {
-                m_start = std::chrono::steady_clock::now();
-            }
-        }
-        ~CoreScope()
-        {
-            if (m_into != nullptr) {
-                *m_into += static_cast<u64>(
-                    std::chrono::duration_cast<std::chrono::nanoseconds>(
-                        std::chrono::steady_clock::now() - m_start)
-                        .count());
-            }
-        }
-        CoreScope(const CoreScope&)            = delete;
-        CoreScope& operator=(const CoreScope&) = delete;
-
-    private:
-        u64*                                  m_into = nullptr;
-        std::chrono::steady_clock::time_point m_start{};
-    };
 };
 
 }  // namespace sm2::hw

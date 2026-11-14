@@ -17,7 +17,7 @@
 //                              bit timing nothing observes. See midi_in.
 //   machine().rand()           a fixed-seed generator, so runs are reproducible
 //   set_output_gain            m_master_gain, applied in DoMasterSamples
-//   save_item / device_post_load  dropped; no save states yet
+//   save_item / device_post_load  serialize()
 //
 // The slot update, envelope, LFO and DSP feed are upstream's, so fixes there stay
 // diffable.
@@ -53,6 +53,8 @@ public:
 
     /// `mem_mask` is ignored, as MAME's read ignores it.
     [[nodiscard]] u16 read(u32 offset, u16 mem_mask) override;
+    /// A whole-word read, as upstream's Model 3 board calls it.
+    [[nodiscard]] u16 read(u32 offset) { return read(offset, 0xffff); }
     void write(u32 offset, u16 data, u16 mem_mask) override;
 
     // -- audio --------------------------------------------------------------
@@ -67,6 +69,16 @@ public:
     void set_slot_gains(const u16 gains[32]) override;
 
     void midi_in(u8 value) override;
+
+    /// Bytes waiting in the MIDI input FIFO. It has no overflow check, so a
+    /// fast host (the Model 3 PowerPC) must hold back when it is full.
+    [[nodiscard]] u32 midi_in_pending() const { return static_cast<u32>((m_MidiW - m_MidiR) & 31); }
+
+    /// One slot is lost to the full/empty ambiguity.
+    static constexpr u32 kMidiInCapacity = 31;
+
+    /// DAC18B: the program selected the 18-bit DAC output format.
+    [[nodiscard]] bool dac18() const { return (m_udata.data[0] & 0x0100) != 0; }
 
     // -- inspection, for the headless bring-up test --------------------------
 
@@ -155,27 +167,19 @@ private:
 
     // -- replacements for MAME's framework ----------------------------------
 
-    /// MAME's timerA/B/C emu_timers. The delay upstream asks for is
-    /// attotime::from_ticks(512, (clock/prescale) / (255 - value)), which at a
-    /// sample rate of clock/512 is exactly prescale * (255 - value) samples, so
-    /// the timers become deadlines on the sample counter and need no scheduler.
+    /// MAME's timerA/B/C emu_timers, as deadlines on the sample counter.
     void kick_timer(int which, u16 value);
     void service_timers();
     void timer_expired(int which);
 
-    /// One sample of the MIDI transmitter's byte clock. Upstream lets
-    /// device_serial_interface shift bits out; nothing here observes the bits, so
-    /// the byte is delivered whole after one byte time. See the note in scsp.cpp.
+    /// One sample of the MIDI transmitter's byte clock. See the note in scsp.cpp.
     void service_midi_out();
     void begin_midi_transmit(u8 value);
 
-    /// MAME's machine().rand(), seeded fixed so that two runs of the emulator
-    /// produce the same noise. Used for the noise slot type and for the LFO's
-    /// noise waveform table.
+    /// MAME's machine().rand(), fixed-seed so runs produce the same noise.
     u32 next_random();
 
-    /// MAME's devcb objects are callable whether or not anything is bound;
-    /// std::function is not, so these wrap the null check.
+    /// devcb stand-ins that wrap the null check.
     void irq_cb(int level, bool assert);
     void main_irq_cb(bool assert);
     [[nodiscard]] bool has_irq_handler() const { return static_cast<bool>(m_irq_cb); }
@@ -265,9 +269,7 @@ private:
     /// applied where the mixer writes its result.
     float m_master_gain = 1.0f;
 
-    /// Per-slot output gain, 1/256 units (256 == unity); see set_slot_gains.
-    /// m_slot_gain_active is false when every entry is unity, bypassing the
-    /// gain path so the faithful case stays bit-exact.
+    /// See set_slot_gains. m_slot_gain_active is false when every entry is unity.
     u16  m_slot_gain[32]     = {};
     bool m_slot_gain_active  = false;
 
@@ -293,5 +295,8 @@ private:
 
     Stats m_stats;
 };
+
+/// The Model 3 sound board drives the MAME-derived core directly.
+using Scsp = ScspMame;
 
 }  // namespace sm2::hw

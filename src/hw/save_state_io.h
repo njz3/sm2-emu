@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -27,12 +29,10 @@ class Archive;
 
 // Shared save-state file I/O for all four boards.
 //
-// Every board's save_state/load_state is the same envelope around its own
-// serialize(Archive&): write a header + payload on save; on load validate the
-// header (magic/version/game/board), then apply with a snapshot-rollback so a
-// truncated or corrupt file leaves the running machine untouched (requirement
-// 3.2). Only the per-board serialize differs, so it is passed in as a visitor
-// and the envelope lives here once rather than being copied per board.
+// The envelope around each board's serialize(Archive&): a header and payload on
+// save; on load the header (magic/version/game/board) is validated and the
+// payload applied with a snapshot rollback, so a truncated or corrupt file leaves
+// the running machine untouched.
 
 namespace sm2::hw {
 
@@ -40,7 +40,7 @@ namespace sm2::hw {
 /// decides the direction.
 using SerializeFn = std::function<void(Archive&)>;
 
-/// Write `serialize`'s payload, behind an SM2STATE header keyed by `game` /
+/// Write `serialize`'s payload, behind a state header keyed by `game` /
 /// `board`, into `out`. `in_frame` must be false (save only between frames).
 [[nodiscard]] bool save_state_to_buffer(std::vector<u8>& out, const std::string& game,
                                         u32 board, bool in_frame,
@@ -54,7 +54,8 @@ using SerializeFn = std::function<void(Archive&)>;
                                           u32 board, bool in_frame,
                                           const SerializeFn& serialize);
 
-/// A state file's bytes to and from disk. False (logged) on an I/O error.
+/// A state file's bytes to and from disk, deflated on write; an uncompressed
+/// file still reads. False (logged) on an I/O error or a corrupt file.
 [[nodiscard]] bool write_state_file(const std::string& path, std::span<const u8> data);
 [[nodiscard]] bool read_state_file(const std::string& path, std::vector<u8>& out);
 
@@ -67,7 +68,7 @@ void set_host_state(SerializeFn serialize);
 // Slots
 // ---------------------------------------------------------------------------
 // A game gets one reserved quick-save slot plus a few numbered slots. Files are
-// named `<game>.<slot>.sm2state` under the states directory (data dir / states).
+// named `<game>.<slot>.kstate` under the states directory (data dir / states).
 
 /// The reserved quick-save slot name.
 inline constexpr const char* kQuickSlot = "quick";
@@ -75,10 +76,12 @@ inline constexpr const char* kQuickSlot = "quick";
 /// How many numbered slots ("1".."kNumberedSlots") a game has.
 inline constexpr int kNumberedSlots = 4;
 
-/// Absolute path of one slot's file: `<dir>/<game>.<slot>.sm2state`. `dir` is
+/// Absolute path of one slot's file: `<dir>/<game>.<slot>.kstate`. `dir` is
 /// the states directory (resolve_default_paths derives it as data dir/states).
+/// An sm2-emu `.sm2state` for the slot is converted to it first; without
+/// `convert` (a folder that must not be written), that file is named instead.
 [[nodiscard]] std::string state_slot_path(const std::string& dir, const std::string& game,
-                                          const std::string& slot);
+                                          const std::string& slot, bool convert = true);
 
 /// One slot's status for the overlay.
 struct SlotInfo {
@@ -90,10 +93,10 @@ struct SlotInfo {
 /// The quick slot followed by the numbered slots, each with its occupied state
 /// and (where occupied) a local-time modification stamp, for `game` under `dir`.
 [[nodiscard]] std::vector<SlotInfo> list_state_slots(const std::string& dir,
-                                                     const std::string& game);
+                                                     const std::string& game,
+                                                     bool convert = true);
 
-/// Delete one slot's file. Returns true if the file was removed; false (logged)
-/// on an I/O error. A missing file is treated as success (nothing to do).
+/// Delete one slot's file. False (logged) on an I/O error; a missing file is success.
 [[nodiscard]] bool delete_state_slot(const std::string& dir, const std::string& game,
                                      const std::string& slot);
 

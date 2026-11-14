@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -32,6 +34,7 @@
 #include "hw/sound_board.h"
 #include "hw/model2b.h"
 #include "hw/model2c.h"
+#include "hw/model3/model3.h"
 #include "hw/model2_debug.h"
 #include "hw/model2_softrender.h"
 #include "hw/model2_softrender_async.h"
@@ -47,6 +50,8 @@
 #include "osd/scraper.h"
 #include "osd/window.h"
 #include "render/backend.h"
+#include "render/model3/soft_backend.h"
+#include "render/model3/texture_dump.h"
 #include "render/texture_dump.h"
 #include "render/texture_replace.h"
 #include "rom/game_db.h"
@@ -79,8 +84,7 @@
 #include <vector>
 
 #if !defined(SM2_HAVE_VULKAN)
-// enumerate_render_devices() is Vulkan-only (it lists VkPhysicalDevices);
-// a Vulkan-less build has no device list, so provide an empty fallback.
+// enumerate_render_devices() is Vulkan-only; a Vulkan-less build lists none.
 namespace sm2::render {
 std::vector<std::string> enumerate_render_devices() { return {}; }
 }  // namespace sm2::render
@@ -90,7 +94,7 @@ namespace {
 
 /// The window's name: this branch's builds carry their version as the release
 /// packages name it (git describe) and the edition.
-constexpr const char* kWindowName = "sm2-emu " SM2_BUILD_VERSION " FFB Edition";
+constexpr const char* kWindowName = "Keisho " SM2_BUILD_VERSION " FFB Edition";
 
 /// The colour ramp's black level for the brightness setting: 50% is the
 /// default 40, 0% is 64 and 100% is 16.
@@ -99,9 +103,8 @@ constexpr const char* kWindowName = "sm2-emu " SM2_BUILD_VERSION " FFB Edition";
     return 64 - (std::min<sm2::u32>(config.brightness, 100) * 48 + 50) / 100;
 }
 
-/// --graphics-backend's three values. Which GL flavour `Opengl` resolves to is
-/// a build-time fact (SM2_BUILD_OPENGL_DESKTOP vs SM2_BUILD_OPENGL_ES), not a
-/// fourth value here.
+/// --graphics-backend's values. Which GL flavour `Opengl` means is fixed at
+/// build time.
 enum class GraphicsBackendChoice {
     Software,
     Vulkan,
@@ -109,7 +112,7 @@ enum class GraphicsBackendChoice {
 };
 
 /// Parses --graphics-backend's argument. Returns false, naming the valid
-/// choices, on anything else rather than silently defaulting.
+/// choices, on anything else.
 [[nodiscard]] bool parse_graphics_backend(const char* value, GraphicsBackendChoice* out)
 {
     if (std::strcmp(value, "software") == 0) {
@@ -180,7 +183,6 @@ void apply_input_background(bool on)
 
 /// Default when --graphics-backend is not given: whichever GPU backend was
 /// compiled in, else software.
-///
 constexpr GraphicsBackendChoice kDefaultGraphicsBackend =
 #if defined(SM2_HAVE_OPENGL_ES)
     GraphicsBackendChoice::Opengl;
@@ -196,18 +198,19 @@ struct Options {
     /// Settings that persist. Loaded from the file, then overridden by flags.
     sm2::Config config;
 
-    /// Which of those the command line actually set, so a flag can win over the
-    /// file without every flag having to carry its own default.
+    /// Which of those the command line set, so a flag can win over the file.
     struct Given {
         bool vsync      = false;
         bool throttle   = false;
         bool fullscreen = false;
+        bool fullscreen_resolution = false;
         bool lightgun   = false;
         bool validation = false;
         bool log_level  = false;
         bool gpu        = false;
         bool rom_dir    = false;
         bool model1_rom_dir = false;
+        bool model3_rom_dir = false;
         bool nvram_dir  = false;
         bool screenshot_dir = false;
         bool render_scale = false;
@@ -232,49 +235,38 @@ struct Options {
     std::string rom_path;
 
     /// Load this save state before the run loop, so --run-frames 1 --screenshot
-    /// captures that exact moment (used to compare backends on real gameplay).
+    /// captures that exact moment.
     std::string load_state;
 
     /// Capture a frame every this many frames instead of only the last one. Each
     /// goes to the screenshot path with the frame number appended.
     sm2::u32 screenshot_interval = 0;
 
-    /// Capture exactly these frames. A comparison against another emulator has to
-    /// search a window of frames around each sample to find the one that lines up,
-    /// and an interval cannot express "these three windows and nothing else"
-    /// without writing hundreds of frames nobody looks at.
+    /// Capture exactly these frames.
     std::set<sm2::u32> screenshot_frames;
 
     /// Insert coins and press start around this frame. Zero leaves the panel
     /// alone.
     sm2::u32 coin_at = 0;
 
-    /// Write one line per frame recording what the geometry engine produced, so a
-    /// whole run can be compared against MAME's own count rather than a single
-    /// instant. Comparing curves rather than instants is what makes the comparison
-    /// survive the two emulators sitting on different attract pages.
+    /// Write one line per frame recording what the geometry engine produced, for
+    /// comparison against MAME's counts over a whole run.
     std::string poly_log;
 
     /// Write every texture the 3D samples to <saves>/textures/<game>/dump.
     bool dump_textures = false;
 
-    /// Also render each captured frame on the CPU, through the port of MAME's own
-    /// rasteriser, and write it beside the screenshot. Both come from the same
-    /// machine state, so a difference between them is the renderer and nothing
-    /// else.
+    /// Also render each captured frame through the CPU rasteriser and write it
+    /// beside the screenshot. Both come from the same machine state, so any
+    /// difference is the renderer's.
     bool soft_render = false;
 
-    /// Which renderer actually draws the window: Vulkan (the GPU path) or
-    /// Software (the same CPU rasteriser --soft-render uses for comparison,
-    /// drawn here instead of alongside). F2 toggles this live so the two can be
-    /// compared without restarting.
+    /// Draw the window with the CPU rasteriser (the one --soft-render uses)
+    /// rather than the GPU.
     bool start_in_software_renderer = false;
 
-    /// Which GPU backend is constructed underneath, independent of
-    /// start_in_software_renderer, which only decides whether the CPU rasteriser
-    /// is drawing this frame.
-    /// --graphics-backend software sets both: it presents through a GPU backend
-    /// but draws on the CPU, and also flips start_in_software_renderer.
+    /// Which GPU backend is constructed. --graphics-backend software still
+    /// presents through one, and also sets start_in_software_renderer.
     GraphicsBackendChoice graphics_backend = kDefaultGraphicsBackend;
 
     /// Run this many frames headless, report, and exit. Zero means run normally.
@@ -304,20 +296,18 @@ struct Options {
     sm2::u32 run_frames   = 0;
 
     /// Quit after this many wall-clock seconds, in the windowed path. Unlike
-    /// --run-frames, this bounds real time rather than emulated frames, which is
-    /// what a throughput comparison between renderers needs to hold fixed: with
-    /// --no-throttle the frame *count* is exactly the thing being measured, so it
-    /// cannot also be the stopping condition.
+    /// --run-frames this bounds real time, so --no-throttle can measure the
+    /// frame count.
     sm2::u32 duration_seconds = 0;
 
     /// Per-stage CPU/GPU breakdown rather than just the whole-frame rate.
     /// Implies --duration's stopping behaviour when duration_seconds is zero.
     bool profile = false;
 
+
     /// Discard every profiler and frame-time sample before this presented-frame
-    /// number, so attract/title/select screens (which draw almost nothing) do
-    /// not inflate the average. Set past the coin/start sequence (coin_at +
-    /// ~350). Zero measures from the first frame.
+    /// number, so near-empty attract and title screens do not skew the average.
+    /// Zero measures from the first frame.
     sm2::u32 profile_after = 0;
 
     /// Also write --profile's per-stage table to this CSV file, one row per stage.
@@ -329,13 +319,13 @@ struct Options {
 void print_usage()
 {
     std::printf(
-        "sm2-emu " SM2_VERSION " — Sega Model 1 & 2 arcade emulator\n"
+        "Keisho " SM2_VERSION " — Sega Model 1, 2 & 3 arcade emulator\n"
         "\n"
-        "Usage: sm2-emu [options] [rom.zip]\n"
+        "Usage: keisho [options] [rom.zip]\n"
         "\n"
         "Options:\n"
         "  -h, --help          Show this message\n"
-        "      --config <dir>  Directory holding sm2-emu.ini, used for both\n"
+        "      --config <dir>  Directory holding keisho.ini, used for both\n"
         "                      reading and saving settings; a game's own\n"
         "                      <set>.ini there is read instead when there is one\n"
         "      --set SECTION.KEY=VALUE  A setting over the file's, for this run\n"
@@ -350,6 +340,8 @@ void print_usage()
         "                      the usual places are read, never written\n"
         "      --dump-textures Write every 3D texture to <saves>/textures/<game>/dump\n"
         "      --fullscreen    Start filling the screen\n"
+        "      --fullscreen-resolution <WxH>  Fullscreen at a lower mode the\n"
+        "                      compositor scales up (faster on slow GPUs)\n"
         "      --game <name>   Load this set specifically, for archives that\n"
         "                      hold several revisions; with no path given, the\n"
         "                      archive is found in --rom-dir\n"
@@ -357,8 +349,9 @@ void print_usage()
         "      --graphics-backend <software|vulkan|opengl>\n"
         "                      Which renderer to use. 'opengl' means whichever GL\n"
         "                      flavour this binary was built with\n"
-        "      --lightgun      Light-gun mode: show the aiming crosshair and\n"
-        "                      hide the mouse cursor (for the gun titles)\n"
+        "      --lightgun, --no-lightgun  Gun mode (crosshair, hidden cursor) on\n"
+        "                      in every game, or off; by default a gun game turns\n"
+        "                      it on by itself\n"
         "      --list-gamepads Show which gamepads were recognised and which\n"
         "                      player each would drive\n"
         "      --agent         Serve a driving agent's commands over stdin and\n"
@@ -393,6 +386,8 @@ void print_usage()
         "                      path is loaded from <dir>/<name>.zip or .7z\n"
         "      --model1-rom-dir <dir>  Where the Model 1 archives live, if not\n"
         "                      in --rom-dir\n"
+        "      --model3-rom-dir <dir>  Where the Model 3 archives live, if not\n"
+        "                      in --rom-dir\n"
         "      --screenshot-dir <dir>  Where screenshots are written\n"
         "      --load-state <file>  Restore this save state before running, so a\n"
         "                      one-frame --screenshot captures that exact moment\n"
@@ -420,7 +415,7 @@ WriteDir g_write_dir;
 /// Whether a file can be made, written and removed in `dir`; if not, why.
 [[nodiscard]] bool writable(const std::filesystem::path& dir, std::string* why)
 {
-    const std::filesystem::path probe   = dir / ".sm2-emu-write-probe";
+    const std::filesystem::path probe   = dir / ".keisho-write-probe";
     std::FILE*                  handle  = std::fopen(probe.string().c_str(), "wb");
     bool                        written = handle != nullptr && std::fputs("sm2-emu\n", handle) >= 0;
     if (handle != nullptr) {
@@ -484,10 +479,13 @@ void copy_in(const std::filesystem::path& from, const std::filesystem::path& to,
 [[nodiscard]] std::string state_read_path(const sm2::Config& config, const std::string& game,
                                           const std::string& slot)
 {
-    const std::string path = sm2::hw::state_slot_path(states_directory(config, game), game, slot);
+    // Nothing converted where a refused --write-dir forbids writing.
+    const std::string path = sm2::hw::state_slot_path(states_directory(config, game), game, slot,
+                                                      !g_write_dir.refused);
     std::error_code   error;
     if (g_write_dir.on() && !std::filesystem::exists(path, error)) {
-        const std::string before = sm2::hw::state_slot_path(g_write_dir.states.string(), game, slot);
+        const std::string before =
+            sm2::hw::state_slot_path(g_write_dir.states.string(), game, slot, false);
         if (std::filesystem::exists(before, error)) {
             return before;
         }
@@ -501,10 +499,10 @@ void copy_in(const std::filesystem::path& from, const std::filesystem::path& to,
                                                          const std::string& game)
 {
     std::vector<sm2::hw::SlotInfo> slots =
-        sm2::hw::list_state_slots(states_directory(config, game), game);
+        sm2::hw::list_state_slots(states_directory(config, game), game, !g_write_dir.refused);
     if (g_write_dir.on()) {
         const std::vector<sm2::hw::SlotInfo> before =
-            sm2::hw::list_state_slots(g_write_dir.states.string(), game);
+            sm2::hw::list_state_slots(g_write_dir.states.string(), game, false);
         for (sm2::hw::SlotInfo& slot : slots) {
             for (const sm2::hw::SlotInfo& old : before) {
                 if (!slot.occupied && old.occupied && old.slot == slot.slot) {
@@ -643,11 +641,13 @@ void copy_in(const std::filesystem::path& from, const std::filesystem::path& to,
         } else if (std::strcmp(arg, "--no-throttle") == 0) {
             out->config.throttle = false;
             out->given.throttle  = true;
+        } else if (takes_value("--fullscreen-resolution", &out->config.fullscreen_resolution)) {
+            out->given.fullscreen_resolution = true;
         } else if (std::strcmp(arg, "--fullscreen") == 0) {
             out->config.fullscreen = true;
             out->given.fullscreen  = true;
-        } else if (std::strcmp(arg, "--lightgun") == 0) {
-            out->config.lightgun = true;
+        } else if (std::strcmp(arg, "--lightgun") == 0 || std::strcmp(arg, "--no-lightgun") == 0) {
+            out->config.lightgun = arg[2] == 'n' ? sm2::Config::LightgunMode::Off : sm2::Config::LightgunMode::On;
             out->given.lightgun  = true;
         } else if (std::strcmp(arg, "--net-outputs") == 0) {
             out->config.outputs_network = true;
@@ -781,6 +781,8 @@ void copy_in(const std::filesystem::path& from, const std::filesystem::path& to,
             out->given.rom_dir = true;
         } else if (takes_value("--model1-rom-dir", &out->config.model1_rom_dir)) {
             out->given.model1_rom_dir = true;
+        } else if (takes_value("--model3-rom-dir", &out->config.model3_rom_dir)) {
+            out->given.model3_rom_dir = true;
         } else if (takes_value("--nvram", &out->config.nvram_dir)) {
             out->given.nvram_dir = true;
         } else if (takes_value("--screenshot-dir", &out->config.screenshot_dir)) {
@@ -880,10 +882,6 @@ void copy_in(const std::filesystem::path& from, const std::filesystem::path& to,
     return (std::filesystem::path(dir) / (game + "-" + stamp + ".png")).string();
 }
 
-/// A loaded machine plus the pointers the loop reaches into it for. The four
-/// concrete downcasts are kept because the boot-test diagnostics and copro
-/// self-test need a specific board's registers. Audio is not opened here: the
-/// boot-test path needs a machine but no audio, so the caller opens it.
 /// The key a game's per-game settings are stored under, shared by every revision.
 [[nodiscard]] std::string game_family(const sm2::rom::GameSpec& game)
 {
@@ -930,23 +928,30 @@ void apply_volume(std::span<const sm2::s16> in, sm2::u32 percent, std::vector<sm
     }
 }
 
+/// A loaded machine plus the pointers the loop reaches into it for. The
+/// concrete downcasts are for the boot-test diagnostics, which need a specific
+/// board's registers.
 struct LoadedMachine {
-    sm2::rom::GameSpec                          game;
-    std::unique_ptr<sm2::hw::Model2MachineBase> machine_iface;
+    sm2::rom::GameSpec                game;
+    std::unique_ptr<sm2::hw::Machine> machine_owner;
+
+    /// machine_owner's Model 1 / Model 2 interface.
+    sm2::hw::Model2MachineBase* machine_iface = nullptr;
 
     sm2::hw::Model2*         machine      = nullptr;
     sm2::hw::Model2B*        machine_2b   = nullptr;
     sm2::hw::Model2C*        machine_2c   = nullptr;
     sm2::hw::Model2Original* machine_orig = nullptr;
     sm2::hw::Model1*         machine_m1   = nullptr;
+    sm2::hw::model3::Model3* machine_m3   = nullptr;
 
     sm2::cpu::i960::I960* main_cpu    = nullptr;
     sm2::hw::SoundBoard*  sound_board = nullptr;
     const sm2::hw::I8251* sound_link  = nullptr;
 };
 
-/// The folder set `name` loads from: model1_rom_dir for a Model 1 set when one
-/// is given, else rom_dir.
+/// The folder set `name` loads from: model1_rom_dir / model3_rom_dir for a
+/// Model 1 / Model 3 set when one is given, else rom_dir.
 [[nodiscard]] const std::string& rom_dir_for(const sm2::rom::GameDatabase& database,
                                              const sm2::Config& config,
                                              const std::string& name)
@@ -955,6 +960,10 @@ struct LoadedMachine {
     if (game != nullptr && game->board == sm2::rom::Board::Model1
         && !config.model1_rom_dir.empty()) {
         return config.model1_rom_dir;
+    }
+    if (game != nullptr && game->board == sm2::rom::Board::Model3
+        && !config.model3_rom_dir.empty()) {
+        return config.model3_rom_dir;
     }
     return config.rom_dir;
 }
@@ -996,10 +1005,9 @@ struct LoadedMachine {
     return std::nullopt;
 }
 
-/// Load, build, wire, point at NVRAM and reset a machine. The one path both a
-/// --game/positional launch and the picker use, so a picked game boots exactly
-/// like a directly-launched one. nullopt (logged, and in `error` when given)
-/// on failure.
+/// Load, build, wire, point at NVRAM and reset a machine, for both a direct
+/// launch and the picker. Audio is opened by the caller. nullopt (logged, and
+/// in `error` when given) on failure.
 [[nodiscard]] std::optional<LoadedMachine> load_game(sm2::rom::GameDatabase& database,
                                                      const std::string& rom_path,
                                                      const std::string& game_name,
@@ -1017,8 +1025,10 @@ struct LoadedMachine {
 
     LoadedMachine out;
     out.game          = result->game;
-    out.machine_iface = hw::create_machine(result->game, std::move(result->roms));
-    if (!out.machine_iface) {
+    out.machine_owner = hw::create_machine(result->game, std::move(result->roms));
+    out.machine_iface = out.machine_owner ? out.machine_owner->as_model2() : nullptr;
+    out.machine_m3    = out.machine_owner ? out.machine_owner->as_model3() : nullptr;
+    if (!out.machine_iface && !out.machine_m3) {
         if (error != nullptr) {
             error->game    = result->game.name;
             error->message = "The emulated machine could not be built; the log has the details.";
@@ -1027,11 +1037,11 @@ struct LoadedMachine {
     }
 
     // Downcast once; accessors below stay written against the concrete class.
-    out.machine      = dynamic_cast<hw::Model2*>(out.machine_iface.get());
-    out.machine_2b   = dynamic_cast<hw::Model2B*>(out.machine_iface.get());
-    out.machine_2c   = dynamic_cast<hw::Model2C*>(out.machine_iface.get());
-    out.machine_orig = dynamic_cast<hw::Model2Original*>(out.machine_iface.get());
-    out.machine_m1   = dynamic_cast<hw::Model1*>(out.machine_iface.get());
+    out.machine      = dynamic_cast<hw::Model2*>(out.machine_iface);
+    out.machine_2b   = dynamic_cast<hw::Model2B*>(out.machine_iface);
+    out.machine_2c   = dynamic_cast<hw::Model2C*>(out.machine_iface);
+    out.machine_orig = dynamic_cast<hw::Model2Original*>(out.machine_iface);
+    out.machine_m1   = dynamic_cast<hw::Model1*>(out.machine_iface);
     if (out.machine != nullptr) {
         out.main_cpu    = &out.machine->cpu();
         out.sound_board = &out.machine->sound();
@@ -1051,6 +1061,8 @@ struct LoadedMachine {
     } else if (out.machine_m1 != nullptr) {
         out.sound_board = &out.machine_m1->sound();
         out.sound_link  = &out.machine_m1->uart();
+    } else if (out.machine_m3 != nullptr) {
+        out.sound_board = out.machine_m3->sound() ? out.machine_m3->sound()->sound_board() : nullptr;
     } else {
         SM2_ERROR("internal error: create_machine returned an unexpected machine type");
         return std::nullopt;
@@ -1062,19 +1074,19 @@ struct LoadedMachine {
         static_cast<void>(scsp_board->set_scsp_core(scsp_core));
     }
 
-    out.machine_iface->set_nvram_directory(game_saves_directory(nvram_dir, out.game.name));
-    out.machine_iface->set_log_unmapped(log_unmapped);
-    out.machine_iface->load_nvram();
+    out.machine_owner->set_nvram_directory(game_saves_directory(nvram_dir, out.game.name));
+    out.machine_owner->set_log_unmapped(log_unmapped);
+    out.machine_owner->load_nvram();
     // init() resets before the NVRAM is in place, so reset again to let the
     // program read the settings it saved last time.
-    out.machine_iface->reset();
+    out.machine_owner->reset();
     return out;
 }
 
 /// Attach a LAN transport to the link board when linking is on, else restore
-/// the loopback. Called after every load. A socket that fails to bind is not
-/// fatal: the board reports not-connected and simply never links.
-void configure_cabinet_link(sm2::hw::Model2MachineBase& machine,
+/// the loopback. A socket that fails to bind is not fatal: the board just
+/// never links.
+void configure_cabinet_link(sm2::hw::Machine& machine,
                             const sm2::Config&          config)
 {
     using namespace sm2;
@@ -1102,13 +1114,16 @@ void configure_cabinet_link(sm2::hw::Model2MachineBase& machine,
 
     auto transport = std::make_unique<hw::UdpTransport>(
         config.link_local_ip, static_cast<u16>(config.link_port),
-        config.link_next_ip, static_cast<u16>(config.link_next_port));
+        config.link_next_ip, static_cast<u16>(config.link_next_port),
+        // Model 3 needs every segment; Model 1/2 drop stale frames.
+        machine.as_model3() != nullptr ? 4096 : hw::UdpTransport::kBacklog);
     if (!transport->ok()) {
         SM2_WARN("cabinet link disabled: %s", transport->error().c_str());
         machine.comm().set_transport(nullptr);
         return;
     }
     machine.comm().set_transport(std::move(transport));
+    machine.comm().set_link_delay(config.link_delay);
     SM2_INFO("cabinet link enabled (cabinet %u): listening %s:%u, next %s:%u",
              config.link_cabinet_index,
              config.link_local_ip.empty() ? "*" : config.link_local_ip.c_str(),
@@ -1131,6 +1146,9 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
         options->config.fullscreen = from_file.fullscreen;
     }
     options->config.borderless_fullscreen = from_file.borderless_fullscreen;
+    if (!options->given.fullscreen_resolution) {
+        options->config.fullscreen_resolution = from_file.fullscreen_resolution;
+    }
     if (!options->given.lightgun) {
         options->config.lightgun = from_file.lightgun;
     }
@@ -1145,6 +1163,9 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
     }
     if (!options->given.model1_rom_dir) {
         options->config.model1_rom_dir = from_file.model1_rom_dir;
+    }
+    if (!options->given.model3_rom_dir) {
+        options->config.model3_rom_dir = from_file.model3_rom_dir;
     }
     if (!options->given.nvram_dir) {
         options->config.nvram_dir = from_file.nvram_dir;
@@ -1214,6 +1235,7 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
     // GUI shows and round-trips what was saved.
     options->config.show_fps            = from_file.show_fps;
     options->config.software_async      = from_file.software_async;
+    options->config.model3_async        = from_file.model3_async;
     options->config.software_slow_cores = from_file.software_slow_cores;
     options->config.show_notifications  = from_file.show_notifications;
     options->config.rewind              = from_file.rewind;
@@ -1281,6 +1303,7 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
     options->config.link_next_ip        = from_file.link_next_ip;
     options->config.link_next_port      = from_file.link_next_port;
     options->config.link_cabinet_index  = from_file.link_cabinet_index;
+    options->config.link_delay          = from_file.link_delay;
     options->config.link_mode           = from_file.link_mode;
 
     if (!options->given.scsp_core) {
@@ -1300,6 +1323,37 @@ void merge_file_settings(Options* options, const sm2::Config& from_file)
 
 }  // namespace
 
+/// The settings as written back: a value given on the command line holds for
+/// this run only, so the file keeps its own unless it was changed since launch.
+sm2::Config persisted_config(const sm2::Config& current, const Options& options,
+                             const sm2::Config& launched, const sm2::Config& from_file)
+{
+    using sm2::Config;
+    Config      c    = current;
+    const auto& g    = options.given;
+    auto        keep = [&](bool given, auto Config::*field) {
+        if (given && c.*field == launched.*field) {
+            c.*field = from_file.*field;
+        }
+    };
+    keep(g.vsync, &Config::vsync);
+    keep(g.throttle, &Config::throttle);
+    keep(g.fullscreen, &Config::fullscreen);
+    keep(g.fullscreen_resolution, &Config::fullscreen_resolution);
+    keep(g.lightgun, &Config::lightgun);
+    keep(g.validation, &Config::validation);
+    keep(g.log_level, &Config::log_level);
+    keep(g.gpu, &Config::gpu);
+    keep(g.rom_dir, &Config::rom_dir);
+    keep(g.model1_rom_dir, &Config::model1_rom_dir);
+    keep(g.model3_rom_dir, &Config::model3_rom_dir);
+    keep(g.nvram_dir, &Config::nvram_dir);
+    keep(g.screenshot_dir, &Config::screenshot_dir);
+    keep(g.render_scale, &Config::render_scale);
+    keep(g.graphics_backend, &Config::graphics_backend);
+    return c;
+}
+
 int main(int argc, char** argv)
 {
     using namespace sm2;
@@ -1314,9 +1368,8 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    // --graphics-backend opengl needs a GL backend compiled in (either
-    // desktop GL 4.3 core or GLES 3.1 -- they are mutually exclusive build
-    // options that both produce the same "opengl" runtime name).
+    // --graphics-backend opengl needs a GL backend compiled in (desktop GL 4.3
+    // core or GLES 3.1, which are mutually exclusive).
 #if !defined(SM2_HAVE_OPENGL_DESKTOP) && !defined(SM2_HAVE_OPENGL_ES)
     if (options.graphics_backend == GraphicsBackendChoice::Opengl) {
         SM2_ERROR("--graphics-backend opengl was requested, but this binary was "
@@ -1326,7 +1379,6 @@ int main(int argc, char** argv)
     }
 #endif
 
-    // Likewise the Vulkan backend is opt-in at build time (SM2_BUILD_VULKAN).
 #if !defined(SM2_HAVE_VULKAN)
     if (options.graphics_backend == GraphicsBackendChoice::Vulkan) {
         SM2_ERROR("--graphics-backend vulkan was requested, but this binary was "
@@ -1337,20 +1389,19 @@ int main(int argc, char** argv)
 #endif
 
     // Command line first, then the file for everything the command line did not
-    // mention. Doing it this way round rather than loading first and overwriting
-    // means a flag is always the last word, whatever the file says.
+    // mention, so a flag always has the last word.
     Config defaults;
 #if defined(SM2_ENABLE_VALIDATION)
-    // A build with validation compiled in enables it by default, which is still a
-    // default: a file that turns it off is obeyed.
+    // A build with validation compiled in enables it by default; a file can
+    // still turn it off.
     defaults.validation = true;
 #endif
 
-    // --config names a directory; the file within it is always sm2-emu.ini.
+    // --config names a directory; the file within it is keisho.ini.
     std::string config_path =
-        options.config_path.empty()
-            ? default_config_path()
-            : (std::filesystem::path(options.config_path) / "sm2-emu.ini").string();
+        options.config_path.empty() ? default_config_path() : config_file_in(options.config_path);
+    config_path = migrate_legacy_settings(config_path, options.config_path.empty()
+                                             && !std::filesystem::path(config_path).parent_path().empty());
 
     Config                   from_file = defaults;
     std::vector<std::string> problems;
@@ -1409,14 +1460,21 @@ int main(int argc, char** argv)
                 before.nvram_dir = options.config.nvram_dir;
             }
             resolve_default_paths(&before,
-                                  options.config_path.empty() && config_path == "sm2-emu.ini",
+                                  options.config_path.empty()
+                                      && std::filesystem::path(config_path).parent_path().empty(),
                                   content_dir);
             g_write_dir.root    = root;
             g_write_dir.saves   = before.nvram_dir;
             g_write_dir.states  = before.states_dir;
             g_write_dir.artwork = before.artwork_dir;
 
-            const std::filesystem::path moved = root / "sm2-emu.ini";
+            const std::filesystem::path moved = root / "keisho.ini";
+            // A write folder sm2-emu used: its settings go on under the new name.
+            if (const std::filesystem::path legacy = root / "sm2-emu.ini";
+                !std::filesystem::exists(moved, error) && std::filesystem::exists(legacy, error)) {
+                std::filesystem::copy_file(legacy, moved, error);
+                SM2_INFO("write-dir: %s copied from %s", moved.string().c_str(), legacy.string().c_str());
+            }
             if (!std::filesystem::exists(moved, error) && std::filesystem::exists(config_path, error)) {
                 std::filesystem::copy_file(config_path, moved, error);
             }
@@ -1463,12 +1521,10 @@ int main(int argc, char** argv)
 
     merge_file_settings(&options, from_file);
 
-    // Default saves/screenshots under the platform data dir; a cwd-ini dev tree
-    // keeps them relative (see resolve_default_paths / data_directory). Artwork
-    // goes beside the ini, so pass its directory.
+    // Default saves and screenshots go under the platform data dir, or stay
+    // relative for an ini in the working directory. Artwork goes beside the ini.
     const bool config_in_cwd =
-        options.config_path.empty()
-        && common_config_path == std::string("sm2-emu.ini");
+        options.config_path.empty() && std::filesystem::path(common_config_path).parent_path().empty();
     const std::string config_dir =
         std::filesystem::path(common_config_path).parent_path().string();
     resolve_default_paths(&options.config, config_in_cwd, config_dir);
@@ -1498,7 +1554,7 @@ int main(int argc, char** argv)
     (void)parse_log_level(options.config.log_level, &level);
     log::set_level(level);
 
-    SM2_INFO("sm2-emu %s", SM2_VERSION);
+    SM2_INFO("Keisho %s", SM2_VERSION);
     SM2_INFO("settings: %s", config_path.c_str());
 
     // Platform sockets, once (a no-op except on Windows). The process reclaims
@@ -1512,13 +1568,17 @@ int main(int argc, char** argv)
         SM2_WARN("%s", problem.c_str());
     }
 
-    // Make sure the settings and NVRAM locations exist. If there is no ini yet,
-    // write one so there is a file to edit and later saves have somewhere to go;
-    // an existing one is left untouched. save_config creates the parent dir.
+    const Config launched = options.config;
+    const auto   to_save  = [&](const Config& current) {
+        return persisted_config(current, options, launched, from_file);
+    };
+
+    // Make sure the settings and NVRAM locations exist. With no ini yet, write
+    // one so there is a file to edit; an existing one is left untouched.
     {
         std::error_code error;
         if ((!std::filesystem::exists(config_path, error) || error)
-            && !save_settings(config_path, options.config)) {
+            && !save_settings(config_path, to_save(options.config))) {
             SM2_WARN("could not create '%s'", config_path.c_str());
         }
         if (!options.config.nvram_dir.empty() && !g_write_dir.on() && !g_write_dir.refused) {
@@ -1614,30 +1674,26 @@ int main(int argc, char** argv)
         return started ? 0 : 1;
     }
 
-    // --game with no path: the archive is found in rom_dir once the database
-    // says which parent a clone's merged archive is named after. A positional
-    // path wins.
+    // --game with no path: the archive is found in rom_dir once the database is
+    // loaded (a clone may live in its parent's archive). A positional path wins.
     const bool any_rom_dir = !options.config.rom_dir.empty()
-                             || !options.config.model1_rom_dir.empty();
+                             || !options.config.model1_rom_dir.empty()
+                             || !options.config.model3_rom_dir.empty();
     const bool game_in_rom_dir = options.rom_path.empty() && !options.game.empty()
                                  && any_rom_dir;
 
-    // Show the picker when launched with no ROM but a rom_dir to browse, heading
-    // for the windowed loop. The DB is then built unconditionally below.
+    // Show the picker when launched with no ROM but a rom_dir to browse.
     const bool will_show_picker = options.rom_path.empty() && options.game.empty()
                                   && any_rom_dir
-                                  && !options.list_games && options.boot_test == 0
-                                  && options.savestate_test == 0;
+                                  && !options.list_games && options.boot_test == 0;
 
-    // Same as will_show_picker, minus requiring rom_dir already set: it may
-    // be set later from the Paths tab, whose rescan below needs the database.
+    // As will_show_picker, but rom_dir may be set later from the Paths tab,
+    // whose rescan needs the database.
     const bool may_need_picker = options.rom_path.empty() && options.game.empty()
-                                 && !options.list_games && options.boot_test == 0
-                                 && options.savestate_test == 0;
+                                 && !options.list_games && options.boot_test == 0;
 
     // -- ROM database ------------------------------------------------------
-    // Loaded before anything graphical, so a bad ROM path fails immediately
-    // instead of after a window has appeared.
+    // Loaded before anything graphical, so a bad ROM path fails immediately.
     rom::GameDatabase database;
     if (options.list_games || !options.rom_path.empty() || game_in_rom_dir
         || may_need_picker) {
@@ -1668,8 +1724,7 @@ int main(int argc, char** argv)
         std::printf("%-12s %-14s %-34s %-6s %s\n",
                     "SET", "BOARD", "TITLE", "YEAR", "NOTES");
         for (const rom::GameSpec& game : database.games()) {
-            // The version is printed as written rather than with a "v" prefix,
-            // because these strings are Sega's own words: "2.1", but also
+            // Printed as written, without a "v" prefix: "2.1", but also
             // "Revision B".
             std::string notes = game.version;
             if (game.preliminary) {
@@ -1697,8 +1752,6 @@ int main(int argc, char** argv)
     }
 
     // -- the machine -------------------------------------------------------
-    // Bind the returned struct's pointers to the locals the rest of main()
-    // already uses, so nothing downstream changes.
     std::optional<LoadedMachine> loaded;
     if (!options.rom_path.empty()) {
         loaded = load_game(database, options.rom_path, options.game,
@@ -1708,31 +1761,33 @@ int main(int argc, char** argv)
             return 1;
         }
         use_settings_for(loaded->game.name, false);
-        configure_cabinet_link(*loaded->machine_iface, options.config);
+        configure_cabinet_link(*loaded->machine_owner, options.config);
     } else {
         SM2_INFO("no ROM given; starting with the bring-up display only");
     }
 
-    hw::Model2MachineBase* machine_iface = loaded.has_value() ? loaded->machine_iface.get()
+    hw::Model2MachineBase* machine_iface = loaded.has_value() ? loaded->machine_iface
                                                               : nullptr;
     hw::Model2*         machine      = loaded.has_value() ? loaded->machine      : nullptr;
     hw::Model2B*        machine_2b   = loaded.has_value() ? loaded->machine_2b   : nullptr;
     hw::Model2C*        machine_2c   = loaded.has_value() ? loaded->machine_2c   : nullptr;
     hw::Model2Original* machine_orig = loaded.has_value() ? loaded->machine_orig : nullptr;
     hw::Model1*         machine_m1   = loaded.has_value() ? loaded->machine_m1   : nullptr;
+    hw::model3::Model3* machine_m3   = loaded.has_value() ? loaded->machine_m3   : nullptr;
+    hw::Machine*        machine_any  = loaded.has_value() ? loaded->machine_owner.get() : nullptr;
 
     cpu::i960::I960* main_cpu    = loaded.has_value() ? loaded->main_cpu    : nullptr;
     hw::SoundBoard*  sound_board = loaded.has_value() ? loaded->sound_board : nullptr;
     const hw::I8251* sound_link  = loaded.has_value() ? loaded->sound_link  : nullptr;
 
     // Restore a save state before anything runs, so a one-frame --screenshot
-    // renders exactly that state through whichever backend is selected.
+    // renders exactly that state.
     if (!options.load_state.empty()) {
-        if (machine_iface == nullptr) {
+        if (machine_any == nullptr) {
             SM2_ERROR("--load-state needs a ROM");
             return 1;
         }
-        if (!machine_iface->load_state(options.load_state)) {
+        if (!machine_any->load_state(options.load_state)) {
             SM2_ERROR("--load-state: failed to load '%s'", options.load_state.c_str());
             return 1;
         }
@@ -1743,7 +1798,7 @@ int main(int argc, char** argv)
     // Headless save-state regression (see the block for what it checks). Runs
     // before the boot-test/windowed paths because it, too, needs only a machine.
     if (options.savestate_test != 0) {
-        if (machine_iface == nullptr) {
+        if (machine_any == nullptr) {
             SM2_ERROR("--savestate-test needs a ROM");
             return 1;
         }
@@ -1762,10 +1817,10 @@ int main(int argc, char** argv)
                 if (options.coin_at != 0) {
                     const osd::Input::ScriptedPress press = osd::Input::scripted_press(
                         frame, options.coin_at, loaded->game.start1_bit);
-                    machine_iface->inputs().in0 = static_cast<u8>(0xff & ~press.in0);
-                    machine_iface->inputs().in1 = static_cast<u8>(0xff & ~press.in1);
+                    machine_any->inputs().in0 = static_cast<u8>(0xff & ~press.in0);
+                    machine_any->inputs().in1 = static_cast<u8>(0xff & ~press.in1);
                 }
-                machine_iface->run_frame();
+                machine_any->run_frame();
                 if (sound_board != nullptr) {
                     sound_board->clear_pending_samples();
                 }
@@ -1773,13 +1828,13 @@ int main(int argc, char** argv)
         };
 
         namespace fs = std::filesystem;
-        const fs::path dir = fs::temp_directory_path() / "sm2_savestate_test";
+        const fs::path dir = fs::temp_directory_path() / "keisho_savestate_test";
         std::error_code ec;
         fs::create_directories(dir, ec);
-        const std::string path_a  = (dir / "a.sm2state").string();
-        const std::string path_b  = (dir / "b.sm2state").string();
-        const std::string path_a2 = (dir / "a2.sm2state").string();
-        const std::string path_b2 = (dir / "b2.sm2state").string();
+        const std::string path_a  = (dir / "a.kstate").string();
+        const std::string path_b  = (dir / "b.kstate").string();
+        const std::string path_a2 = (dir / "a2.kstate").string();
+        const std::string path_b2 = (dir / "b2.kstate").string();
 
         auto read_file = [](const std::string& p) {
             std::FILE* h = std::fopen(p.c_str(), "rb");
@@ -1802,25 +1857,25 @@ int main(int argc, char** argv)
                  loaded->game.name.c_str());
         advance(0, boot);
 
-        if (!machine_iface->save_state(path_a)) {
+        if (!machine_any->save_state(path_a)) {
             SM2_ERROR("savestate-test: initial save failed");
             return 1;
         }
         advance(boot, stride);
-        if (!machine_iface->save_state(path_b)) {
+        if (!machine_any->save_state(path_b)) {
             SM2_ERROR("savestate-test: post-advance save failed");
             return 1;
         }
-        if (!machine_iface->load_state(path_a)) {
+        if (!machine_any->load_state(path_a)) {
             SM2_ERROR("savestate-test: load failed");
             return 1;
         }
-        if (!machine_iface->save_state(path_a2)) {
+        if (!machine_any->save_state(path_a2)) {
             SM2_ERROR("savestate-test: re-save after load failed");
             return 1;
         }
         advance(boot, stride);
-        if (!machine_iface->save_state(path_b2)) {
+        if (!machine_any->save_state(path_b2)) {
             SM2_ERROR("savestate-test: post-reload advance save failed");
             return 1;
         }
@@ -1858,8 +1913,8 @@ int main(int argc, char** argv)
             const std::string slot_path = hw::state_slot_path(
                 states_directory(options.config, loaded->game.name), loaded->game.name,
                 hw::kQuickSlot);
-            if (!machine_iface->save_state(slot_path)
-                || !machine_iface->load_state(slot_path)) {
+            if (!machine_any->save_state(slot_path)
+                || !machine_any->load_state(slot_path)) {
                 SM2_ERROR("savestate-test: slot-path round trip failed (%s)",
                           slot_path.c_str());
                 rc = 1;
@@ -1873,7 +1928,7 @@ int main(int argc, char** argv)
         // saving the state before and after each rejected load; the two must
         // match byte for byte.
         {
-            if (!machine_iface->save_state(path_a)) {
+            if (!machine_any->save_state(path_a)) {
                 SM2_ERROR("savestate-test: reject setup save failed");
                 rc = 1;
             }
@@ -1881,12 +1936,12 @@ int main(int argc, char** argv)
 
             auto expect_refused_and_intact = [&](const char* what,
                                                  const std::string& bad_path) {
-                if (machine_iface->load_state(bad_path)) {
+                if (machine_any->load_state(bad_path)) {
                     SM2_ERROR("savestate-test: FAIL — %s was accepted", what);
                     rc = 1;
                     return;
                 }
-                static_cast<void>(machine_iface->save_state(path_a2));
+                static_cast<void>(machine_any->save_state(path_a2));
                 if (read_file(path_a2) != before) {
                     SM2_ERROR("savestate-test: FAIL — machine disturbed after a "
                               "rejected %s load", what);
@@ -1898,7 +1953,7 @@ int main(int argc, char** argv)
 
             // 1. Wrong game: a valid state for a different game.
             const std::string wrong_game =
-                (fs::path(dir) / "wrong_game.sm2state").string();
+                (fs::path(dir) / "wrong_game.kstate").string();
             {
                 std::vector<u8> img = before;
                 // Header: 8 magic + u32 version + u32 game_len + game bytes. The
@@ -1917,7 +1972,7 @@ int main(int argc, char** argv)
 
             // 2. Truncated: only the first 8 bytes (magic) survive.
             const std::string truncated =
-                (fs::path(dir) / "truncated.sm2state").string();
+                (fs::path(dir) / "truncated.kstate").string();
             {
                 std::FILE* h = std::fopen(truncated.c_str(), "wb");
                 if (h) {
@@ -1930,7 +1985,7 @@ int main(int argc, char** argv)
             // 3. Wrong version: bump the version field (u32 right after the
             // 8-byte magic) so it no longer matches this build.
             const std::string wrong_version =
-                (fs::path(dir) / "wrong_version.sm2state").string();
+                (fs::path(dir) / "wrong_version.kstate").string();
             {
                 std::vector<u8> img = before;
                 if (img.size() > 8) {
@@ -1955,7 +2010,7 @@ int main(int argc, char** argv)
                                + sizeof(kMarker) - 1;
                 if (found != before.end() && id < before.size()) {
                     const std::string wrong_core =
-                        (fs::path(dir) / "wrong_scsp_core.sm2state").string();
+                        (fs::path(dir) / "wrong_scsp_core.kstate").string();
                     std::vector<u8> img = before;
                     img[id]             = static_cast<u8>(img[id] ^ 1);
                     std::FILE* h = std::fopen(wrong_core.c_str(), "wb");
@@ -2008,10 +2063,7 @@ int main(int argc, char** argv)
             recorded.reserve(static_cast<usize>(options.boot_test) * 800 * 2);
         }
 
-        // Unified accessors: every implemented board shares these types. The
-        // sound board is a pointer rather than a reference because a synthetic
-        // machine in the tests may have none -- see the note where it is
-        // resolved.
+        // Accessors common to every board.
         struct CpuView {
             hw::Model2MachineBase* machine;
             [[nodiscard]] bool        faulted() const { return machine->main_cpu_status().faulted; }
@@ -2053,9 +2105,8 @@ int main(int argc, char** argv)
                 texture_dumper->scan(*machine_iface);
             }
 
-            // A numbered software frame every so often, so one headless run can be
-            // searched for the instant that lines up with a MAME capture instead of
-            // guessing the time.
+            // A numbered software frame every so often, to find the instant that
+            // lines up with a MAME capture.
             const bool wanted_frame =
                 options.screenshot_frames.empty()
                     ? options.screenshot_interval != 0
@@ -2074,9 +2125,8 @@ int main(int argc, char** argv)
                              list.culled, list.clipped_away, list.stats.read_start);
             }
 
-            // Draining every frame whether or not it is being recorded: the sound
-            // board drops samples nothing collects, and leaving that to happen
-            // would put gaps in a recording.
+            // Drain every frame: the sound board drops samples nothing collects,
+            // which would leave gaps in a recording.
             if (the_sound != nullptr) {
                 const std::span<const s16> produced = the_sound->pending_samples();
                 if (!options.dump_audio.empty()) {
@@ -2151,11 +2201,8 @@ int main(int argc, char** argv)
                         copro.fifo_in().size(), copro.fifo_in().peak_overflow(),
                         copro.fifo_out().size(), copro.fifo_out().peak_overflow());
         } else if (machine_orig != nullptr) {
-            // The original Model 2 carries the same MB86234 as Model 2A, wired the
-            // same way, so the same figures apply. What is board-specific here is
-            // the I/O board: it is a whole second computer, and if its Z80 is not
-            // executing sensibly the program sees no inputs at all, so its state
-            // belongs next to the coprocessor's rather than buried in a log.
+            // The original Model 2 carries the same MB86234 as Model 2A, so the
+            // same figures apply.
             const hw::CoproTgp& copro = machine_orig->copro();
             std::printf("copro uploaded    : %u word(s)\n", copro.uploaded_words());
             std::printf("copro instructions: %llu\n",
@@ -2215,9 +2262,8 @@ int main(int argc, char** argv)
             std::printf("polygons          : %zu\n", machine_iface->render_list().polygons.size());
         } else if (machine_2c != nullptr) {
             const hw::CoproTgpx4& copro = machine_2c->copro();
-            // Two host writes make one 64-bit program word, so both figures are
-            // reported: a program that uploaded an odd number of halves has left
-            // its last word half-written, which is worth seeing.
+            // Two host writes make one 64-bit program word; an odd count of halves
+            // means the last word is half-written.
             std::printf("copro uploaded    : %u host write(s), %u program word(s)\n",
                         copro.uploaded_words(), copro.uploaded_words() / 2);
             std::printf("copro instructions: %llu\n",
@@ -2225,8 +2271,7 @@ int main(int argc, char** argv)
             std::printf("copro state       : %s%s\n", copro.cpu().state_string().c_str(),
                         copro.cpu().halted() ? " HALTED" : "");
             // The MB86235 records an unimplemented opcode and stops rather than
-            // aborting, so without printing this a fault looks like a
-            // coprocessor that simply did nothing.
+            // aborting, so report it.
             std::printf("copro faulted     : %s\n",
                         copro.cpu().faulted() ? copro.cpu().fault_message().c_str()
                                               : "no");
@@ -2236,10 +2281,7 @@ int main(int argc, char** argv)
                         copro.fifo_out().size(), copro.fifo_out().peak_overflow());
         }
 
-        // The link is reported whether or not there is a board behind it, because
-        // on the original Model 2 the link is all there is: the M1 audio board is
-        // not emulated, so "bytes sent" is the only evidence that the program's
-        // sound handshake completed rather than stalled.
+        // Reported whether or not there is a board behind the link.
         {
             const hw::I8251::Counters& uart = the_uart.counters();
             std::printf("sound link        : %llu byte(s) to the board, %llu back, "
@@ -2250,9 +2292,7 @@ int main(int argc, char** argv)
                         (unsigned long long)uart.status_reads);
         }
 
-        // Past this point the report is board-specific: the two boards share no
-        // registers, so there is nothing to say about both at once beyond whether
-        // a program ROM turned up.
+        // Past this point the report is board-specific.
         auto* const the_scsp_board = dynamic_cast<hw::Model2Sound*>(the_sound);
         auto* const the_m1_board   = dynamic_cast<hw::M1Audio*>(the_sound);
 
@@ -2348,8 +2388,7 @@ int main(int argc, char** argv)
         machine_iface->log_unmapped_summary();
         machine_iface->log_burst_summary();
 
-        // Both TGP boards, since both read the same table ROM through the same
-        // coprocessor.
+        // Both TGP boards read the same table ROM through the same coprocessor.
         hw::CoproTgp* tgp = machine != nullptr        ? &machine->copro()
                           : machine_orig != nullptr   ? &machine_orig->copro()
                                                       : nullptr;
@@ -2361,9 +2400,8 @@ int main(int argc, char** argv)
         hw::print_render_list_summary(*machine_iface);
         hw::print_tilemap_summary(*machine_iface);
 
-        // Compose once, at the end. This exercises the real colour chain and the
-        // real compositor, which is what the display uses, so a discrepancy
-        // between this and the raw layer dump points at one or the other.
+        // Compose once, at the end, through the same colour chain and compositor
+        // the display uses.
         machine_iface->compose_video();
         if (!options.dump_tilemap.empty()) {
             hw::dump_tilemaps(*machine_iface, options.dump_tilemap);
@@ -2394,7 +2432,7 @@ int main(int argc, char** argv)
         return the_cpu.faulted() ? 1 : exit_code_boot_test;
     }
 
-    SDL_SetAppMetadata("sm2-emu", SM2_VERSION, "sm2-emu");
+    SDL_SetAppMetadata("Keisho", SM2_VERSION, "keisho");
 
     if (!SDL_Init(0)) {
         SM2_ERROR("SDL_Init failed: %s", SDL_GetError());
@@ -2409,6 +2447,16 @@ int main(int argc, char** argv)
         window_config.height     = options.config.window_height;
         window_config.fullscreen = options.config.fullscreen;
         window_config.borderless = options.config.borderless_fullscreen;
+        // Upstream's fullscreen_resolution = WxH: the screen switched to that
+        // mode, as borderless_fullscreen = false does at the window's size.
+        if (int w = 0, h = 0; options.config.fullscreen
+                              && std::sscanf(options.config.fullscreen_resolution.c_str(),
+                                             "%dx%d", &w, &h) == 2
+                              && w > 0 && h > 0) {
+            window_config.borderless = false;
+            window_config.width      = static_cast<u32>(w);
+            window_config.height     = static_cast<u32>(h);
+        }
 
         // Which GPU backend presents. `software` only replaces the drawing,
         // so it presents through OpenGL where built, else Vulkan.
@@ -2424,13 +2472,12 @@ int main(int argc, char** argv)
         backend_config.enable_validation = options.config.validation;
         backend_config.vsync             = options.config.vsync;
         backend_config.preferred_device  = options.config.gpu;
-        // The software renderer is the native oracle, so scaling is ignored
-        // (treated as 1) when it drives the window.
+        // The software renderer draws at native resolution.
         backend_config.render_scale =
             options.start_in_software_renderer ? 1U : options.config.render_scale;
 
-        // Present-stage options apply to every backend, including the software
-        // renderer's uploaded frame -- no software special case.
+        // Present-stage options apply to every backend, the software renderer
+        // included.
         backend_config.present.scaling_method        = options.config.scaling_method;
         backend_config.present.aspect_mode           = options.config.aspect_mode;
         backend_config.present.aspect_ratio          = options.config.aspect_ratio;
@@ -2451,9 +2498,7 @@ int main(int argc, char** argv)
         backend_config.enhancement.upscale_2d     = options.config.upscale_2d;
         backend_config.enhancement.translucency   = options.config.translucency;
 
-        // Each factory is only defined when its SM2_BUILD_* option was on, so
-        // the #if guards keep an absent backend from being an undefined symbol.
-        // The mismatched --graphics-backend cases already errored out above.
+        // Each factory exists only when its SM2_BUILD_* option was on.
         osd::Window                      window;
         std::unique_ptr<render::Backend> backend;
         const auto open_backend = [&](bool opengl) {
@@ -2477,6 +2522,10 @@ int main(int argc, char** argv)
 #if defined(SM2_HAVE_VULKAN)
                 backend = render::create_vulkan_backend();
 #endif
+            }
+            if (backend && options.start_in_software_renderer) {
+                // Model 3 draws on the CPU too; the GPU backend only presents.
+                backend = render::create_software_model3_backend(std::move(backend));
             }
             if (!backend) {
                 SM2_ERROR("no GPU backend is available to present with. Build with "
@@ -2510,14 +2559,14 @@ int main(int argc, char** argv)
         // Name of the constructed GPU backend, for the title bar and overlay label.
         const char* gpu_backend_name = present_with_opengl ? "OpenGL" : "Vulkan";
 
-        // The settings overlay, drawn on top of the emulator's output. Owns
-        // only ImGui's context and its SDL3 platform backend; the backend
-        // above owns whichever GPU API actually draws what it builds.
+        // The settings overlay. Owns only ImGui's context and its SDL3 platform
+        // backend; the render backend draws what it builds.
         osd::Gui gui;
         gui.set_config_path(config_path);
         gui.set_common_config_path(common_config_path);
         gui.set_save_function(save_settings);
         gui.set_content_dir(content_dir);
+        gui.set_save_filter(to_save);
         gui.set_texture_backend(backend.get());
         // The renderers this build offers, most-preferred first. Software only
         // presents through a GPU backend, so it needs one present.
@@ -2536,11 +2585,12 @@ int main(int argc, char** argv)
         }
         {
             // One row per family, titled after its parent set, for the Audio
-            // tab's volumes and the Gamepad tab's layouts. Families that do not
-            // run (`preliminary` includes DOA, which does).
+            // tab's volumes and the Gamepad tab's layouts. kNoVolume lists
+            // families that do not run.
             static const std::set<std::string> kNoVolume = {"rascot2"};
             std::map<std::string, std::string> titles;
             std::map<std::string, std::pair<bool, bool>> guns;
+            std::map<std::string, osd::Gui::GameFamily>  uses;
             for (const rom::GameSpec& game : database.games()) {
                 const std::string family = game_family(game);
                 if (kNoVolume.count(family) != 0) {
@@ -2557,13 +2607,32 @@ int main(int argc, char** argv)
                 if (gun) {
                     guns[family] = {true, game.gun_missile};
                 }
+                osd::Gui::GameFamily& use = uses[family];
+                use.inputs |= static_cast<u32>(game.inputs);
+                const bool one_player = rom::has_input(game.inputs, rom::InputFlags::Fishing);
+                for (const rom::AnalogChannel& channel : game.analog) {
+                    switch (osd::Input::pad_axis_role(channel.control, one_player)) {
+                        case Config::PadAxisRole::AimX:
+                        case Config::PadAxisRole::AimY:   use.aim = true; break;
+                        case Config::PadAxisRole::Accel:  use.accel = true; break;
+                        case Config::PadAxisRole::Brake:  use.brake = true; break;
+                        case Config::PadAxisRole::LeverX:
+                        case Config::PadAxisRole::LeverY: use.lever = true; break;
+                        default: break;
+                    }
+                }
+                use.gears = use.gears || game.gearbox || game.shift_buttons;
             }
             std::vector<osd::Gui::GameFamily> families;
             for (auto& [key, title] : titles) {
                 const std::string shown = game_title_without_cabinet(title);
                 const auto        gun   = guns.find(key);
-                families.push_back({key, shown.empty() ? key : shown, gun != guns.end(),
-                                    gun != guns.end() && gun->second.second});
+                osd::Gui::GameFamily family = uses[key];
+                family.key     = key;
+                family.title   = shown.empty() ? key : shown;
+                family.gun     = gun != guns.end();
+                family.missile = gun != guns.end() && gun->second.second;
+                families.push_back(std::move(family));
             }
             std::sort(families.begin(), families.end(),
                       [](const osd::Gui::GameFamily& a, const osd::Gui::GameFamily& b) {
@@ -2583,7 +2652,7 @@ int main(int argc, char** argv)
                 if (clone != nullptr && titles.count(game_family(*clone)) != 0) {
                     layouts.try_emplace(game_family(*clone), it->second);
                 } else {
-                    SM2_WARN("sm2-emu.ini: no game family '%s'; its gamepad layout is ignored",
+                    SM2_WARN("keisho.ini: no game family '%s'; its gamepad layout is ignored",
                              it->first.c_str());
                 }
                 it = layouts.erase(it);
@@ -2602,8 +2671,8 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        // Declared here so its dtor joins the thread after the loop but before
-        // the backend is torn down (the thread-safety contract needs that order).
+        // Declared here so its destructor joins the thread after the loop but
+        // before the backend is torn down.
         osd::Scraper scraper;
 
         // Build the picker's entry list from the launchable sets and turn it on.
@@ -2648,7 +2717,7 @@ int main(int argc, char** argv)
 
         // No ROM: show the picker if there is a rom_dir, else the settings
         // overlay so a ROM directory can be set.
-        if (!machine_iface) {
+        if (!machine_any) {
             if (will_show_picker) {
                 show_picker();
             } else {
@@ -2661,9 +2730,7 @@ int main(int argc, char** argv)
         const std::vector<std::string> gpu_names =
             present_with_opengl ? std::vector<std::string>{} : render::enumerate_render_devices();
 
-        // A machine with no gamepad is not an error, so a failure here is worth
-        // reporting but not worth refusing to run over: the keyboard covers
-        // everything the cabinet has.
+        // No gamepad is not fatal: the keyboard covers everything the cabinet has.
         osd::Input input;
         bool input_background = options.config.input_background;
         apply_input_background(input_background);
@@ -2679,9 +2746,8 @@ int main(int argc, char** argv)
             ~HostStateGuard() { hw::set_host_state({}); }
         } host_state_guard;
 
-        // A machine with no audio device still has to run, so a failure here is
-        // reported by Audio::init and otherwise ignored. Opened at the machine's
-        // own 44100 Hz and left to SDL to resample.
+        // No audio device is not fatal; Audio::init reports it. SDL resamples
+        // from the board's own rate.
         osd::Audio audio;
         osd::Outputs outputs;
 
@@ -2711,8 +2777,7 @@ int main(int argc, char** argv)
             static_cast<void>(audio.init(sound_board->sample_rate()));
         }
 
-        // With no machine there is nothing to draw, so present the two empty
-        // surfaces over a recognisable background rather than a blank window.
+        // With no machine, present empty surfaces over a recognisable background.
         hw::Model2Video idle_video;
 
         // The CPU rasteriser, used when --graphics-backend software was chosen
@@ -2725,13 +2790,9 @@ int main(int argc, char** argv)
         hw::AsyncSoftRenderer async_soft(soft_renderer);
         async_soft.set_use_slow_cores(options.config.software_slow_cores);
 
-        // Paced against real time rather than against the display, because the
-        // machine's 57.5245 Hz divides into no monitor's refresh rate.
-        //
-        // Vsync and pacing compose rather than conflict: whichever wants the longer
-        // frame wins, so on a 60 Hz display the pacer's 17.384 ms is the limit and
-        // the rate is right. On a display slower than 57.5 Hz vsync would win and the
-        // game would run slow, which is what --no-vsync is for.
+        // Paced against real time, because the machine's 57.5245 Hz matches no
+        // monitor's refresh rate. With vsync the longer frame wins, so a display
+        // slower than 57.5 Hz needs --no-vsync.
         osd::FramePacer pacer;
         pacer.set_throttled(options.config.throttle);
         // The buffered link's cabinets wait for one another at the end of each
@@ -2758,16 +2819,13 @@ int main(int argc, char** argv)
         std::vector<s16> recorded_audio;
         std::vector<s16> scaled_audio;  ///< the per-game volume's scratch buffer
 
-        // Per-stage CPU timers for --profile. Built regardless of
-        // options.profile -- maybe_scope() below makes recording a no-op when
-        // profiling is off, one branch per stage rather than a conditional at
-        // every call site.
+        // Per-stage CPU timers for --profile. Always built; maybe_scope() makes
+        // recording a no-op when profiling is off.
         core::StageTimer stage_run_frame("run_frame");
         core::StageTimer stage_geometry("geometry_engine");
         core::StageTimer stage_compose("tilemap_compose");
-        // build() triangulates, memcpys into the mapped host buffers, and (when
-        // texture_generation changed) records the decode dispatch, so this one
-        // scope covers all three.
+        // build(): triangulation, the copy into mapped buffers and any texture
+        // decode dispatch.
         core::StageTimer stage_build("poly3d_build_and_memcpy");
         core::StageTimer stage_tilemap_upload("tilemap_upload_memcpy");
         // Everything else issuing vkCmd* this frame: 3D draws, both tilemap
@@ -2780,16 +2838,24 @@ int main(int argc, char** argv)
         core::StageTimer stage_software_wait("software_wait");
         core::StageTimer stage_software_snapshot("software_snapshot");
         core::StageTimer stage_software_async("software_async_draw");
-        // Time blocked on the GPU/present inside begin_frame() (Vulkan
-        // fence+acquire, GL swap back-pressure) -- otherwise an invisible stall.
+        // Time blocked on the GPU inside begin_frame() (Vulkan fence and
+        // acquire, GL swap back-pressure).
         core::StageTimer stage_present_wait("present_wait");
-        // The three cores run_frame() interleaves, split out so a CPU-bound
-        // result can be told from one hot core.
+        // The three cores run_frame() interleaves.
         core::StageTimer stage_cpu_i960("cpu_i960");
         core::StageTimer stage_cpu_copro("cpu_copro");
         core::StageTimer stage_cpu_sound("cpu_sound");
-        if (machine_iface) {
-            machine_iface->set_core_profiling(options.profile);
+        // Model 3 frame build: the wait for the worker, and the build's own
+        // CPU time and parts on whichever thread ran it.
+        core::StageTimer stage_m3_wait("m3_build_wait");
+        core::StageTimer stage_m3_build("m3_build");
+        core::StageTimer stage_m3_textures("m3_textures");
+        core::StageTimer stage_m3_tilegen("m3_tilegen");
+        core::StageTimer stage_m3_scene("m3_scene");
+        core::StageTimer stage_m3_plan("m3_plan");
+        core::StageTimer stage_m3_record("m3_record_3d");
+        if (machine_any) {
+            machine_any->set_core_profiling(options.profile);
         }
         if (options.profile) {
             const usize expected = static_cast<usize>(options.duration_seconds) * 120;
@@ -2798,7 +2864,8 @@ int main(int argc, char** argv)
                  &stage_tilemap_upload, &stage_record, &stage_submit, &stage_software,
                  &stage_software_wait, &stage_software_snapshot, &stage_software_async,
                  &stage_present_wait, &stage_cpu_i960, &stage_cpu_copro,
-                 &stage_cpu_sound}) {
+                 &stage_cpu_sound, &stage_m3_wait, &stage_m3_build, &stage_m3_textures,
+                 &stage_m3_tilegen, &stage_m3_scene, &stage_m3_plan, &stage_m3_record}) {
                 timer->reserve(expected);
             }
         }
@@ -2810,23 +2877,22 @@ int main(int argc, char** argv)
         // One snapshot every other frame, so a held rewind runs at twice real time.
         constexpr u32 kRewindInterval = 2;
         hw::Rewind                   rewind;
-        const hw::Model2MachineBase* rewind_machine = nullptr;
-        bool                         rewind_held    = false;  ///< Backspace is down.
+        const hw::Machine* rewind_machine = nullptr;
+        bool                         rewind_held    = false;  ///< The rewind key is down.
 
         u32  frames_presented = 0;   ///< Since the loop started.
         u32  frames_written_off = 0; ///< Whole frames given up after a stall.
         bool paused             = false;
-        bool audio_paused_state = false; ///< tracks effective pause to drive audio/pacer on change.
+        bool audio_paused_state = false; ///< Effective pause, to pause audio and pacer on change.
         bool fast_forward       = false;
         bool running            = true;
-        bool quit_key_pressed   = false;  ///< F9 went down during this run.
-        bool screenshot_requested = false;  ///< Set by F12, serviced next frame.
-        bool return_to_picker_requested = false;  ///< Set by Esc; unload + picker.
+        bool quit_key_pressed   = false;  ///< The quit key went down during this run.
+        bool screenshot_requested = false;  ///< Serviced next frame.
+        bool return_to_picker_requested = false;  ///< Set by the exit key; unload + picker.
         std::string dropped_path;  ///< A file dropped on the window, launched next frame.
 
-        // A pending save-state action (F6/F7 or an overlay button), serviced
-        // between frames next to the screenshot. `slot` is the slot name
-        // (kQuickSlot for the hotkeys).
+        // A pending save-state action from a hotkey or the overlay, serviced
+        // between frames. `slot` is kQuickSlot for the hotkeys.
         enum class StateOp { Save, Load, Delete };
         struct StateAction {
             StateOp     op = StateOp::Save;
@@ -2834,13 +2900,15 @@ int main(int argc, char** argv)
         };
         std::optional<StateAction> state_action;
         bool settings_was_visible = gui.visible();  ///< Settings visibility, last frame.
-        // Fixed at launch by --graphics-backend software. There is no runtime
-        // switch: the two renderers are a launch-time choice.
+        // Fixed at launch by --graphics-backend software.
         const bool use_software_renderer = options.start_in_software_renderer;
         // 16:9 widens the frame only on a GPU renderer; elsewhere it shows 4:3.
-        const bool can_widen = !use_software_renderer && backend->capabilities().widescreen;
+        // Model 3's software renderer widens as its GPU renderers do.
+        const auto can_widen = [&] {
+            return (!use_software_renderer || machine_m3 != nullptr) && backend->capabilities().widescreen;
+        };
         const auto shown_aspect = [&]() {
-            return options.config.aspect_mode == AspectMode::Widescreen && !can_widen
+            return options.config.aspect_mode == AspectMode::Widescreen && !can_widen()
                        ? AspectMode::FourThree
                        : options.config.aspect_mode;
         };
@@ -2862,6 +2930,9 @@ int main(int argc, char** argv)
             present.crt_mask_strength     = options.config.crt_mask_strength;
             present.crt_glow_strength     = options.config.crt_glow_strength;
             present.crt_curvature         = options.config.crt_curvature;
+            if (machine_m3) {
+                present.gain = 0.5f + static_cast<float>(std::min(options.config.brightness, 100u)) / 100.0f;
+            }
             return present;
         };
         // Draw one frame behind on a second thread; off for captures, which
@@ -2876,12 +2947,8 @@ int main(int argc, char** argv)
         }
         u64  last_title_ns      = SDL_GetTicksNS();
 
-        // --duration's deadline, and the per-frame wall-clock cost recorded for
-        // its summary. Frame time here is measured start-to-start rather than
-        // just the render, so it includes run_frame(), the pacer's wait() and
-        // everything else one iteration of this loop does -- the whole-loop cost
-        // is what a player experiences as the frame rate, which is the same
-        // reasoning FramePacer::measured_hz() already uses.
+        // --duration's deadline, and the per-frame wall-clock cost for its
+        // summary, measured start-to-start so it covers the whole loop.
         const u64 run_start_ns = SDL_GetTicksNS();
         const u64 run_deadline_ns =
             options.duration_seconds != 0
@@ -2889,16 +2956,12 @@ int main(int argc, char** argv)
                 : 0;
         std::vector<double> frame_times_ms;
         if (run_deadline_ns != 0) {
-            // 57.52 Hz unthrottled on reasonable hardware comfortably exceeds
-            // this; reserving avoids reallocation skewing the very timings being
-            // measured.
+            // Reserved so reallocation does not skew the timings.
             frame_times_ms.reserve(static_cast<usize>(options.duration_seconds) * 2000);
         }
 
-        // "sm2-emu — <game or 'no game'> [Vulkan|OpenGL|Software]", plus the
-        // rate and pause state once the loop is running. Shared by the initial
-        // title and the once-a-second refresh, so the two can never drift into
-        // different formats.
+        // "Keisho — <game or 'no game'> [Vulkan|OpenGL|Software]", plus the
+        // rate and pause state once the loop is running.
         const auto build_title = [&]() {
             std::string title = std::string(kWindowName) + " — "
                               + (loaded.has_value() ? loaded->game.title : "no game")
@@ -2920,6 +2983,7 @@ int main(int argc, char** argv)
         window.set_title(build_title());
 
         std::optional<render::TextureDumper> texture_dumper;
+        std::unique_ptr<render::model3::TextureDumper> model3_dumper;
         std::string                          texture_dump_game;
 
         // Custom textures for the running game; the backend holds a pointer,
@@ -2938,14 +3002,17 @@ int main(int argc, char** argv)
             switch_settings(next.game.name);
             async_soft.forget_machine();
             backend->wait_idle();
+            backend->reset_model3();
             loaded        = std::move(next);
-            machine_iface = loaded->machine_iface.get();
-            telemetry_decoder = telemetry::make_telemetry(loaded->game);
+            machine_iface = loaded->machine_iface;
+            telemetry_decoder = machine_iface != nullptr ? telemetry::make_telemetry(loaded->game) : nullptr;
             machine       = loaded->machine;
             machine_2b    = loaded->machine_2b;
             machine_2c    = loaded->machine_2c;
             machine_orig  = loaded->machine_orig;
             machine_m1    = loaded->machine_m1;
+            machine_m3    = loaded->machine_m3;
+            machine_any   = loaded->machine_owner.get();
             main_cpu      = loaded->main_cpu;
             sound_board   = loaded->sound_board;
             sound_link    = loaded->sound_link;
@@ -2953,7 +3020,7 @@ int main(int argc, char** argv)
             if (sound_board != nullptr) {
                 static_cast<void>(audio.init(sound_board->sample_rate()));
             }
-            configure_cabinet_link(*machine_iface, options.config);
+            configure_cabinet_link(*machine_any, options.config);
             input.reset_drive_board();  // the new machine's board starts from power-up
             if (gui.picker_active()) {
                 scraper.stop();
@@ -2988,8 +3055,7 @@ int main(int argc, char** argv)
 
             SDL_Event event;
             while (SDL_PollEvent(&event)) {
-                // Let ImGui see every event so it can capture mouse/keyboard
-                // when the overlay is active, bar a key the System tab is
+                // Let ImGui see every event, bar a key the System tab is
                 // binding, which its keyboard navigation would also press.
                 if (event.type != SDL_EVENT_KEY_DOWN || !gui.visible() || !gui.capturing_key()) {
                     ImGui_ImplSDL3_ProcessEvent(&event);
@@ -3009,12 +3075,9 @@ int main(int argc, char** argv)
                         } else if (event.key.key == SDLK_ESCAPE && gui.load_error_open()) {
                             // The dialog takes this Esc.
                         } else if (is_hotkey(event.key, Config::Hotkey::Exit)) {
-                            // Esc returns to the game picker (unloading the
-                            // current game) when there is a picker to return to;
-                            // otherwise -- a single ROM launched by path with no
-                            // rom_dir to browse -- it quits. Serviced after the
-                            // event loop, so the teardown runs outside it.
-                            if (will_show_picker && machine_iface != nullptr) {
+                            // Return to the game picker when there is one,
+                            // otherwise quit. Serviced after the event loop.
+                            if (will_show_picker && machine_any != nullptr) {
                                 return_to_picker_requested = true;
                             } else {
                                 running = false;
@@ -3041,12 +3104,12 @@ int main(int argc, char** argv)
                             if (is_hotkey(event.key, Config::Hotkey::Pause) && !event.key.repeat) {
                                 paused = !paused;
                             } else if (is_hotkey(event.key, Config::Hotkey::QuickSave) && !event.key.repeat
-                                       && machine_iface != nullptr) {
+                                       && machine_any != nullptr) {
                                 // Quick-save / quick-load the reserved slot. Only
                                 // with a game running; serviced between frames.
                                 state_action = StateAction{StateOp::Save, hw::kQuickSlot};
                             } else if (is_hotkey(event.key, Config::Hotkey::QuickLoad) && !event.key.repeat
-                                       && machine_iface != nullptr) {
+                                       && machine_any != nullptr) {
                                 state_action = StateAction{StateOp::Load, hw::kQuickSlot};
                             } else if (is_hotkey(event.key, Config::Hotkey::Fps) && !event.key.repeat) {
                                 options.config.show_fps = !options.config.show_fps;
@@ -3088,7 +3151,7 @@ int main(int argc, char** argv)
                 input.update_pad_shortcuts(options.config.pad_shortcuts);
             if (pad_shortcuts.exit) {
                 // As Esc: back to the games when there are some, else quit.
-                if (will_show_picker && machine_iface != nullptr) {
+                if (will_show_picker && machine_any != nullptr) {
                     return_to_picker_requested = true;
                 } else {
                     running = false;
@@ -3097,7 +3160,7 @@ int main(int argc, char** argv)
             if (pad_shortcuts.screenshot) {
                 screenshot_requested = true;
             }
-            if (!gui.visible() && machine_iface != nullptr) {
+            if (!gui.visible() && machine_any != nullptr) {
                 if (pad_shortcuts.save) {
                     state_action = StateAction{StateOp::Save, hw::kQuickSlot};
                 } else if (pad_shortcuts.load) {
@@ -3105,14 +3168,12 @@ int main(int argc, char** argv)
                 }
             }
 
-            // Fast-forward is a held key rather than a toggle, so letting go always
-            // returns to real time.
+            // Fast-forward is held rather than toggled.
             pacer.set_throttled(options.config.throttle && !fast_forward
                                 && !pad_shortcuts.fast_forward);
 
-            // Audio clock pull: nudge the frame rate toward the audio device's
-            // true rate so the queue does not drift. Too full -> slower, too
-            // empty -> faster; deadband stops it fighting the per-frame sawtooth.
+            // Nudge the frame rate toward the audio device's true rate so the queue
+            // does not drift; the deadband stops it fighting the per-frame sawtooth.
             if (sound_board != nullptr && audio.active()) {
                 const s32 depth = static_cast<s32>(audio.queued_milliseconds());
                 const s32 target = static_cast<s32>(osd::Audio::kTargetQueuedMilliseconds);
@@ -3125,21 +3186,18 @@ int main(int argc, char** argv)
                 pacer.set_sync_adjust(adjust);
             }
 
-            // Warm-up gate: don't sample until --profile-after's frame (see its
-            // declaration). Zero means always true.
+            // Do not sample before --profile-after's frame.
             const bool profile_sample =
                 options.profile
                 && (options.profile_after == 0 || frames_presented >= options.profile_after);
 
-            // The wheel's Menu-bound button toggles the overlay, same as F1.
-            // Polled every frame (not only while running) so it can also close
-            // the overlay once it has paused the game.
+            // The wheel's Menu-bound button toggles the overlay. Polled every frame
+            // so it can also close the overlay once it has paused the game.
             if (input.menu_button_pressed() || pad_shortcuts.menu) {
                 gui.toggle();
             }
 
-            // Opening the overlay pauses the game, so settings can be changed
-            // without the car driving off. The P key's manual pause still holds
+            // Opening the overlay pauses the game; the manual pause holds
             // independently. Audio and the pacer follow on each transition.
             const bool effective_pause = paused || gui.visible();
             if (effective_pause != audio_paused_state) {
@@ -3155,16 +3213,18 @@ int main(int argc, char** argv)
                               static_cast<u16>(options.config.outputs_network_port),
                               static_cast<u16>(options.config.outputs_network_udp_port),
                               options.config.outputs_windows);
-            if (machine_iface != nullptr && loaded.has_value()) {
-                outputs.set_game(loaded->game.name, loaded->game.parent,
-                                 loaded->game.outputs, loaded->game.drive_board);
+            if ((machine_iface != nullptr || machine_m3 != nullptr) && loaded.has_value()) {
+                outputs.set_game(loaded->game.name, loaded->game.parent, loaded->game.outputs,
+                                 loaded->game.drive_board,
+                                 loaded->game.model3.drive_board == rom::Model3DriveBoard::Billboard);
             } else {
                 outputs.set_game({}, {});
             }
             outputs.set_paused(effective_pause);
 
             {
-                const std::string wanted = machine_iface != nullptr && loaded.has_value()
+                const std::string wanted = (machine_iface != nullptr || machine_m3 != nullptr)
+                                                   && loaded.has_value()
                                                    && options.config.custom_textures
                                                ? loaded->game.name
                                                : std::string();
@@ -3178,6 +3238,7 @@ int main(int argc, char** argv)
                         if (!replacements) {
                             replacements = std::make_unique<render::TextureReplacements>();
                         }
+                        backend->finish_model3();  // the build reads the pack
                         (void)replacements->load(texture_load_directory(options.config, wanted));
                         backend->set_texture_replacements(replacements.get());
                     }
@@ -3186,9 +3247,11 @@ int main(int argc, char** argv)
             }
 
             {
-                const bool dumping = machine_iface != nullptr && loaded.has_value()
-                                  && (options.dump_textures || options.config.dump_textures)
-                                  && !g_write_dir.refused;
+                const bool wants_dump = loaded.has_value()
+                                     && (options.dump_textures || options.config.dump_textures)
+                                     && !g_write_dir.refused;
+                const bool dumping   = wants_dump && machine_iface != nullptr;
+                const bool dumping_3 = wants_dump && machine_m3 != nullptr;
                 const bool same_game =
                     loaded.has_value() && texture_dump_game == loaded->game.name;
                 if (texture_dumper && (!dumping || !same_game)) {
@@ -3196,11 +3259,21 @@ int main(int argc, char** argv)
                     texture_dumper->finish(same_game ? machine_iface : nullptr);
                     texture_dumper.reset();
                 }
-                if (dumping && !texture_dumper) {
+                if (model3_dumper && (!dumping_3 || !same_game)) {
+                    backend->set_model3_texture_dumper(nullptr);
+                    model3_dumper.reset();
+                }
+                if ((dumping && !texture_dumper) || (dumping_3 && !model3_dumper)) {
                     texture_dump_game = loaded->game.name;
-                    texture_dumper.emplace(
-                        texture_dump_directory(options.config, texture_dump_game),
-                        texture_dump_game);
+                    const std::string directory =
+                        texture_dump_directory(options.config, texture_dump_game);
+                    if (dumping) {
+                        texture_dumper.emplace(directory, texture_dump_game);
+                    } else {
+                        model3_dumper = std::make_unique<render::model3::TextureDumper>(
+                            directory, texture_dump_game);
+                        backend->set_model3_texture_dumper(model3_dumper.get());
+                    }
                 }
             }
 
@@ -3208,25 +3281,32 @@ int main(int argc, char** argv)
                                  ? static_cast<usize>(options.config.rewind_buffer_mb) << 20
                                  : 0,
                              kRewindInterval);
-            if (machine_iface != rewind_machine) {
+            if (machine_any != rewind_machine) {
                 rewind.clear();
-                rewind_machine = machine_iface;
+                rewind_machine = machine_any;
             }
             if (gui.visible()) {
                 rewind_held = false;
             }
 
+            // Model 3 async: this pass draws the frame emulated by the pass
+            // before, built on a worker while this one emulates.
+            const bool m3_async = machine_m3 != nullptr && options.config.model3_async;
+            const u32  m3_lag   = m3_async ? 1u : 0u;
+            backend->set_model3_async(m3_async);
+            // --run-frames' extra pass to show the last frame emulated.
+            const bool draining = options.run_frames != 0 && frames_presented >= options.run_frames;
+
             bool rewinding = false;
-            if (machine_iface && !effective_pause) {
+            if (machine_any && !effective_pause && !draining) {
                 // Step back a snapshot, then run a frame from it so there is a
                 // picture; its sound is dropped.
                 rewinding = (rewind_held || pad_shortcuts.rewind)
-                         && rewind.step_back(*machine_iface);
+                         && rewind.step_back(*machine_any);
 
-                // Inputs are levels, sampled whenever the program polls the I/O
-                // controller during the frame, so they have to be set before the
-                // frame runs rather than after.
-                input.poll(&machine_iface->inputs(), loaded->game);
+                // Inputs are levels the program polls during the frame, so they
+                // are set before it runs.
+                input.poll(&machine_any->inputs(), loaded->game);
                 // Push the live settings (the GUI changes these) before computing
                 // this frame's force, so slider and calibration take effect now.
                 input.set_wheel_settings(wheel_settings_from(options.config));
@@ -3234,7 +3314,8 @@ int main(int argc, char** argv)
                                  options.config.lightgun_recoil_strength);
                 input.set_gun_buttons(options.config.gun_buttons);
                 input.set_pad_aim_centred(options.config.lightgun_pad_centred);
-                input.set_pad_layout(options.config.pad_layout_for(game_family(loaded->game)));
+                input.set_pad_layout(osd::Input::game_layout(options.config, game_family(loaded->game),
+                                                             static_cast<u32>(loaded->game.inputs)));
                 input.set_pad_stick_sensitivity(options.config.pad_stick_sensitivity);
                 input.set_pad_stick_deadzone(options.config.pad_stick_deadzone);
                 input.set_pad_rumble(options.config.pad_rumble,
@@ -3242,18 +3323,27 @@ int main(int argc, char** argv)
                                      options.config.pad_rumble_cornering);
                 input.set_present_placement(present_options());
                 input.set_sinden_border(options.config.sinden_border);
-                const auto drive_writes = machine_iface->take_drive_board_writes();
+                const auto drive_writes = machine_any->take_drive_board_writes();
                 input.update_drive_board(loaded->game, drive_writes.view());
-                outputs.update(machine_iface->lamp_latch(), drive_writes.view(),
-                               machine_iface->work_ram());
+                outputs.update(machine_any->lamp_latch(), drive_writes.view(),
+                               machine_iface ? osd::Outputs::RamView{machine_iface->work_ram()}
+                               : machine_m3  ? osd::Outputs::RamView{machine_m3->ram(), 0, true}
+                                             : osd::Outputs::RamView{},
+                               {machine_any->inputs().in0, machine_any->inputs().in1, machine_any->inputs().in2});
+                {
+                    const hw::Machine::BoardOutputs& board = machine_any->board_outputs();
+                    if (board.billboard) outputs.update_billboard(board.bill);
+                    input.set_board_force({board.force_feedback, board.constant, board.self_center,
+                                           board.friction, board.vibrate});
+                }
                 ++telemetry_frames;
-                if (options.telemetry_sync && telemetry_decoder && telemetry_server.clients() == 0
+                if (options.telemetry_sync && telemetry_decoder && machine_iface != nullptr && telemetry_server.clients() == 0
                     && !telemetry_sync_waited) {
                     // Lockstep: no frame runs before the driver is there (once).
                     telemetry_sync_waited = true;
                     telemetry_server.wait_client(15000);
                 }
-                if (telemetry_decoder && telemetry_server.wanted()
+                if (telemetry_decoder && machine_iface != nullptr && telemetry_server.wanted()
                     && telemetry_decoder->update({machine_iface->work_ram(), machine_iface->scratch_ram()},
                                                  telemetry_frames, telemetry_inputs_used.analog,
                                                  telemetry_inputs_used.in0, telemetry_inputs_used.in1,
@@ -3280,26 +3370,40 @@ int main(int argc, char** argv)
                                 input.handle_event(joystick_events[e]);
                             }
                         }
-                        input.poll(&machine_iface->inputs(), loaded->game);
+                        input.poll(&machine_any->inputs(), loaded->game);
                     }
                 }
                 input.update_force_feedback(loaded->game);
                 input.update_pad_rumble(loaded->game);
                 if (options.coin_at != 0) {
                     // Scripted coin, start and character confirmation, so an
-                    // unattended capture can reach the game itself rather than
-                    // only the attract mode.
+                    // unattended capture reaches the game itself.
                     const osd::Input::ScriptedPress press = osd::Input::scripted_press(
                         frames_presented, options.coin_at, loaded->game.start1_bit);
-                    machine_iface->inputs().in0 &= static_cast<u8>(~press.in0);
-                    machine_iface->inputs().in1 &= static_cast<u8>(~press.in1);
+                    machine_any->inputs().in0 &= static_cast<u8>(~press.in0);
+                    machine_any->inputs().in1 &= static_cast<u8>(~press.in1);
                 }
 
-                telemetry_inputs_used = machine_iface->inputs();
+                telemetry_inputs_used = machine_any->inputs();
+                if (machine_iface) {
                 machine_iface->set_draw_distance(options.config.extended_draw_distance);
                 machine_iface->set_music_volume(options.config.music_volume);
                 machine_iface->set_black_level(black_level_for(options.config));
-                {
+                }
+                if (machine_m3 && machine_m3->sound() != nullptr) {
+                    machine_m3->sound()->set_music_volume(options.config.music_volume);
+                }
+                if (machine_m3) {
+                    const u32 columns =
+                        shown_aspect() == AspectMode::Widescreen ? render::kWideColumns : 0;
+                    const rom::SideFill fill = loaded->game.side_fill;
+                    const bool widen = columns != 0 && fill != rom::SideFill::Pillarbox;
+                    input.set_widescreen(columns);
+                    backend->set_widescreen(columns, !widen                       ? 0u
+                                                     : fill == rom::SideFill::Mirror ? 1u
+                                                                                     : 2u);
+                }
+                if (machine_iface) {
                     // The geometry engine and the backend must agree on the
                     // width for the frame run_frame() builds.
                     const u32 columns =
@@ -3332,49 +3436,46 @@ int main(int argc, char** argv)
                 }
                 // A real drive board's answer, when BackForceFeeder sends it
                 // back over the network outputs (m2ffb_rx); else the emulated one.
-                machine_iface->set_drive_reply(outputs.drive_reply());
+                machine_any->set_drive_reply(outputs.drive_reply());
+                if (machine_m3) {
+                    backend->release_model3_frames(machine_m3->video_frame());
+                }
                 {
                     auto scope = core::maybe_scope(stage_run_frame, profile_sample);
-                    machine_iface->run_frame();
+                    machine_any->run_frame();
                 }
                 if (!rewinding) {
-                    rewind.capture(*machine_iface);
+                    rewind.capture(*machine_any);
                 }
-                if (loaded->game.lightgun.present) {
+                if (machine_iface && loaded->game.lightgun.present) {
                     machine_iface->video().filter_gun_flash(options.config.lightgun_hide_flash,
                                                             machine_iface->inputs().in1);
                 }
-                if (texture_dumper) {
+                if (texture_dumper && machine_iface) {
                     // scan() can compose, which must not race the render thread.
                     async_soft.wait();
                     texture_dumper->scan(*machine_iface);
                 }
                 if (profile_sample) {
-                    // Read straight back out rather than timed separately: the
-                    // geometry engine runs inside run_frame() (at vblank), not as
-                    // a call main.cpp makes itself, so there is no separate scope
-                    // to wrap -- see Geometrizer::last_run_nanoseconds()'s own
-                    // documentation of why this figure exists.
+                    // The geometry engine runs inside run_frame(), so its time is
+                    // read back rather than scoped here.
                     stage_geometry.record_ms(
-                        static_cast<double>(machine_iface->geometry_stage_nanoseconds())
+                        static_cast<double>(machine_iface ? machine_iface->geometry_stage_nanoseconds() : 0)
                         / 1'000'000.0);
-                    // The per-core split, filled inside run_frame() for the same
-                    // reason: main.cpp sees one interleaved call, not three.
+                    // The per-core split, likewise filled inside run_frame().
                     stage_cpu_i960.record_ms(
-                        static_cast<double>(machine_iface->i960_stage_nanoseconds())
+                        static_cast<double>(machine_any->i960_stage_nanoseconds())
                         / 1'000'000.0);
                     stage_cpu_copro.record_ms(
-                        static_cast<double>(machine_iface->copro_stage_nanoseconds())
+                        static_cast<double>(machine_any->copro_stage_nanoseconds())
                         / 1'000'000.0);
                     stage_cpu_sound.record_ms(
-                        static_cast<double>(machine_iface->sound_stage_nanoseconds())
+                        static_cast<double>(machine_any->sound_stage_nanoseconds())
                         / 1'000'000.0);
                 }
 
-                // The sound board produced about 767 stereo frames while that ran.
-                // Handed over every frame rather than buffered here, so the only
-                // buffering is SDL's. Null on the original Model 2, whose sound
-                // board is not emulated.
+                // About 767 stereo frames per video frame, handed over every frame
+                // so the only buffering is SDL's.
                 if (sound_board != nullptr && rewinding) {
                     sound_board->clear_pending_samples();
                 } else if (sound_board != nullptr) {
@@ -3393,31 +3494,34 @@ int main(int argc, char** argv)
                     sound_board->clear_pending_samples();
                 }
 
-                if (const hw::CpuStatus cpu = machine_iface->main_cpu_status(); cpu.faulted) {
+                if (const hw::CpuStatus cpu = machine_any->main_cpu_status(); cpu.faulted) {
                     SM2_ERROR("stopping: %s", cpu.fault_message.c_str());
                     exit_code = 1;
                     break;
                 }
             }
 
-            // Timed as present_wait (see its declaration). The scope closes
-            // before the continue below so a skipped frame's SDL_Delay is not
-            // folded into the figure.
+            // The scope closes before the continue below so a skipped frame's
+            // SDL_Delay is not folded into present_wait.
             bool begin_ok;
             {
                 auto scope = core::maybe_scope(stage_present_wait, profile_sample);
                 begin_ok = backend->begin_frame();
             }
+            if (!begin_ok && backend->device_lost()) {
+                SM2_ERROR("the GPU driver reset the device; quitting. If it happens again, try "
+                          "--graphics-backend opengl");
+                exit_code = 1;
+                break;
+            }
             if (!begin_ok) {
-                // Minimised or the swapchain was rebuilt. Yield rather than
-                // spinning on a window we cannot draw into, and abandon the pacing
-                // deadline because an unknown amount of time is about to pass.
+                // Minimised or the swapchain was rebuilt: yield, and abandon the
+                // pacing deadline.
                 SDL_Delay(16);
                 pacer.resync();
-                // Still honour a wall-clock run deadline (--duration/--profile):
-                // without this, a window that stays non-drawable spins here
-                // forever and the profile/summary never prints. The frame-time
-                // sample is deliberately NOT recorded for a skipped frame.
+                // Still honour a --duration/--profile deadline, or a window that
+                // stays non-drawable never prints its summary. No frame-time
+                // sample is recorded for a skipped frame.
                 if (run_deadline_ns != 0 && SDL_GetTicksNS() >= run_deadline_ns) {
                     running = false;
                 }
@@ -3427,29 +3531,23 @@ int main(int argc, char** argv)
             const hw::Model2Video& video =
                 machine_iface ? machine_iface->video() : idle_video;
 
-            // Only meaningful with a machine loaded: SoftRenderer::render() takes
-            // a Model2MachineBase, so there is nothing for it to draw against the
-            // idle placeholder and the Vulkan path below covers that case anyway.
+            // SoftRenderer needs a Model 1/2 machine; the idle display uses the GPU.
             const bool draw_with_software = use_software_renderer && machine_iface;
 
-            // Render test mode's framebuffer overlay (Model2Video::
-            // draw_framebuffer) overwrites `below` after the tilemap composite
-            // and has no GPU equivalent, so that mode always takes the CPU path.
+            // Render test mode's framebuffer overlay overwrites `below` after the
+            // tilemap composite and has no GPU equivalent, so it takes the CPU path.
             const bool render_test = machine_iface && machine_iface->render_test_mode();
 
-            // Whether this frame's Vulkan draw uses tilemaps.compute() in place
-            // of the CPU-composited upload. Independent of need_cpu_compose
-            // below: a --soft-render comparison run wants both the GPU path
-            // exercised (this) and a fresh CPU oracle (that), in the same frame.
-            const bool cpu_tilemap = machine_iface && machine_iface->needs_cpu_tilemap();
+            // Whether the GPU composes the tilemaps this frame. Independent of
+            // need_cpu_compose: a --soft-render run wants both.
+            const bool cpu_tilemap =
+                machine_iface
+                && (machine_iface->needs_cpu_tilemap() || !backend->capabilities().compute_shaders);
             const bool use_gpu_tilemap =
                 machine_iface && !use_software_renderer && !render_test && !cpu_tilemap;
 
-            // Whether Model2Video::compose(), the CPU tilemap composite, must
-            // run this frame: whenever something reads video.below()/above()
-            // directly -- the software renderer's live draw, a --soft-render
-            // comparison capture later in this same frame (hw::dump_software_frame,
-            // below), or render test mode's compose()-then-overlay sequence.
+            // Whether the CPU tilemap composite must run: whenever something reads
+            // video.below()/above() directly.
             const bool need_cpu_compose =
                 machine_iface
                 && (use_software_renderer || options.soft_render || render_test || cpu_tilemap);
@@ -3476,9 +3574,7 @@ int main(int argc, char** argv)
                     auto scope = core::maybe_scope(stage_compose, profile_sample);
                     machine_iface->compose_video();
                 } else if (use_gpu_tilemap) {
-                    // compose_video()'s other job, done here directly since its
-                    // own compose() call -- the expensive part -- is what
-                    // tilemaps.compute() below replaces.
+                    // compose_video()'s palette refresh, without its compose().
                     if (machine_iface->palette_dirty()) {
                         machine_iface->video().refresh_pens();
                         machine_iface->clear_palette_dirty();
@@ -3486,11 +3582,39 @@ int main(int argc, char** argv)
                 }
             }
 
-            if (!draw_with_software) {
-                // Uploads and the 3D pass first. Both need a command buffer that is
-                // not inside a rendering scope: a transfer cannot be issued inside
-                // one, and the 3D pass opens a scope of its own on its offscreen
-                // target.
+            // Line-of-sight results go back to the machine before the frame is
+            // built, so they lag by the same number of frames with or without async.
+            const auto submit_m3 = [&] {
+                const render::model3::LineOfSight los = backend->model3_line_of_sight();
+                for (unsigned i = 0; los.frame_number != 0 && i < los.range.size(); ++i) {
+                    machine_m3->set_line_of_sight(i, los.range[i]);
+                }
+                auto scope = core::maybe_scope(stage_build, profile_sample);
+                backend->submit_model3_frame(machine_m3->video_frame());
+            };
+            const auto sample_m3_build = [&] {
+                if (!profile_sample) {
+                    return;
+                }
+                const render::model3::BuildTimes t = backend->model3_build_times();
+                stage_m3_build.record_ms(t.total);
+                stage_m3_textures.record_ms(t.textures);
+                stage_m3_tilegen.record_ms(t.tilegen);
+                stage_m3_scene.record_ms(t.scene);
+                stage_m3_plan.record_ms(t.plan);
+                if (m3_async) {
+                    stage_m3_record.record_ms(t.record);
+                }
+            };
+            if (machine_m3) {
+                if (!m3_async) {
+                    submit_m3();
+                    sample_m3_build();
+                }
+            } else if (!draw_with_software) {
+                // Uploads and the 3D pass first, outside any rendering scope: a
+                // transfer cannot be issued inside one, and the 3D pass opens its
+                // own on its offscreen target.
                 {
                     auto scope = core::maybe_scope(stage_tilemap_upload, profile_sample);
                     if (use_gpu_tilemap) {
@@ -3505,28 +3629,30 @@ int main(int argc, char** argv)
                 }
             }
 
-            // Command recording proper starts here: polygons.render() below, and
-            // everything up to and including present.record() further down
-            // (marked at its own call site) is vkCmd* issuance for this frame,
-            // with a capture's readback recording folded in between since it is
-            // also just a command, and nothing else interleaved in the
-            // non-software path. Not used when draw_with_software, since there
-            // is no Vulkan drawing to time in that path -- present.upload_from_host()
-            // is a transfer, not a draw, and stays out of this figure.
+            // Command recording starts here and ends after the present below. Not
+            // timed when drawing in software, which records no GPU drawing.
+            if (m3_async) {
+                {
+                    auto scope = core::maybe_scope(stage_m3_wait, profile_sample);
+                    backend->finish_model3();
+                }
+                sample_m3_build();
+            }
+
             std::optional<core::StageTimer::Scope> record_scope;
             if (profile_sample && !draw_with_software) {
                 record_scope.emplace(stage_record);
             }
 
-            if (!draw_with_software) {
+            if (machine_m3) {
+                backend->render_model3();
+            } else if (!draw_with_software) {
                 backend->render_polygons();
             }
 
-            // The hardware's three-way composite, all of it at the native 496x384:
-            // tilemap layers of priority category zero, then the 3D output, then
-            // category one. Nothing is magnified until blit_to_swapchain() below,
-            // so the two blends run on the hardware's own pixels rather than on
-            // colours a magnifying filter has already mixed with their neighbours.
+            // The hardware's three-way composite runs at native 496x384: tilemap
+            // priority category zero, the 3D output, then category one. Nothing is
+            // magnified until the present, so the blends use unfiltered pixels.
             if (profile_sample) {
                 const render::GpuStageTimes gpu_times = backend->read_stage_times();
                 if (!backend->supports_gpu_timing() && !gpu_timing_unavailable_warned) {
@@ -3542,12 +3668,8 @@ int main(int argc, char** argv)
             }
 
             if (draw_with_software) {
-                // The CPU rasteriser performs this whole three-way composite
-                // itself -- background, below, 3D (or the framebuffer in render
-                // test mode), above -- so the tilemap and 3D passes above are
-                // skipped entirely; its result lands in the same native target
-                // either renderer presents from, which is what lets a screenshot
-                // and the present/letterbox path stay renderer-agnostic.
+                // The CPU rasteriser performs the whole three-way composite itself
+                // and lands in the same native target the GPU path presents from.
                 if (async_software && !render_test) {
                     // Collect and present the previous frame, then hand this one
                     // to the render thread.
@@ -3572,30 +3694,32 @@ int main(int argc, char** argv)
                     }
                     backend->submit_native_frame(soft_frame);
                 }
-            } else {
-                // Render test mode cuts the DSP out: the framebuffer bank the host has
-                // been drawing into is shown instead of the 3D pass, and has already
-                // been composed into the layers below.
+            } else if (!machine_m3) {
+                // Render test mode shows the host's framebuffer bank instead of the
+                // 3D pass; it is already composed into the layers.
                 const bool skip_3d = machine_iface && machine_iface->render_test_mode();
                 backend->composite_native_frame(video.background(), skip_3d);
             }
 
-            // Read back the finished native frame, before it is scaled, so a
-            // screenshot is the frame the hardware produced at the size it
-            // produced it.
+            // Read back the finished native frame before it is scaled.
+            // Model 3 async shows the frame emulated by the pass before.
+            const u32  shown_frame = frames_presented - std::min(frames_presented, m3_lag);
             const bool last_frame =
-                options.run_frames != 0 && frames_presented + 1 >= options.run_frames;
+                options.run_frames != 0 && frames_presented + 1 >= options.run_frames + m3_lag;
             const bool numbered_series =
                 options.screenshot_interval != 0 || !options.screenshot_frames.empty();
             const bool capture_diagnostic =
-                !options.screenshot.empty()
+                !options.screenshot.empty() && frames_presented >= m3_lag
                 && (!options.screenshot_frames.empty()
-                        ? options.screenshot_frames.count(frames_presented) != 0
+                        ? options.screenshot_frames.count(shown_frame) != 0
                         : options.screenshot_interval != 0
-                              ? (frames_presented % options.screenshot_interval) == 0
+                              ? (shown_frame % options.screenshot_interval) == 0
                                     || last_frame
                               : last_frame || options.run_frames == 0);
-            const bool capture_this_frame = capture_diagnostic || screenshot_requested;
+            const std::string dump_frame =
+                model3_dumper ? model3_dumper->take_frame_request() : std::string();
+            const bool capture_this_frame =
+                capture_diagnostic || screenshot_requested || !dump_frame.empty();
             if (capture_this_frame && !backend->request_capture()) {
                 SM2_ERROR("frame capture failed");
                 exit_code = 1;
@@ -3613,10 +3737,13 @@ int main(int argc, char** argv)
                                             ? static_cast<int>(frames_presented)
                                             : -1);
             }
+            // After the dumper's request is taken: its scan runs in the build.
+            if (m3_async) {
+                submit_m3();
+            }
 
-            // Push present and enhancement options each frame so a GUI change
-            // takes effect immediately; both are shader/pass state, never a
-            // reallocation.
+            // Pushed every frame so a GUI change takes effect at once; both are
+            // shader state, never a reallocation.
             {
                 const render::PresentOptions present = present_options();
                 backend->set_present_options(present);
@@ -3632,16 +3759,11 @@ int main(int argc, char** argv)
 
             // Then the one magnification, into the swapchain.
             backend->blit_to_swapchain();
-            // Command recording, as this figure means it, ends here: the GUI
-            // overlay below is a separate concern (ImGui's own draw-list build
-            // plus its own submission) and left out on purpose.
+            // Command recording ends here; the GUI overlay is left out.
             record_scope.reset();
 
             // Draw the ImGui overlay on top of the presented frame, while the
-            // swapchain image is still in a colour-attachment layout. The FPS
-            // counter is always on now, so this always has something to draw and
-            // gui_active is unconditionally true; the return value stays a bool
-            // for symmetry with draw_overlay()'s inactive path below.
+            // swapchain image is still in a colour-attachment layout.
             backend->begin_overlay_frame();
             {
                 u32 fbw = 0;
@@ -3651,8 +3773,8 @@ int main(int argc, char** argv)
             }
             gui.new_frame();
             // Live link state for the Network tab.
-            if (machine_iface != nullptr) {
-                const hw::CommBoard& comm = machine_iface->comm();
+            if (machine_any != nullptr) {
+                const hw::CommBoard& comm = machine_any->comm();
                 osd::Gui::LinkStatus status{options.config.link_enabled, comm.enabled(),
                                             comm.link_alive(), comm.link_id(), comm.link_count()};
                 if (const hw::BufferedLink* link = comm.buffered_link()) {
@@ -3680,7 +3802,7 @@ int main(int argc, char** argv)
             }
             // Feed the States tab the game's slots (only while the overlay is up,
             // since listing them touches the filesystem).
-            if (gui.visible() && machine_iface != nullptr && loaded.has_value()) {
+            if (gui.visible() && machine_any != nullptr && loaded.has_value()) {
                 std::vector<osd::Gui::StateSlot> gui_slots;
                 for (const hw::SlotInfo& s : state_slots(options.config, loaded->game.name)) {
                     osd::Gui::StateSlot g;
@@ -3693,9 +3815,10 @@ int main(int argc, char** argv)
                 }
                 gui.set_state_slots(true, std::move(gui_slots));
             } else {
-                gui.set_state_slots(machine_iface != nullptr, {});
+                gui.set_state_slots(machine_any != nullptr, {});
             }
             gui.set_current_game(loaded.has_value() ? loaded->game.name : std::string());
+            gui.set_model3_running(loaded.has_value() && loaded->game.board == rom::Board::Model3);
             gui.set_current_family(loaded.has_value() ? game_family(loaded->game)
                                                       : std::string());
             gui.set_shown_aspect(shown_aspect());
@@ -3720,7 +3843,7 @@ int main(int argc, char** argv)
             window.set_fullscreen(options.config.fullscreen, options.config.borderless_fullscreen,
                                   options.config.window_width, options.config.window_height);
             // Settings just closed with no game loaded: rescan rom_dir.
-            if (settings_was_visible && !gui.visible() && machine_iface == nullptr) {
+            if (settings_was_visible && !gui.visible() && machine_any == nullptr) {
                 show_picker();
             }
             settings_was_visible = gui.visible();
@@ -3753,16 +3876,14 @@ int main(int argc, char** argv)
                 }
             }
 
-            // Esc asked to unload the game and return to the picker. Handled
-            // after the frame is submitted, mirroring the launch path below in
-            // reverse: save the game's NVRAM, wait for the GPU to finish with
-            // it, drop the machine, then bring the picker back up.
+            // Unload the game and return to the picker, after the frame is
+            // submitted: save NVRAM, wait for the GPU, drop the machine.
             if (return_to_picker_requested) {
                 return_to_picker_requested = false;
                 async_soft.forget_machine();
-                if (machine_iface != nullptr) {
+                if (machine_any != nullptr) {
                     if (!g_write_dir.refused) {
-                        machine_iface->save_nvram();
+                        machine_any->save_nvram();
                     }
                 }
                 backend->wait_idle();
@@ -3774,6 +3895,8 @@ int main(int argc, char** argv)
                 machine_2c    = nullptr;
                 machine_orig  = nullptr;
                 machine_m1    = nullptr;
+                machine_m3    = nullptr;
+                machine_any   = nullptr;
                 main_cpu      = nullptr;
                 sound_board   = nullptr;
                 sound_link    = nullptr;
@@ -3838,9 +3961,9 @@ int main(int argc, char** argv)
                                         i18n::tr("Drop a .zip or .7z ROM archive to play it."), {});
                     continue;
                 }
-                if (machine_iface != nullptr) {
+                if (machine_any != nullptr) {
                     if (!g_write_dir.refused) {
-                        machine_iface->save_nvram();
+                        machine_any->save_nvram();
                     }
                 }
                 rom::LoadError               load_error;
@@ -3861,19 +3984,22 @@ int main(int argc, char** argv)
                 continue;
             }
 
-            // A series has to be written as it goes, and the readback is only
-            // complete once the submission is. Waiting for the device here stalls
-            // the pipeline, which is acceptable in a diagnostic mode and is why
-            // this is not the default path.
+            // A series is written as it goes, and the readback is complete only
+            // once the submission is, so this stalls the pipeline.
             if (capture_diagnostic && numbered_series) {
                 backend->wait_idle();
-                if (!backend->save_capture(numbered_path(options.screenshot, frames_presented))) {
+                if (!backend->save_capture(numbered_path(options.screenshot, shown_frame))) {
                     exit_code = 1;
                     break;
                 }
             }
 
-            // F12: write a timestamped PNG into the screenshots directory.
+            if (!dump_frame.empty()) {
+                backend->wait_idle();
+                (void)backend->save_capture(dump_frame);
+            }
+
+            // Write a timestamped PNG into the screenshots directory.
             if (screenshot_requested) {
                 screenshot_requested = false;
                 backend->wait_idle();
@@ -3895,7 +4021,7 @@ int main(int argc, char** argv)
             // screenshot, so the machine is never mid-run_frame (the board's own
             // m_in_frame guard also enforces this). The overlay and the F6/F7
             // hotkeys both route through state_action.
-            if (state_action.has_value() && machine_iface != nullptr && loaded.has_value()) {
+            if (state_action.has_value() && machine_any != nullptr && loaded.has_value()) {
                 const std::string path =
                     state_action->op == StateOp::Load
                         ? state_read_path(options.config, loaded->game.name, state_action->slot)
@@ -3912,7 +4038,7 @@ int main(int argc, char** argv)
                                    ? i18n::trf("Save failed: %s", file.c_str())
                                    : i18n::trf("Delete failed: %s", file.c_str()));
                 } else if (state_action->op == StateOp::Save) {
-                    if (machine_iface->save_state(path)) {
+                    if (machine_any->save_state(path)) {
                         SM2_INFO("saved state to slot '%s'", state_action->slot.c_str());
                         gui.notify(i18n::trf("State saved: %s", file.c_str()));
                     } else {
@@ -3921,7 +4047,7 @@ int main(int argc, char** argv)
                         gui.notify(i18n::trf("Save failed: %s", file.c_str()));
                     }
                 } else if (state_action->op == StateOp::Load) {
-                    if (machine_iface->load_state(path)) {
+                    if (machine_any->load_state(path)) {
                         SM2_INFO("loaded state from slot '%s'", state_action->slot.c_str());
                         pacer.resync();  // the frame clock jumped; do not chase it
                         gui.notify(i18n::trf("State loaded: %s", file.c_str()));
@@ -3957,28 +4083,16 @@ int main(int argc, char** argv)
 
             ++frames_presented;
 
-            if (options.run_frames != 0 && frames_presented >= options.run_frames) {
+            if (options.run_frames != 0 && frames_presented >= options.run_frames + m3_lag) {
                 running = false;
             }
 
-            // Measured from this iteration's own frame_start_ns rather than an
-            // external "last frame's end" mark, so a skipped iteration (the
-            // begin_frame() continue above, on a minimised window or a swapchain
-            // rebuild) cannot fold its idle time into the next sample as a fake
-            // outlier.
-            //
-            // Recorded before pacer.wait(): with throttling on, wait() is where
-            // the pacer deliberately spends idle time to hold the target rate, and
-            // including it would measure the pacer instead of the renderer. With
-            // --no-throttle, which is what a throughput comparison wants, wait()
-            // returns immediately and this is the whole frame cost either way --
-            // see FramePacer::wait()'s own account_for_frame() call for the same
-            // reasoning applied to measured_hz().
+            // Measured from this iteration's own start, so a skipped iteration
+            // cannot fold its idle time into the next sample. Recorded before
+            // pacer.wait(), which would otherwise measure the pacer's idle time.
             if (run_deadline_ns != 0) {
                 const u64 now_ns = SDL_GetTicksNS();
-                // Same --profile-after gate as the per-stage samples, so the fps
-                // average is in-game only. The deadline check below stays
-                // unconditional.
+                // Same --profile-after gate as the per-stage samples.
                 if (options.profile_after == 0 || frames_presented > options.profile_after) {
                     frame_times_ms.push_back(
                         static_cast<double>(now_ns - frame_start_ns) / 1'000'000.0);
@@ -3988,8 +4102,7 @@ int main(int argc, char** argv)
                 }
             }
 
-            // Last thing in the loop, so the wait absorbs everything the frame cost
-            // rather than only part of it.
+            // Last thing in the loop, so the wait absorbs the whole frame's cost.
             frames_written_off += pacer.wait();
 
             const u64 now = SDL_GetTicksNS();
@@ -4013,6 +4126,8 @@ int main(int argc, char** argv)
             texture_dumper->finish(machine_iface);
             texture_dumper.reset();
         }
+        backend->set_model3_texture_dumper(nullptr);
+        model3_dumper.reset();
         backend->set_texture_replacements(nullptr);
 
         if (frames_written_off != 0) {
@@ -4053,8 +4168,7 @@ int main(int argc, char** argv)
                      options.config.throttle ? "on" : "off");
 
             if (options.profile) {
-                // Named with set, frame range, coin-at and NVRAM dir, so two
-                // reports run under different conditions cannot be confused.
+                // Labelled with the run's conditions.
                 std::printf("\n--- per-stage CPU (ms), %s, --duration %u, --coin-at %u, "
                             "--nvram %s ---\n",
                             loaded.has_value() ? loaded->game.name.c_str() : "no game",
@@ -4063,9 +4177,7 @@ int main(int argc, char** argv)
                 std::printf("%-24s %8s %10s %10s %10s %10s\n", "stage", "samples", "mean",
                             "p50", "p95", "p99");
 
-                // Collected alongside the printed table, for --profile-csv below,
-                // rather than reopening the file and re-deriving the same
-                // StageStats/GpuStageTime figures a second time.
+                // Written alongside the printed table.
                 std::FILE* csv = nullptr;
                 if (!options.profile_csv.empty()) {
                     csv = std::fopen(options.profile_csv.c_str(), "w");
@@ -4082,7 +4194,9 @@ int main(int argc, char** argv)
                      &stage_cpu_sound, &stage_geometry, &stage_compose,
                      &stage_tilemap_upload, &stage_build, &stage_record, &stage_submit,
                      &stage_present_wait, &stage_software, &stage_software_wait,
-                     &stage_software_snapshot, &stage_software_async}) {
+                     &stage_software_snapshot, &stage_software_async, &stage_m3_wait,
+                     &stage_m3_build, &stage_m3_textures, &stage_m3_tilegen, &stage_m3_scene,
+                     &stage_m3_plan, &stage_m3_record}) {
                     const core::StageStats stats = core::summarise(*timer);
                     if (stats.samples == 0) {
                         continue;
@@ -4144,6 +4258,9 @@ int main(int argc, char** argv)
             }
         }
 
+        if (machine_any) {
+            machine_any->save_nvram();
+        }
         if (machine_iface) {
             if (!g_write_dir.refused) {
                 machine_iface->save_nvram();
@@ -4172,15 +4289,14 @@ int main(int argc, char** argv)
 
         // Persist settings on exit, so changes made in the overlay (gun
         // bindings, wheel, video) stick without needing the Save button.
-        if (!save_settings(config_path, options.config)) {
+        if (!save_settings(config_path, to_save(options.config))) {
             SM2_WARN("could not save settings to '%s'", config_path.c_str());
         }
 
         audio.shutdown();
         input.shutdown();
-        // Before gui.shutdown(): the backend's own ImGui renderer backend
-        // shutdown also reads ImGui's global context, which must not have
-        // been destroyed yet.
+        // Before gui.shutdown(): the backend's ImGui renderer shutdown reads
+        // ImGui's global context.
         backend->shutdown_overlay();
         gui.shutdown();
         backend->shutdown();

@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later AND BSD-3-Clause
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -18,11 +20,8 @@
 // The memory map follows MAME's model2_snd in src/mame/sega/model2.cpp
 // (BSD-3-Clause) region for region.
 //
-// The board is almost independent of the CPU board. It has its own ROM, its own
-// RAM and its own clock; the only link is a serial one, an i8251 on the host side
-// talking to the SCSP's MIDI port, which carries the sound commands. There is no
-// reset line from the host either, so the sound program runs from power-on and
-// this can be brought up and verified without the host being involved at all.
+// The board has its own ROM, RAM and clock. Its only link to the host is serial,
+// from the host's i8251 to the SCSP's MIDI port, and there is no reset line.
 
 #pragma once
 
@@ -52,20 +51,15 @@ public:
     Model2Sound& operator=(const Model2Sound&) = delete;
 
     /// Sound program ROM (MAME's "audiocpu") and PCM sample ROM ("samples").
-    ///
-    /// Either may be empty. A board with no program ROM is inert: run() does
-    /// nothing, which keeps a synthetic machine in the tests usable.
+    /// Either may be empty; without a program ROM the board is inert.
     void attach(std::span<const u8> program_rom, std::span<const u8> samples);
 
-    /// Attach the Z80 Digital Sound Board's ROMs, for the sets that carry one
-    /// (Sega Touring Car and other DSB titles). The board plays the music as
-    /// MPEG audio; its output mixes into this board's stream. Absent for most
-    /// sets, in which case the DSB stays inert.
+    /// Attach the Z80 Digital Sound Board's ROMs (Sega Touring Car). Its MPEG
+    /// music mixes into this board's stream; empty regions leave it inert.
     void attach_dsb(std::span<const u8> dsb_program, std::span<const u8> dsb_mpeg);
 
-    /// Attach the 68000-based DSB2 music board's ROMs, for the sets that carry
-    /// one (Top Skater). Same role as the Z80 DSB, different board; a set has at
-    /// most one. Empty regions leave it inert.
+    /// Attach the 68000-based DSB2 music board's ROMs (Top Skater). Empty
+    /// regions leave it inert.
     void attach_dsb2(std::span<const u8> dsb_program, std::span<const u8> dsb_mpeg);
 
     void set_music_volume(u32 percent)
@@ -88,13 +82,8 @@ public:
     /// Apply the per-set flat gain that levels loudness across the library.
     void configure_balance(const std::string& game_name);
 
-    /// Advance the board by the sound-clock equivalent of `host_cycles` of the
-    /// host i960's 25 MHz clock.
-    ///
-    /// The two ratios involved are kept exactly, with the remainders carried
-    /// between calls: 45.1584 MHz / 4 over 25 MHz for the 68000, and 44100 Hz
-    /// over 25 MHz for the SCSP. Rounding either per call would drift audibly
-    /// over a few minutes.
+    /// Advance the board by the equivalent of `host_cycles` of the i960's 25 MHz
+    /// clock. Remainders are carried between calls so the ratios stay exact.
     void run(u32 host_cycles);
 
     [[nodiscard]] bool present() const override { return !m_program_rom.empty(); }
@@ -159,10 +148,8 @@ public:
     [[nodiscard]] const ScspCore& scsp() const { return *m_scsp; }
     [[nodiscard]] std::span<const u8> ram() const { return m_ram; }
 
-    /// Save/restore the whole sound board: the 68000, the SCSP, both MPEG
-    /// boards, the 512 KB work RAM, banking and clock carries.
-    /// The program/sample ROM spans and the pending-sample scratch are
-    /// excluded. Between-frames only.
+    /// Save/restore the whole board except the ROM spans and pending samples.
+    /// Between frames only.
     void serialize(Archive& ar);
 
 private:
@@ -199,9 +186,7 @@ private:
     ScspCore::MidiOutHandler m_midi_out_handler;
     std::array<u16, 32>      m_slot_gains{};
 
-    /// The MPEG music boards, present only on DSB titles. A set carries at
-    /// most one; both are inert otherwise. m_dsb is the Z80 board (stcc),
-    /// m_dsb2 the 68000 board (topskatr).
+    /// The MPEG music boards; a set carries at most one.
     DsbZ80 m_dsb;
     Dsb2   m_dsb2;
 
@@ -210,9 +195,7 @@ private:
 
     std::vector<u8> m_ram;  ///< 512 KB, shared with the SCSP's own address space.
 
-    /// Offsets into the sample ROM for the two banked windows. Fixed for every
-    /// Model 2 game whose sample region is 8 MB or smaller, which is all of them
-    /// that matter here; see snd_ctrl_write.
+    /// Sample ROM offsets of the two banked windows; see snd_ctrl_write.
     u32 m_bank4_offset = 0x200000;
     u32 m_bank5_offset = 0x600000;
 

@@ -1,15 +1,17 @@
-sm2-emu — Sega Model 1 & 2 arcade emulator
-======================================
+Keisho — Sega Model 1, 2 & 3 arcade emulator
+============================================
 
-Copyright (c) 2025+ Daniel Martin (dmanlfc) and the sm2-emu contributors.
+Keisho was formerly named sm2-emu.
 
-sm2-emu is free software: you can redistribute it and/or modify it under the
+Copyright (c) 2025+ Daniel Martin (dmanlfc) and the Keisho contributors.
+
+Keisho is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation, either version 3 of the License, or (at your option) any later
 version, together with the additional terms below. See LICENSE for the full
 text of the GPL.
 
-sm2-emu is distributed in the hope that it will be useful, but WITHOUT ANY
+Keisho is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
 A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
@@ -20,23 +22,26 @@ notice in each source file's header.
 Additional terms (GNU GPL version 3, section 7)
 -----------------------------------------------
 
-These terms apply to sm2-emu and to every work based on it, in source or
-object form.
+These terms apply to Keisho and to every work based on it, in source or
+object form. They cover only the material whose copyright the Keisho authors
+hold. Code taken from Supermodel (see "Derived from Supermodel" below) stays
+under the GNU GPL version 3 or later alone, as its authors released it; these
+terms apply to Keisho's changes to that code, not to the code itself.
 
   1. Attribution (section 7(b)). Keep intact the copyright notices and author
      attributions in the source files, in this NOTICE file, and on the
      program's About screen. A version without an About screen must show them
      somewhere equivalent that users can reach from the program.
 
-  2. Origin (section 7(c)). Do not misrepresent the origin of sm2-emu, or
+  2. Origin (section 7(c)). Do not misrepresent the origin of Keisho, or
      present it or a work based on it as entirely your own work. A modified
      version must be marked as modified, both in its source and on its About
-     screen, and must state that it is based on sm2-emu, with a link to
-     https://github.com/dmanlfc/sm2-emu.
+     screen, and must state that it is based on Keisho, with a link to
+     https://github.com/Keisho-Emu/Keisho.
 
-  3. Name (section 7(e)). This licence grants no rights to the name "sm2-emu"
+  3. Name (section 7(e)). This licence grants no rights to the name "Keisho"
      or its logo. A modified version distributed to others must use a
-     different name; describing it as "based on sm2-emu" is fine. Copies built
+     different name; describing it as "based on Keisho" is fine. Copies built
      from unmodified source, or changed only to build, package or install it
      on a particular system (such as a Linux distribution or Batocera), may
      keep the name.
@@ -48,7 +53,7 @@ which the MAME authors released under the BSD 3-Clause License. Their copyright
 notices are preserved in the individual source files that carry derived code.
 Those files are marked "SPDX-License-Identifier: GPL-3.0-or-later AND
 BSD-3-Clause": the code taken from MAME remains under the BSD 3-Clause License
-(see LICENSES/BSD-3-Clause.txt), and sm2-emu's changes to it are under the GPL.
+(see LICENSES/BSD-3-Clause.txt), and Keisho's changes to it are under the GPL.
 
 Derived from MAME (https://github.com/mamedev/mame), BSD-3-Clause
 -----------------------------------------------------------------
@@ -164,16 +169,79 @@ into its device framework in ways a port would have to unpick.
     SCSP at the other end of the wire; this models whole bytes and keeps only the
     byte period, which is the part the sound driver's pacing depends on.
 
-Architectural influence
------------------------
+Derived from Supermodel (https://github.com/trzy/Supermodel), GPL-3.0-or-later
+-------------------------------------------------------------------------------
 
-The application structure — the XML-driven ROM database with content-addressed
-CRC32 identification and stride/chunk interleaving, the snapshot-based handoff
-between emulation and rendering, and the layered input abstraction — was
-informed by the design of Supermodel, the Sega Model 3 emulator
-(https://supermodel3.com). Supermodel is licensed under the GPL; no Supermodel
-code is included in sm2-emu except where contributed directly by its original
-author under the terms of this project's licence.
+Keisho's Sega Model 3 support is ported from Supermodel at commit 24d2ffc
+("Fix initializer order (#325)", 26 July 2026). Supermodel is licensed under
+the GNU GPL version 3 or later, the same licence as Keisho, and the files
+below keep their authors' copyright notices. Those files are marked
+"SPDX-License-Identifier: GPL-3.0-or-later" and name the Supermodel file they
+come from. As stated above, the section 7 additional terms do not extend to
+the code taken from Supermodel.
+
+  Copyright (c) 2003-2026 The Supermodel Team: Bart Trzynadlowski, Ian Curtis,
+  Nik Henson, and the other Supermodel contributors.
+
+  Files derived from Supermodel are listed here as they are ported:
+
+    data/games.xml        Model 3 game definitions, from Config/Games.xml
+    Model 3 sound board
+      src/hw/model3/model3_sound.cpp, model3_sound.h
+      from Src/Model3/SoundBoard.cpp, SoundBoard.h
+      Copyright (c) 2011 Bart Trzynadlowski, Nik Henson; with the MIDI port
+      and output mixing from Src/Model3/Model3.cpp, Src/Model3/DSB.cpp and
+      Src/OSD/SDL/Audio.cpp, Copyright (c) 2003-2026 The Supermodel Team
+
+    Digital Sound Board 2, the Model 3 command set (portions)
+      src/hw/dsb2.cpp, dsb2.h (otherwise derived from MAME, above)
+      from Src/Model3/DSB.cpp, Copyright (c) 2003-2026 The Supermodel Team;
+      based on code donated by R. Belmont
+    src/hw/model3/model3.cpp, model3.h        Src/Model3/Model3.cpp, Model3.h
+    src/hw/model3/irq.h                       Src/Model3/IRQ.cpp, IRQ.h
+    src/hw/model3/mpc10x.cpp, mpc10x.h        Src/Model3/MPC10x.cpp, MPC10x.h,
+                                              PCI.cpp, PCI.h
+    src/hw/model3/scsi_53c810.cpp, .h         Src/Model3/53C810.cpp, 53C810.h
+    src/hw/model3/rtc72421.cpp, rtc72421.h    Src/Model3/RTC72421.cpp, RTC72421.h
+    src/hw/model3/jtag.cpp, jtag.h            Src/Model3/JTAG.cpp, JTAG.h
+    src/hw/model3/tilegen.cpp, tilegen.h      Src/Model3/TileGen.cpp, TileGen.h
+                                              (emulation side only)
+    src/hw/model3/real3d.cpp, real3d.h        Src/Model3/Real3D.cpp, Real3D.h
+                                              (emulation side only)
+    src/hw/model3/drive_board.cpp             Src/Model3/DriveBoard/DriveBoard.cpp,
+                                              WheelBoard.cpp, JoystickBoard.cpp,
+                                              BillBoard.cpp, SkiBoard.cpp,
+                                              Z80CTC.cpp and their headers,
+                                              Copyright (c) 2011-2021 Bart
+                                              Trzynadlowski, Nik Henson, Ian
+                                              Curtis, Harry Tuttle, and Spindizzi
+    src/hw/model3/net_board.cpp               Src/Network/SimNetBoard.cpp,
+                                              SimNetBoard.h, Copyright (c)
+                                              2011-2020 Bart Trzynadlowski, Nik
+                                              Henson, Ian Curtis, Harry Tuttle,
+                                              and Spindizzi
+
+    Model 3 renderer (New3D by Ian Curtis, Copyright (c) 2003-2026 The
+    Supermodel Team; tile generator Copyright (c) 2011-2012 Bart
+    Trzynadlowski, Nik Henson)
+    src/render/model3/r3d_math.cpp, .h        Src/Graphics/New3D/Mat4.cpp, Mat4.h,
+                                              R3DFloat.cpp, R3DFloat.h, Vec.cpp
+    src/render/model3/r3d_model.cpp, .h       Src/Graphics/New3D/Model.h, Model.cpp,
+                                              PolyHeader.h, PolyHeader.cpp, R3DData.h
+    src/render/model3/tilegen.cpp, .h         Src/Model3/TileGen.cpp, TileGen.h,
+                                              Src/Graphics/Render2D.cpp (drawing)
+    Under the Keisho header, with portions of New3D (New3D.cpp, R3DShader.cpp,
+    R3DShaderCommon.h, R3DShaderTriangles.h, R3DFrameBuffers.cpp,
+    R3DScrollFog.cpp, TextureBank.cpp):
+    src/render/model3/scene.cpp, .h, frame_plan.cpp, .h, textures.cpp, .h
+    src/render/gl/model3_pass.cpp, .h
+    src/render/vk/model3_pass.cpp, .h
+    src/render/model3/soft_render.cpp, .h
+    shaders/model3_r3d.vert, model3_r3d.frag, model3_scroll_fog.frag,
+            model3_composite_base.frag, model3_composite_trans.frag
+
+The 315-5881 cipher is ported directly from MAME and is credited under
+"Derived from MAME" above. The PowerPC core is written for Keisho.
 
 Third-party dependencies
 ------------------------
@@ -195,8 +263,13 @@ Third-party dependencies
   libcurl                   — curl licence      — Daniel Stenberg et al.
     (optional, for the game picker's artwork scraping; linked from the
     system, not vendored under 3rdparty/)
+  Noto Sans Thai, Devanagari, Bengali, Tamil and Arabic
+                            — SIL OFL 1.1       — The Noto Project Authors
+    (subsets in data/lang/fonts, used only where the system has no font
+    for the script; licence in data/lang/fonts/OFL.txt and
+    LICENSES/OFL-1.1.txt)
 
 Sega, Model 1, Model 2, Virtua Fighter, Virtua Cop and Daytona USA are
-trademarks of their respective owners. sm2-emu is an independent work and is
+trademarks of their respective owners. Keisho is an independent work and is
 not affiliated with or endorsed by Sega. No copyrighted game data is
 distributed with this software.

@@ -1,14 +1,16 @@
-//  ____  __  __  ____         _____ __  __ _   _
-// / ___||  \/  ||___ \       | ____|  \/  | | | |
-// \___ \| |\/| |  __) |_____ |  _| | |\/| | | | |
-//  ___) | |  | | / __/|_____|| |___| |  | | |_| |
-// |____/|_|  |_||_____|      |_____|_|  |_|\___/
+// ██╗  ██╗███████╗██╗███████╗██╗  ██╗ ██████╗
+// ██║ ██╔╝██╔════╝██║██╔════╝██║  ██║██╔═══██╗
+// █████╔╝ █████╗  ██║███████╗███████║██║   ██║
+// ██╔═██╗ ██╔══╝  ██║╚════██║██╔══██║██║   ██║
+// ██║  ██╗███████╗██║███████║██║  ██║╚██████╔╝
+// ╚═╝  ╚═╝╚══════╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝
+//            継 承  ( k e i s h ō )
 //
-// A Sega Model 1 & 2 arcade emulator.
+// A Sega Model 1, 2 & 3 arcade emulator.
 // Copyright (c) 2025+ Daniel Martin (dmanlfc)
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// This header must not be removed. sm2-emu is licensed under the GNU General
+// This header must not be removed. Keisho is licensed under the GNU General
 // Public License, version 3 or later, with additional terms under section 7 of
 // that licence. See LICENSE and NOTICE.
 //
@@ -238,7 +240,6 @@ bool UdpSocket::open(const std::string& bind_ip, u16 port)
         return false;
     }
 
-    // Non-blocking.
 #if defined(_WIN32)
     u_long nonblock = 1;
     ioctlsocket(static_cast<SOCKET>(fd), FIONBIO, &nonblock);
@@ -295,8 +296,8 @@ bool UdpSocket::recv_from(std::vector<u8>& out)
 {
     if (m_fd == kInvalid) return false;
 
-    // Model 2 comm frames top out at 0x1000+1 bytes; a page is ample headroom.
-    u8 buffer[0x1200];
+    // Model 2 comm frames top out at 0x1001 bytes.
+    u8 buffer[0x10000];
     const auto n = ::recvfrom(
 #if defined(_WIN32)
         static_cast<SOCKET>(m_fd), reinterpret_cast<char*>(buffer), sizeof buffer,
@@ -312,10 +313,6 @@ bool UdpSocket::recv_from(std::vector<u8>& out)
     out.assign(buffer, buffer + n);
     return true;
 }
-
-// ---------------------------------------------------------------------------
-// Process startup / teardown
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // TcpServer
@@ -785,6 +782,10 @@ TcpStream TcpListener::accept()
     }
     return stream;
 }
+
+// ---------------------------------------------------------------------------
+// Process startup / teardown
+// ---------------------------------------------------------------------------
 
 #if defined(_WIN32)
 

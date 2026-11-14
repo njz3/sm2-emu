@@ -604,7 +604,7 @@ int run_agent(hw::Model2MachineBase& machine, hw::SoundBoard* sound, const rom::
     std::unique_ptr<Show> show;
     if (options.show) {
         show = std::make_unique<Show>();
-        if (!show->open("sm2-emu agent: " + game.name, sound, options.throttle, options.volume)) {
+        if (!show->open("Keisho agent: " + game.name, sound, options.throttle, options.volume)) {
             return 1;
         }
     }
